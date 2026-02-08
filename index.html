@@ -396,329 +396,314 @@ class TesseraService {
 
 const svc = new TesseraService();
 
-/* ═══════════════════ DEFINITION AUTHORITIES (§C.0) ═══════════════════ */
-const DEFAULT_AUTHORITIES = [
-  { id:'auth_hud_578_3', name:'24 CFR 578.3 — Homeless Definition',
-    uri:'https://www.ecfr.gov/current/title-24/subtitle-B/chapter-V/subchapter-C/part-578/subpart-A/section-578.3',
-    authority_type:'federal_regulation', authority_org:'HUD', version:'FY2025',
-    terms:[
-      {id:'cat_1',label:'Literally Homeless',uri_fragment:'578.3(b)(1)',
-       definition:'Individual who lacks a fixed, regular, and adequate nighttime residence'},
-      {id:'cat_2',label:'Imminent Risk of Homelessness',uri_fragment:'578.3(b)(2)',
-       definition:'Individual who will imminently lose primary nighttime residence within 14 days'},
-      {id:'cat_3',label:'Homeless Under Other Federal Statutes',uri_fragment:'578.3(b)(3)'},
-      {id:'cat_4',label:'Fleeing/Attempting to Flee DV',uri_fragment:'578.3(b)(4)'},
-    ]},
-  { id:'auth_hud_hmis_ds', name:'HUD HMIS Data Standards',
-    uri:'https://hudexchange.info/programs/hmis/hmis-data-standards/',
-    authority_type:'federal_standard', authority_org:'HUD', version:'FY2025',
-    terms:[
-      {id:'hmis_3_12',label:'Living Situation (3.12)',definition:'Current living situation at project entry'},
-      {id:'hmis_3_917',label:'Living Situation (3.917)',definition:'Current living situation at assessment'},
-      {id:'hmis_4_3',label:'Date of Birth (4.03)'},
-      {id:'hmis_3_1',label:'Name (3.01)'},
-      {id:'hmis_3_2',label:'SSN (3.02)'},
-    ]},
-  { id:'auth_211_airs', name:'211/AIRS Taxonomy',
-    uri:'https://211.org/taxonomy',
-    authority_type:'industry_standard', authority_org:'211/United Way', version:'v12',
-    terms:[
-      {id:'airs_bd',label:'Basic Needs / Housing',definition:'Service category for housing assistance'},
-      {id:'airs_lh',label:'Legal / Housing Rights',definition:'Legal services related to housing'},
-    ]},
-  { id:'auth_local_coc', name:'Local CoC Policy',
-    uri:'local://coc/policy', authority_type:'local_policy', authority_org:'CoC',
-    terms:[] },
-];
+/* ═══════════════════ DOMAIN CONFIG (§C.0) ═══════════════════
+ * All domain-specific content is consolidated here. To adapt Tessera for a
+ * different sector, replace the contents of DOMAIN_CONFIG — the application
+ * logic, encryption model, bridge topology, and EO operator layer are all
+ * domain-agnostic.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+const DOMAIN_CONFIG = {
 
-/* ═══════════════════ DEFAULT SCHEMA (§C) ═══════════════════ */
-const DEFAULT_PROMPTS = [
-  { id:'prompt_sleep_location', key:'sleep_location', question:'Where did you sleep last night?', type:'single_select',
-    version:1, audience:'client',
-    eo:{
-      chain:[
-        {op:'DES',target:{entity:'sleep_location',designation:'Sleep Location Prompt'},
-         frame:{type:'schema',epistemic:'MEANT',role:'network'}},
-        {op:'CON',target:{source:'sleep_location',destination:'hud:hmis_3.12'},
-         context:{authority_id:'auth_hud_hmis_ds',element:'hmis_3_12',
-                  authority_name:'HUD HMIS Data Standards'}},
-        {op:'SEG',target:{field:'response_options',entity:'sleep_location'},
-         context:{rationale:'Simplified from full HMIS 3.12 for field use',
-                  excluded:['foster_care','long_term_care']}}
-      ],
-      trace:'sleep_location = DES → CON(hud:hmis_3.12) → SEG({field simplified})'
-    },
-    options:[
-      {v:'own_housing',l:'Own apartment or house (with lease)',
-       eo:{op:'SYN',target:{local:'own_housing',external:'hud:hmis_3.12:1'}}},
-      {v:'other_housing',l:"Someone else's apartment or house",
-       eo:{op:'SYN',target:{local:'other_housing',external:'hud:hmis_3.12:2'}}},
-      {v:'shelter',l:'Emergency shelter',
-       eo:{op:'SYN',target:{local:'shelter',external:'hud:hmis_3.12:3'}}},
-      {v:'transitional',l:'Transitional housing',
-       eo:{op:'SYN',target:{local:'transitional',external:'hud:hmis_3.12:4'}}},
-      {v:'hotel_paid',l:'Hotel or motel',
-       eo:{op:'SYN',target:{local:'hotel_paid',external:'hud:hmis_3.12:5'}}},
-      {v:'vehicle',l:'Car, van, or RV',
-       eo:{op:'SYN',target:{local:'vehicle',external:'hud:hmis_3.12:7'}}},
-      {v:'encampment',l:'Tent or encampment',
-       eo:{op:'SYN',target:{local:'encampment',external:'hud:hmis_3.12:16'}}},
-      {v:'unsheltered',l:'Street, park, or unsheltered',
-       eo:{op:'SYN',target:{local:'unsheltered',external:'hud:hmis_3.12:16'},
-           context:{note:'Collapsed with encampment — SEG of two HUD codes into one option'}}},
-      {v:'institutional',l:'Hospital, treatment, or jail',
-       eo:{op:'SYN',target:{local:'institutional',external:'hud:hmis_3.12:8'}}},
-      {v:'other',l:'Other',
-       eo:{op:'INS',target:{local:'other'},context:{note:'Catch-all not in HUD taxonomy'}}}
-    ],
-    category:'housing', sensitive:false, metrics:true },
-  { id:'prompt_service_contact', key:'service_contact', question:'What service contact occurred?', type:'single_select',
-    version:1, audience:'client',
-    eo:{
-      chain:[
-        {op:'DES',target:{entity:'service_contact',designation:'Service Contact Prompt'},
-         frame:{type:'schema',epistemic:'MEANT',role:'network'}},
-        {op:'CON',target:{source:'service_contact',destination:'airs:service_types'},
-         context:{authority_id:'auth_211_airs',authority_name:'211/AIRS Taxonomy'}}
-      ],
-      trace:'service_contact = DES → CON(airs:service_types)'
-    },
-    options:[
-      {v:'case_meeting',l:'Met with caseworker'},{v:'phone_call',l:'Phone call with provider'},
-      {v:'called_211',l:'Called 211/helpline',eo:{op:'CON',target:{local:'called_211',external:'airs:bd'}}},
-      {v:'shelter_intake',l:'Shelter intake'},{v:'housing_app',l:'Housing application submitted'},{v:'other',l:'Other'}],
-    category:'services', sensitive:false, metrics:true },
-  { id:'prompt_document_event', key:'document_event', question:'What document event occurred?', type:'single_select',
-    version:1, audience:'client',
-    eo:{
-      chain:[
-        {op:'DES',target:{entity:'document_event',designation:'Document Event Prompt'},
-         frame:{type:'schema',epistemic:'MEANT',role:'network'}}
-      ],
-      trace:'document_event = DES'
-    },
-    options:[
-      {v:'lease_signed',l:'Lease signed'},{v:'eviction_notice',l:'Eviction notice received'},{v:'eviction_filed',l:'Eviction filed'},
-      {v:'voucher_issued',l:'Housing voucher issued'},{v:'id_obtained',l:'ID/document obtained'},{v:'benefits_approved',l:'Benefits approved'},{v:'other',l:'Other'}],
-    category:'documents', sensitive:false, metrics:true },
-  { id:'prompt_income_event', key:'income_event', question:'What income change occurred?', type:'single_select',
-    version:1, audience:'client',
-    eo:{
-      chain:[
-        {op:'DES',target:{entity:'income_event',designation:'Income Event Prompt'},
-         frame:{type:'schema',epistemic:'MEANT',role:'network'}}
-      ],
-      trace:'income_event = DES'
-    },
-    options:[
-      {v:'started_job',l:'Started new job'},{v:'lost_job',l:'Lost job'},{v:'received_benefit',l:'Received benefit'},
-      {v:'income_increase',l:'Income increased'},{v:'income_decrease',l:'Income decreased'},{v:'other',l:'Other'}],
-    category:'financial', sensitive:false, metrics:true },
-  { id:'prompt_health_event', key:'health_event', question:'What health event occurred?', type:'single_select',
-    version:1, audience:'client',
-    eo:{
-      chain:[
-        {op:'DES',target:{entity:'health_event',designation:'Health Event Prompt'},
-         frame:{type:'schema',epistemic:'MEANT',role:'network'}}
-      ],
-      trace:'health_event = DES'
-    },
-    options:[
-      {v:'er_visit',l:'Visited ER'},{v:'filled_rx',l:'Filled prescription'},{v:'missed_appt',l:'Missed appointment'},
-      {v:'new_diagnosis',l:'New diagnosis'},{v:'treatment_started',l:'Treatment started'},{v:'other',l:'Other'}],
-    category:'medical', sensitive:true, metrics:true },
-];
+  /* ── Authorities ── */
+  authorities: [
+    { id:'auth_org_policy', name:'Organization Policy v1',
+      uri:'local://org/policy',
+      authority_type:'organizational_policy', authority_org:'Organization', version:'v1',
+      terms:[
+        {id:'policy_1',label:'Eligibility Criteria',
+         definition:'Conditions under which an individual qualifies for services'},
+        {id:'policy_2',label:'Service Standards',
+         definition:'Required standards for service delivery'},
+        {id:'policy_3',label:'Data Collection Requirements',
+         definition:'Mandatory data elements for intake and ongoing engagement'},
+      ]},
+    { id:'auth_ext_standard', name:'External Reporting Standard',
+      uri:'local://ext/standard',
+      authority_type:'external_standard', authority_org:'Regulatory Body', version:'v1',
+      terms:[
+        {id:'ext_1',label:'Status Classification (1.01)',
+         definition:'Current status at point of engagement'},
+        {id:'ext_2',label:'Engagement Type (1.02)',
+         definition:'Nature of service engagement'},
+        {id:'ext_3',label:'Identity Elements (2.01)'},
+        {id:'ext_4',label:'Contact Elements (2.02)'},
+      ]},
+    { id:'auth_service_taxonomy', name:'Service Taxonomy',
+      uri:'local://service/taxonomy',
+      authority_type:'industry_standard', authority_org:'Standards Body', version:'v1',
+      terms:[
+        {id:'svc_cat_1',label:'Direct Services',definition:'Services delivered to individuals'},
+        {id:'svc_cat_2',label:'Coordination Services',definition:'Referral and linkage services'},
+      ]},
+    { id:'auth_local_policy', name:'Local Policy',
+      uri:'local://local/policy', authority_type:'local_policy', authority_org:'Local Authority',
+      terms:[] },
+  ],
 
-/* ═══════════════════ PROVIDER-SIDE PROMPTS (§C.1) ═══════════════════ */
-const DEFAULT_PROVIDER_PROMPTS = [
-  { id:'pprompt_vispdat', key:'vi_spdat_score', question:'VI-SPDAT Score', type:'numeric',
-    version:1, audience:'provider',
-    eo:{
-      chain:[
-        {op:'DES',target:{entity:'vi_spdat_score',designation:'VI-SPDAT Assessment Score'},
-         frame:{type:'schema',epistemic:'MEANT',role:'provider'}},
-        {op:'CON',target:{source:'vi_spdat_score',destination:'orgcode:vi-spdat-v3'},
-         context:{authority_name:'OrgCode Consulting',note:'Vulnerability Index - Service Prioritization Decision Assistance Tool'}}
+  /* ── Client Observation Prompts ── */
+  clientPrompts: [
+    { id:'prompt_current_status', key:'current_status', question:'What is your current status?', type:'single_select',
+      version:1, audience:'client',
+      eo:{
+        chain:[
+          {op:'DES',target:{entity:'current_status',designation:'Current Status Prompt'},
+           frame:{type:'schema',epistemic:'MEANT',role:'network'}},
+          {op:'CON',target:{source:'current_status',destination:'ext:standard_1.01'},
+           context:{authority_id:'auth_ext_standard',element:'ext_1',
+                    authority_name:'External Reporting Standard'}},
+          {op:'SEG',target:{field:'response_options',entity:'current_status'},
+           context:{rationale:'Simplified from full reporting standard for field use',
+                    excluded:['administrative_hold','archived']}}
+        ],
+        trace:'current_status = DES → CON(ext:standard_1.01) → SEG({field simplified})'
+      },
+      options:[
+        {v:'active',l:'Active — currently receiving services',
+         eo:{op:'SYN',target:{local:'active',external:'ext:standard_1.01:a'}}},
+        {v:'on_hold',l:'On hold — temporarily paused',
+         eo:{op:'SYN',target:{local:'on_hold',external:'ext:standard_1.01:b'}}},
+        {v:'pending_review',l:'Pending review',
+         eo:{op:'SYN',target:{local:'pending_review',external:'ext:standard_1.01:c'}}},
+        {v:'resolved',l:'Resolved — services completed',
+         eo:{op:'SYN',target:{local:'resolved',external:'ext:standard_1.01:d'}}},
+        {v:'other',l:'Other',
+         eo:{op:'INS',target:{local:'other'},context:{note:'Catch-all not in reporting taxonomy'}}}
       ],
-      trace:'vi_spdat_score = DES → CON(orgcode:vi-spdat-v3)'
-    },
-    range:{min:0,max:20}, thresholds:[{v:0,l:'No intervention'},{v:4,l:'Rapid rehousing'},{v:8,l:'Permanent supportive housing'}],
-    category:'assessment', sensitive:true, metrics:true },
-  { id:'pprompt_phq9', key:'phq9_score', question:'PHQ-9 Depression Score', type:'numeric',
-    version:1, audience:'provider',
-    eo:{
-      chain:[
-        {op:'DES',target:{entity:'phq9_score',designation:'PHQ-9 Score'},
-         frame:{type:'schema',epistemic:'MEANT',role:'provider'}},
-        {op:'CON',target:{source:'phq9_score',destination:'phq:phq-9'},
-         context:{authority_name:'Pfizer / Columbia University',note:'Patient Health Questionnaire-9'}}
-      ],
-      trace:'phq9_score = DES → CON(phq:phq-9)'
-    },
-    range:{min:0,max:27}, thresholds:[{v:0,l:'Minimal'},{v:5,l:'Mild'},{v:10,l:'Moderate'},{v:15,l:'Moderately severe'},{v:20,l:'Severe'}],
-    category:'assessment', sensitive:true, metrics:true },
-  { id:'pprompt_housing_placement', key:'housing_placement', question:'Housing placement status?', type:'single_select',
-    version:1, audience:'provider',
-    eo:{
-      chain:[
-        {op:'DES',target:{entity:'housing_placement',designation:'Housing Placement Status'},
-         frame:{type:'schema',epistemic:'MEANT',role:'provider'}},
-        {op:'CON',target:{source:'housing_placement',destination:'hud:hmis_3.12'},
-         context:{authority_id:'auth_hud_hmis_ds',element:'hmis_3_12'}}
-      ],
-      trace:'housing_placement = DES → CON(hud:hmis_3.12)'
-    },
-    options:[
-      {v:'not_started',l:'Not yet started'},{v:'document_gathering',l:'Gathering documents'},
-      {v:'application_submitted',l:'Application submitted'},{v:'waitlisted',l:'Waitlisted'},
-      {v:'voucher_issued',l:'Voucher issued'},{v:'unit_search',l:'Searching for unit'},
-      {v:'lease_signed',l:'Lease signed'},{v:'moved_in',l:'Moved in'},{v:'stabilized',l:'Stably housed 90+ days'}],
-    category:'case_management', sensitive:false, metrics:true },
-  { id:'pprompt_service_plan', key:'service_plan_status', question:'Service plan milestone?', type:'single_select',
-    version:1, audience:'provider',
-    eo:{
-      chain:[
-        {op:'DES',target:{entity:'service_plan_status',designation:'Service Plan Status'},
-         frame:{type:'schema',epistemic:'MEANT',role:'provider'}}
-      ],
-      trace:'service_plan_status = DES'
-    },
-    options:[
-      {v:'intake_complete',l:'Intake completed'},{v:'plan_created',l:'Plan created'},
-      {v:'in_progress',l:'Services in progress'},{v:'milestone_met',l:'Milestone achieved'},
-      {v:'plan_updated',l:'Plan updated'},{v:'goal_achieved',l:'Goal achieved'},
-      {v:'case_closed',l:'Case closed — stable'},{v:'case_closed_lost',l:'Case closed — lost contact'}],
-    category:'case_management', sensitive:false, metrics:true },
-  { id:'pprompt_referral', key:'referral_status', question:'Referral status?', type:'single_select',
-    version:1, audience:'provider',
-    eo:{
-      chain:[
-        {op:'DES',target:{entity:'referral_status',designation:'Referral Status'},
-         frame:{type:'schema',epistemic:'MEANT',role:'provider'}},
-        {op:'CON',target:{source:'referral_status',destination:'airs:referral'},
-         context:{authority_id:'auth_211_airs'}}
-      ],
-      trace:'referral_status = DES → CON(airs:referral)'
-    },
-    options:[
-      {v:'identified',l:'Need identified'},{v:'referral_sent',l:'Referral sent'},
-      {v:'accepted',l:'Accepted by receiving org'},{v:'scheduled',l:'Appointment scheduled'},
-      {v:'completed',l:'Service completed'},{v:'declined',l:'Client declined'},{v:'no_capacity',l:'Receiving org at capacity'}],
-    category:'coordination', sensitive:false, metrics:true },
-];
+      category:'status', sensitive:false, metrics:true },
+    { id:'prompt_engagement', key:'engagement_type', question:'What engagement occurred?', type:'single_select',
+      version:1, audience:'client',
+      eo:{
+        chain:[
+          {op:'DES',target:{entity:'engagement_type',designation:'Engagement Type Prompt'},
+           frame:{type:'schema',epistemic:'MEANT',role:'network'}},
+          {op:'CON',target:{source:'engagement_type',destination:'svc:direct_services'},
+           context:{authority_id:'auth_service_taxonomy',authority_name:'Service Taxonomy'}}
+        ],
+        trace:'engagement_type = DES → CON(svc:direct_services)'
+      },
+      options:[
+        {v:'in_person',l:'In-person meeting'},{v:'phone_call',l:'Phone call'},
+        {v:'referral_contact',l:'Referral or linkage',eo:{op:'CON',target:{local:'referral_contact',external:'svc:svc_cat_2'}}},
+        {v:'intake',l:'Intake or enrollment'},{v:'follow_up',l:'Follow-up contact'},{v:'other',l:'Other'}],
+      category:'engagement', sensitive:false, metrics:true },
+    { id:'prompt_intake_event', key:'intake_event', question:'What intake event occurred?', type:'single_select',
+      version:1, audience:'client',
+      eo:{
+        chain:[
+          {op:'DES',target:{entity:'intake_event',designation:'Intake Event Prompt'},
+           frame:{type:'schema',epistemic:'MEANT',role:'network'}}
+        ],
+        trace:'intake_event = DES'
+      },
+      options:[
+        {v:'application_submitted',l:'Application submitted'},{v:'documents_provided',l:'Documents provided'},
+        {v:'eligibility_confirmed',l:'Eligibility confirmed'},{v:'enrolled',l:'Enrolled in program'},
+        {v:'waitlisted',l:'Placed on waitlist'},{v:'other',l:'Other'}],
+      category:'intake', sensitive:false, metrics:true },
+    { id:'prompt_additional_context', key:'additional_context', question:'Any additional context to record?', type:'single_select',
+      version:1, audience:'client',
+      eo:{
+        chain:[
+          {op:'DES',target:{entity:'additional_context',designation:'Additional Context Prompt'},
+           frame:{type:'schema',epistemic:'MEANT',role:'network'}}
+        ],
+        trace:'additional_context = DES'
+      },
+      options:[
+        {v:'situation_change',l:'Situation changed'},{v:'new_need',l:'New need identified'},
+        {v:'barrier_encountered',l:'Barrier encountered'},{v:'milestone_reached',l:'Milestone reached'},{v:'other',l:'Other'}],
+      category:'general', sensitive:true, metrics:true },
+  ],
 
-const DEFAULT_DEFINITIONS = [
-  { id:'def_housing_status_hud_2025', key:'housing_status', name:'Housing Status (HUD FY2025)', type:'classification_rule',
-    version:1,
-    eo:{
-      chain:[
-        {op:'DES',target:{entity:'housing_status',designation:'HUD Homeless Categories'},
-         frame:{type:'schema',epistemic:'MEANT',role:'network'}},
-        {op:'CON',target:{source:'housing_status',destination:'24cfr578.3'},
-         context:{authority_id:'auth_hud_578_3',
-                  authority_name:'24 CFR 578.3',version:'FY2025'}},
-        {op:'SEG',target:{field:'categories',entity:'housing_status'},
-         context:{included:['cat_1','cat_2'],excluded:['cat_3','cat_4'],
-                  rationale:'Network outreach prioritizes literally and imminently homeless'}}
-      ],
-      trace:'housing_status = DES → CON(24 CFR 578.3) → SEG({Categories 1-2})'
-    },
-    rules:[
-      {category:'literally_homeless', criteria:'sleep_location IN (vehicle,encampment,unsheltered)', hud:1,
-       eo:{
-         chain:[
-           {op:'SYN',target:{local:'literally_homeless',external:'24cfr578.3(b)(1)'}},
-           {op:'CON',target:{source:'literally_homeless',destination:'sleep_location'},
-            context:{derivation:'Classification derived from observation',
-                     epistemic_crossing:'GIVEN → MEANT',
-                     note:'Observation (where did you sleep) is GIVEN; classification (literally homeless) is MEANT'}}
-         ]}},
-      {category:'imminently_homeless', criteria:'document_event=eviction_notice in 14 days AND no own_housing', hud:2,
-       eo:{
-         chain:[
-           {op:'SYN',target:{local:'imminently_homeless',external:'24cfr578.3(b)(2)'}},
-           {op:'CON',target:{source:'imminently_homeless',destination:'document_event'},
-            context:{derivation:'Classification derived from document observation + sleep location',
-                     epistemic_crossing:'GIVEN → MEANT'}}
-         ]}},
-      {category:'stably_housed', criteria:'sleep_location=own_housing for 30+ days', hud:null,
-       eo:{
-         chain:[
-           {op:'DES',target:{entity:'stably_housed',designation:'Stably Housed'},
-            context:{note:'Local definition — no direct HUD equivalent'}},
-           {op:'CON',target:{source:'stably_housed',destination:'sleep_location'},
-            context:{derivation:'Classification from sustained observation pattern',
-                     epistemic_crossing:'GIVEN → MEANT'}}
-         ]}},
-    ]},
-  { id:'def_chronic_homelessness', key:'chronic_homelessness', name:'Chronic Homelessness', type:'classification_rule',
-    version:1,
-    eo:{
-      chain:[
-        {op:'DES',target:{entity:'chronic_homelessness',designation:'Chronic Homelessness Definition'},
-         frame:{type:'schema',epistemic:'MEANT',role:'network'}},
-        {op:'CON',target:{source:'chronic_homelessness',destination:'24cfr578.3'},
-         context:{authority_id:'auth_hud_578_3',
-                  authority_name:'24 CFR 578.3',version:'FY2025'}},
-        {op:'SUP',target:{entity:'chronic_homelessness',field:'definition'},
-         context:{
-           states:[
-             {source:'24cfr578.3',definition:'12 months continuous OR 4 episodes in 3 years totaling 12 months',
-              frame:'federal_compliance'},
-             {source:'local_coc_policy',definition:'6 months continuous OR 3 episodes in 2 years',
-              frame:'local_outreach_priority'}
-           ],
-           resolution:null,
-           note:'Federal definition used for HUD reporting; local definition used for outreach prioritization'
-         }}
-      ],
-      trace:'chronic_homelessness = DES → CON(24 CFR 578.3) → SUP({federal vs local})'
-    },
-    rules:[
-      {category:'chronic_federal', criteria:'literally_homeless for 12+ months continuous OR 4+ episodes in 3 years', hud:'chronic',
-       eo:{chain:[{op:'SYN',target:{local:'chronic_federal',external:'24cfr578.3'}}]}},
-      {category:'chronic_local', criteria:'literally_homeless for 6+ months continuous OR 3+ episodes in 2 years', hud:null,
-       eo:{chain:[{op:'DES',target:{entity:'chronic_local'},context:{note:'Local CoC threshold — lower bar for outreach'}}]}},
-    ]},
-];
+  /* ── Provider-Side Prompts ── */
+  providerPrompts: [
+    { id:'pprompt_assessment_score', key:'assessment_score', question:'Assessment Score', type:'numeric',
+      version:1, audience:'provider',
+      eo:{
+        chain:[
+          {op:'DES',target:{entity:'assessment_score',designation:'Assessment Score'},
+           frame:{type:'schema',epistemic:'MEANT',role:'provider'}},
+          {op:'CON',target:{source:'assessment_score',destination:'org:assessment-v1'},
+           context:{authority_name:'Organization Policy',note:'Standard assessment instrument'}}
+        ],
+        trace:'assessment_score = DES → CON(org:assessment-v1)'
+      },
+      range:{min:0,max:10}, thresholds:[{v:0,l:'Low'},{v:4,l:'Medium'},{v:7,l:'High'}],
+      category:'assessment', sensitive:true, metrics:true },
+    { id:'pprompt_case_stage', key:'case_stage', question:'Case stage?', type:'single_select',
+      version:1, audience:'provider',
+      eo:{
+        chain:[
+          {op:'DES',target:{entity:'case_stage',designation:'Case Stage'},
+           frame:{type:'schema',epistemic:'MEANT',role:'provider'}}
+        ],
+        trace:'case_stage = DES'
+      },
+      options:[
+        {v:'intake',l:'Intake'},{v:'active',l:'Active'},
+        {v:'monitoring',l:'Monitoring'},{v:'closed_complete',l:'Closed — completed'},
+        {v:'closed_withdrawn',l:'Closed — withdrawn'},{v:'closed_lost',l:'Closed — lost contact'}],
+      category:'case_management', sensitive:false, metrics:true },
+    { id:'pprompt_referral', key:'referral_status', question:'Referral status?', type:'single_select',
+      version:1, audience:'provider',
+      eo:{
+        chain:[
+          {op:'DES',target:{entity:'referral_status',designation:'Referral Status'},
+           frame:{type:'schema',epistemic:'MEANT',role:'provider'}},
+          {op:'CON',target:{source:'referral_status',destination:'svc:coordination'},
+           context:{authority_id:'auth_service_taxonomy'}}
+        ],
+        trace:'referral_status = DES → CON(svc:coordination)'
+      },
+      options:[
+        {v:'identified',l:'Need identified'},{v:'referred',l:'Referred'},
+        {v:'scheduled',l:'Appointment scheduled'},{v:'completed',l:'Service completed'},
+        {v:'declined',l:'Declined'},{v:'no_capacity',l:'Receiving org at capacity'}],
+      category:'coordination', sensitive:false, metrics:true },
+  ],
 
-const DEFAULT_TRANSFORMS = {
-  dob:{method:'age_range',buckets:['0-17','18-24','25-34','35-44','45-54','55-64','65+']},
-  address:{method:'census_tract'}, income:{method:'bracket',buckets:['0-15k','15k-25k','25k-35k','35k-50k','50k-75k','75k+']},
-  full_name:{method:'block'}, gov_id:{method:'block'}, phone:{method:'block'}, email:{method:'block'},
+  /* ── Classification Definitions ── */
+  definitions: [
+    { id:'def_priority_level', key:'priority_level', name:'Priority Level', type:'classification_rule',
+      version:1,
+      eo:{
+        chain:[
+          {op:'DES',target:{entity:'priority_level',designation:'Priority Level Classification'},
+           frame:{type:'schema',epistemic:'MEANT',role:'network'}},
+          {op:'CON',target:{source:'priority_level',destination:'org:policy_1'},
+           context:{authority_id:'auth_org_policy',
+                    authority_name:'Organization Policy v1',version:'v1'}},
+          {op:'SEG',target:{field:'categories',entity:'priority_level'},
+           context:{included:['priority_a','priority_b'],excluded:['priority_d'],
+                    rationale:'Network prioritizes highest-need categories'}}
+        ],
+        trace:'priority_level = DES → CON(org:policy_1) → SEG({Categories A-B})'
+      },
+      rules:[
+        {category:'priority_a', criteria:'current_status IN (active) AND assessment_score >= 7', authority_code:'A',
+         eo:{
+           chain:[
+             {op:'SYN',target:{local:'priority_a',external:'org:policy_1(a)'}},
+             {op:'CON',target:{source:'priority_a',destination:'current_status'},
+              context:{derivation:'Classification derived from observation',
+                       epistemic_crossing:'GIVEN → MEANT',
+                       note:'Observation (current status) is GIVEN; classification (priority A) is MEANT'}}
+           ]}},
+        {category:'priority_b', criteria:'intake_event=eligibility_confirmed AND engagement_type != none', authority_code:'B',
+         eo:{
+           chain:[
+             {op:'SYN',target:{local:'priority_b',external:'org:policy_1(b)'}},
+             {op:'CON',target:{source:'priority_b',destination:'intake_event'},
+              context:{derivation:'Classification derived from intake observation + engagement',
+                       epistemic_crossing:'GIVEN → MEANT'}}
+           ]}},
+        {category:'stable', criteria:'current_status=resolved for 30+ days', authority_code:null,
+         eo:{
+           chain:[
+             {op:'DES',target:{entity:'stable',designation:'Stable'},
+              context:{note:'Local definition — no direct external equivalent'}},
+             {op:'CON',target:{source:'stable',destination:'current_status'},
+              context:{derivation:'Classification from sustained observation pattern',
+                       epistemic_crossing:'GIVEN → MEANT'}}
+           ]}},
+      ]},
+    { id:'def_extended_engagement', key:'extended_engagement', name:'Extended Engagement', type:'classification_rule',
+      version:1,
+      eo:{
+        chain:[
+          {op:'DES',target:{entity:'extended_engagement',designation:'Extended Engagement Definition'},
+           frame:{type:'schema',epistemic:'MEANT',role:'network'}},
+          {op:'CON',target:{source:'extended_engagement',destination:'org:policy_1'},
+           context:{authority_id:'auth_org_policy',
+                    authority_name:'Organization Policy v1',version:'v1'}},
+          {op:'SUP',target:{entity:'extended_engagement',field:'definition'},
+           context:{
+             states:[
+               {source:'org:policy_1',definition:'12 months continuous OR 4 engagement episodes in 3 years',
+                frame:'organization_standard'},
+               {source:'local_policy',definition:'6 months continuous OR 3 episodes in 2 years',
+                frame:'local_practice'}
+             ],
+             resolution:null,
+             note:'Organization definition used for reporting; local definition used for prioritization'
+           }}
+        ],
+        trace:'extended_engagement = DES → CON(org:policy_1) → SUP({org vs local})'
+      },
+      rules:[
+        {category:'extended_org', criteria:'active engagement for 12+ months continuous OR 4+ episodes in 3 years', authority_code:'ext',
+         eo:{chain:[{op:'SYN',target:{local:'extended_org',external:'org:policy_1'}}]}},
+        {category:'extended_local', criteria:'active engagement for 6+ months continuous OR 3+ episodes in 2 years', authority_code:null,
+         eo:{chain:[{op:'DES',target:{entity:'extended_local'},context:{note:'Local threshold — lower bar for outreach'}}]}},
+      ]},
+  ],
+
+  /* ── Anonymization Transforms ── */
+  transforms: {
+    dob:{method:'age_range',buckets:['0-17','18-24','25-34','35-44','45-54','55-64','65+']},
+    address:{method:'area_hash'},
+    full_name:{method:'block'}, id_number:{method:'block'}, phone:{method:'block'}, email:{method:'block'},
+  },
+
+  /* ── Vault Fields ── */
+  vaultFields: [
+    {key:'full_name',label:'Full Name',category:'identity',sensitive:false},
+    {key:'dob',label:'Date of Birth',category:'identity',sensitive:true},
+    {key:'id_number',label:'ID Number',category:'identity',sensitive:true},
+    {key:'email',label:'Email',category:'contact',sensitive:false},
+    {key:'phone',label:'Phone',category:'contact',sensitive:false},
+    {key:'address',label:'Address',category:'contact',sensitive:true},
+    {key:'affiliation',label:'Organization / Affiliation',category:'details',sensitive:false},
+    {key:'case_notes',label:'Case Notes',category:'case',sensitive:false},
+    {key:'documents',label:'Documents',category:'case',sensitive:true},
+    {key:'history',label:'Case History',category:'case',sensitive:false},
+    {key:'restricted_notes',label:'Restricted Notes',category:'sensitive',sensitive:true},
+  ],
+
+  /* ── Field Categories ── */
+  fieldCategories: ['identity','contact','details','case','sensitive'],
+  fieldCatLabels: {identity:'Identity',contact:'Contact',details:'Details',case:'Case',sensitive:'Sensitive'},
+  fieldCatIcons: {identity:'user',contact:'msg',details:'briefcase',case:'folder',sensitive:'shieldCheck'},
+  fieldCatColors: {identity:'blue',contact:'teal',details:'gold',case:'orange',sensitive:'green'},
+
+  /* ── Observation Categories ── */
+  obsCatLabels: {status:'Status',engagement:'Engagement',intake:'Intake',general:'General',
+    assessment:'Assessment',case_management:'Case Mgmt',coordination:'Coordination'},
+  obsCatColors: {status:'teal',engagement:'blue',intake:'orange',general:'gold',
+    assessment:'purple',case_management:'gold',coordination:'blue'},
+
+  /* ── Org Roles ── */
+  orgRoles: ['admin','case_manager','field_worker','intake_coordinator','read_only'],
+  orgRoleLabels: {admin:'Admin',case_manager:'Case Manager',field_worker:'Field Worker',
+    intake_coordinator:'Intake Coordinator',read_only:'Read Only'},
+
+  /* ── Org Types ── */
+  orgTypes: ['direct_service','administrative','clinical','legal','coordinating_body','advocacy','other'],
+  orgTypeLabels: {direct_service:'Direct Service',administrative:'Administrative',clinical:'Clinical',
+    legal:'Legal',coordinating_body:'Coordinating Body',advocacy:'Advocacy',other:'Other'},
 };
 
+/* ── Derived constants (backward-compatible references) ── */
+const DEFAULT_AUTHORITIES = DOMAIN_CONFIG.authorities;
+const DEFAULT_PROMPTS = DOMAIN_CONFIG.clientPrompts;
+const DEFAULT_PROVIDER_PROMPTS = DOMAIN_CONFIG.providerPrompts;
+const DEFAULT_DEFINITIONS = DOMAIN_CONFIG.definitions;
+const DEFAULT_TRANSFORMS = DOMAIN_CONFIG.transforms;
+
 /* ═══════════════════ VAULT FIELD DEFINITIONS (§10) ═══════════════════ */
-const VAULT_FIELDS = [
-  {key:'full_name',label:'Full Name',category:'identity',sensitive:false},
-  {key:'dob',label:'Date of Birth',category:'identity',sensitive:true},
-  {key:'gov_id',label:'SSN / Gov ID',category:'identity',sensitive:true},
-  {key:'email',label:'Email',category:'contact',sensitive:false},
-  {key:'phone',label:'Phone',category:'contact',sensitive:false},
-  {key:'address',label:'Address',category:'contact',sensitive:true},
-  {key:'employer',label:'Employer',category:'financial',sensitive:false},
-  {key:'income',label:'Annual Income',category:'financial',sensitive:true},
-  {key:'case_notes',label:'Case Notes',category:'case',sensitive:false},
-  {key:'documents',label:'Documents',category:'case',sensitive:true},
-  {key:'history',label:'Case History',category:'case',sensitive:false},
-  {key:'medical',label:'Medical Info',category:'medical',sensitive:true},
-];
-const FIELD_CATEGORIES = ['identity','contact','financial','case','medical'];
-const CAT_LABELS = {identity:'Identity',contact:'Contact',financial:'Financial',case:'Case',medical:'Medical'};
-const CAT_ICONS = {identity:'user',contact:'msg',financial:'briefcase',case:'folder',medical:'shieldCheck'};
-const CAT_COLORS = {identity:'blue',contact:'teal',financial:'gold',case:'orange',medical:'green'};
-const OBS_CAT_LABELS = {housing:'Housing',services:'Services',documents:'Documents',financial:'Financial',medical:'Medical',
-  assessment:'Assessment',case_management:'Case Mgmt',coordination:'Coordination'};
-const OBS_CAT_COLORS = {housing:'teal',services:'blue',documents:'orange',financial:'gold',medical:'green',
-  assessment:'purple',case_management:'gold',coordination:'blue'};
+const VAULT_FIELDS = DOMAIN_CONFIG.vaultFields;
+const FIELD_CATEGORIES = DOMAIN_CONFIG.fieldCategories;
+const CAT_LABELS = DOMAIN_CONFIG.fieldCatLabels;
+const CAT_ICONS = DOMAIN_CONFIG.fieldCatIcons;
+const CAT_COLORS = DOMAIN_CONFIG.fieldCatColors;
+const OBS_CAT_LABELS = DOMAIN_CONFIG.obsCatLabels;
+const OBS_CAT_COLORS = DOMAIN_CONFIG.obsCatColors;
 
 /* ═══════════════════ ORG ROLES & TYPES ═══════════════════ */
-const ORG_ROLES = ['admin','case_manager','outreach_worker','intake_coordinator','read_only'];
-const ORG_ROLE_LABELS = {admin:'Admin',case_manager:'Case Manager',outreach_worker:'Outreach Worker',
-  intake_coordinator:'Intake Coordinator',read_only:'Read Only'};
-const ORG_TYPES = ['shelter','outreach','legal_aid','clinic','coc_lead','day_center','transitional','other'];
-const ORG_TYPE_LABELS = {shelter:'Emergency Shelter',outreach:'Street Outreach',legal_aid:'Legal Aid',
-  clinic:'Health Clinic',coc_lead:'CoC Lead Agency',day_center:'Day Center',transitional:'Transitional Housing',other:'Other'};
+const ORG_ROLES = DOMAIN_CONFIG.orgRoles;
+const ORG_ROLE_LABELS = DOMAIN_CONFIG.orgRoleLabels;
+const ORG_TYPES = DOMAIN_CONFIG.orgTypes;
+const ORG_TYPE_LABELS = DOMAIN_CONFIG.orgTypeLabels;
 
 /* ═══════════════════ ANONYMIZATION (§B.2) ═══════════════════ */
 function anonymizeField(key, value) {
@@ -733,9 +718,9 @@ function anonymizeField(key, value) {
   if (t.method === 'bracket' && value) {
     const num = parseFloat(String(value).replace(/[^0-9.]/g,''));
     const bucket = t.buckets.find(b => {const p=b.replace(/k/g,'000').split('-');return num>=parseFloat(p[0])&&(!p[1]||num<parseFloat(p[1]));});
-    return {key:'income_bracket', value:bucket||t.buckets[t.buckets.length-1]};
+    return {key:'bracket', value:bucket||t.buckets[t.buckets.length-1]};
   }
-  if (t.method === 'census_tract') return {key:'geo', value:value?`area_${Math.abs([...value].reduce((h,c)=>((h<<5)-h+c.charCodeAt(0))|0,0)).toString(36).slice(0,6)}`:null};
+  if (t.method === 'area_hash') return {key:'geo', value:value?`area_${Math.abs([...value].reduce((h,c)=>((h<<5)-h+c.charCodeAt(0))|0,0)).toString(36).slice(0,6)}`:null};
   return {key, value};
 }
 
@@ -1053,7 +1038,7 @@ const AccountTypeScreen = ({onSelect}) => (
         {[
           {type:'client',icon:'shield',title:'Client',desc:'Own your data vault. Record observations. Share specific fields with chosen providers. Revoke access at any time.',color:'teal',tag:'DATA OWNER'},
           {type:'provider',icon:'briefcase',title:'Provider',desc:'Join an existing organization or work independently. View only what clients share. Add case notes and assessments.',color:'gold',tag:'INDIVIDUAL'},
-          {type:'organization',icon:'users',title:'Organization',desc:'Create an org (shelter, outreach team, clinic). Invite staff with roles. Manage cases across your team. Join networks.',color:'blue',tag:'ORG ADMIN'},
+          {type:'organization',icon:'users',title:'Organization',desc:'Create an org (direct service, coordinating body, clinical practice). Invite staff with roles. Manage cases across your team. Join networks.',color:'blue',tag:'ORG ADMIN'},
         ].map(o=><div key={o.type} className="card-h" onClick={()=>onSelect(o.type)} style={{width:250,textAlign:'left',padding:28}}>
           <div style={{width:48,height:48,borderRadius:'var(--r-lg)',background:`var(--${o.color}-dim)`,display:'flex',alignItems:'center',justifyContent:'center',color:`var(--${o.color})`,marginBottom:16}}><I n={o.icon} s={24}/></div>
           <h3 style={{fontSize:18,fontWeight:700,marginBottom:8}}>{o.title}</h3>
@@ -1497,7 +1482,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
               <div style={{display:'flex',gap:8,fontSize:11.5,alignItems:'center'}}>
                 <span className="tag tag-gold" style={{fontSize:9}}>{r.category}</span>
                 <span style={{color:'var(--tx-1)'}}>{r.criteria}</span>
-                {r.hud!=null&&<span style={{color:'var(--tx-3)',fontFamily:'var(--mono)'}}>HUD {r.hud}</span>}
+                {r.authority_code!=null&&<span style={{color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{r.authority_code}</span>}
               </div>
               {r.eo?.chain&&<div style={{marginLeft:12,marginTop:2}}>
                 {r.eo.chain.filter(s=>s.context?.epistemic_crossing).map((s,si)=>
@@ -2081,7 +2066,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           </div>
         </div>)}
         <div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'12px 16px',marginTop:16,fontSize:11.5,color:'var(--tx-1)',lineHeight:1.6}}>
-          <strong style={{color:'var(--teal)'}}>K-anonymity (k=5):</strong> Combinations with fewer than 5 matching individuals are suppressed. This data is suitable for HUD APR, LSA, and PIT reporting.
+          <strong style={{color:'var(--teal)'}}>K-anonymity (k=5):</strong> Combinations with fewer than 5 matching individuals are suppressed. This data is suitable for compliance reporting and aggregate analysis.
         </div>
       </div>}
 
@@ -2153,7 +2138,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
               <div style={{display:'flex',gap:6,alignItems:'center',fontSize:11}}>
                 <span className="tag tag-gold" style={{fontSize:8.5}}>{r.category}</span>
                 <span style={{color:'var(--tx-1)',flex:1}}>{r.criteria}</span>
-                {r.hud!=null&&<span style={{fontFamily:'var(--mono)',color:'var(--tx-3)',fontSize:10}}>HUD {r.hud}</span>}
+                {r.authority_code!=null&&<span style={{fontFamily:'var(--mono)',color:'var(--tx-3)',fontSize:10}}>{r.authority_code}</span>}
               </div>
               {r.eo?.chain?.filter(s=>s.context?.epistemic_crossing).map((s,si)=>
                 <span key={si} style={{fontSize:9,fontFamily:'var(--mono)',color:'var(--orange)',marginLeft:12}}>[{s.context.epistemic_crossing}]</span>
@@ -2166,7 +2151,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       {/* NETWORK VIEW (Addendum E) */}
       {view==='network'&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
         <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700,marginBottom:4}}>Network</h2>
-        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:20}}>Shared definitions that propagate. A CoC, coalition, or partnership. Organizations join voluntarily; the network defines shared vocabulary.</p>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:20}}>Shared definitions that propagate. A coalition, network, or partnership. Organizations join voluntarily; the network defines shared vocabulary.</p>
 
         {!networkRoom?<div>
           <div className="card" style={{textAlign:'center',padding:'30px',borderStyle:'dashed',marginBottom:16}}>
@@ -2228,9 +2213,9 @@ const ProviderApp = ({session, onLogout, showToast}) => {
 
     {/* CREATE NETWORK MODAL */}
     <Modal open={networkModal} onClose={()=>setNetworkModal(false)} title="Create Network">
-      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>Create a new governance network (CoC, coalition, or partnership). You'll be the admin. Other providers can join.</p>
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>Create a new governance network (coalition, network, or partnership). You'll be the admin. Other providers can join.</p>
       <div style={{marginBottom:14}}><span className="section-label">NETWORK NAME</span>
-        <input value={networkName} onChange={e=>setNetworkName(e.target.value)} placeholder="e.g. Nashville CoC"/></div>
+        <input value={networkName} onChange={e=>setNetworkName(e.target.value)} placeholder="e.g. Metro Partnership"/></div>
       <div style={{background:'var(--green-dim)',border:'1px solid rgba(61,214,140,.15)',borderRadius:'var(--r)',padding:'10px 14px',marginBottom:14,fontSize:11.5,color:'var(--tx-1)'}}>
         The network room will contain shared schema definitions that propagate to all member organizations.
       </div>
@@ -2299,7 +2284,7 @@ const OrgApp = ({session, onLogout, showToast}) => {
   const [view, setView] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [setupStep, setSetupStep] = useState(null); // null = done, 'name'|'type'|'area'
-  const [setupData, setSetupData] = useState({name:'',type:'shelter',service_area:'',languages:'en'});
+  const [setupData, setSetupData] = useState({name:'',type:'direct_service',service_area:'',languages:'en'});
   const [inviteModal, setInviteModal] = useState(false);
   const [inviteUserId, setInviteUserId] = useState('');
   const [inviteRole, setInviteRole] = useState('case_manager');
@@ -2499,7 +2484,7 @@ const OrgApp = ({session, onLogout, showToast}) => {
         </div>
         <div style={{marginBottom:14}}>
           <span className="section-label">ORGANIZATION NAME</span>
-          <input value={setupData.name} onChange={e=>setSetupData({...setupData,name:e.target.value})} placeholder="e.g. Nashville Rescue Mission"/>
+          <input value={setupData.name} onChange={e=>setSetupData({...setupData,name:e.target.value})} placeholder="e.g. Metro Services Organization"/>
         </div>
         <div style={{marginBottom:14}}>
           <span className="section-label">ORGANIZATION TYPE</span>
@@ -2614,7 +2599,7 @@ const OrgApp = ({session, onLogout, showToast}) => {
               <p style={{fontSize:10.5,color:'var(--tx-2)',marginTop:2}}>
                 {r==='admin'?'Full access. Manage staff, see all cases, configure schema.':
                  r==='case_manager'?'Assigned cases only. Full read/write on assigned bridges.':
-                 r==='outreach_worker'?'Assigned cases. Record encounters. Limited to own observations.':
+                 r==='field_worker'?'Assigned cases. Record encounters. Limited to own observations.':
                  r==='intake_coordinator'?'Create new bridges. Run intake assessments. Route to case managers.':
                  'View aggregate dashboards only. No PII access.'}
               </p>
@@ -2787,7 +2772,7 @@ const OrgApp = ({session, onLogout, showToast}) => {
               <div style={{display:'flex',gap:6,alignItems:'center'}}>
                 <span className="tag tag-gold" style={{fontSize:9}}>{r.category}</span>
                 <span style={{color:'var(--tx-1)',fontSize:11.5}}>{r.criteria}</span>
-                {r.hud!=null&&<span style={{color:'var(--tx-3)',fontFamily:'var(--mono)',fontSize:10}}>HUD {r.hud}</span>}
+                {r.authority_code!=null&&<span style={{color:'var(--tx-3)',fontFamily:'var(--mono)',fontSize:10}}>{r.authority_code}</span>}
               </div>
               {r.eo?.chain&&<div style={{marginLeft:12,marginTop:2}}>
                 {r.eo.chain.map((step,si)=><span key={si} style={{fontSize:9,fontFamily:'var(--mono)',color:'var(--tx-2)',display:'block'}}>
