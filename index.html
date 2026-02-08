@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Casevault — Sovereign Case Management</title>
+<title>Tessera — Sovereign Case Management</title>
 <script src="https://cdn.jsdelivr.net/npm/matrix-js-sdk@34.11.1/lib/browser-matrix.min.js"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -12,108 +12,61 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Source+Serif+4:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg-0: #08090b;
-  --bg-1: #0e1015;
-  --bg-2: #141720;
-  --bg-3: #1a1e29;
-  --bg-4: #222735;
-  --border-0: #1e2230;
-  --border-1: #2a3040;
-  --border-2: #353d50;
-  --tx-0: #e6e9f0;
-  --tx-1: #a0a8b8;
-  --tx-2: #6b7385;
-  --tx-3: #454d5f;
-  --gold: #c9a352;
-  --gold-dim: rgba(201,163,82,0.10);
-  --gold-mid: rgba(201,163,82,0.22);
-  --green: #3dd68c;
-  --green-dim: rgba(61,214,140,0.10);
-  --red: #e85d5d;
-  --red-dim: rgba(232,93,93,0.10);
-  --blue: #5b9cf5;
-  --blue-dim: rgba(91,156,245,0.10);
-  --teal: #3ec9b0;
-  --teal-dim: rgba(62,201,176,0.10);
-  --orange: #e0943a;
-  --orange-dim: rgba(224,148,58,0.10);
-  --serif: 'Source Serif 4', Georgia, serif;
-  --sans: 'Manrope', system-ui, sans-serif;
-  --mono: 'IBM Plex Mono', monospace;
-  --r: 5px;
-  --r-lg: 8px;
+  --bg-0:#08090b;--bg-1:#0e1015;--bg-2:#141720;--bg-3:#1a1e29;--bg-4:#222735;
+  --border-0:#1e2230;--border-1:#2a3040;--border-2:#353d50;
+  --tx-0:#e6e9f0;--tx-1:#a0a8b8;--tx-2:#6b7385;--tx-3:#454d5f;
+  --gold:#c9a352;--gold-dim:rgba(201,163,82,0.10);--gold-mid:rgba(201,163,82,0.22);
+  --green:#3dd68c;--green-dim:rgba(61,214,140,0.10);
+  --red:#e85d5d;--red-dim:rgba(232,93,93,0.10);
+  --blue:#5b9cf5;--blue-dim:rgba(91,156,245,0.10);
+  --teal:#3ec9b0;--teal-dim:rgba(62,201,176,0.10);
+  --orange:#e0943a;--orange-dim:rgba(224,148,58,0.10);
+  --purple:#a78bfa;--purple-dim:rgba(167,139,250,0.10);
+  --serif:'Source Serif 4',Georgia,serif;--sans:'Manrope',system-ui,sans-serif;--mono:'IBM Plex Mono',monospace;
+  --r:5px;--r-lg:8px;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body,#root{height:100%;background:var(--bg-0);color:var(--tx-0);font-family:var(--sans);}
-::-webkit-scrollbar{width:5px;}
-::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:var(--border-1);border-radius:3px;}
-
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border-1);border-radius:3px;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideR{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:translateX(0)}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.anim-up{animation:fadeUp .3s ease both}
-.anim-in{animation:fadeIn .25s ease both}
-.anim-sl{animation:slideR .28s ease both}
-
-input,textarea,select{
-  font-family:var(--sans);background:var(--bg-1);border:1px solid var(--border-1);
-  color:var(--tx-0);padding:10px 14px;border-radius:var(--r);font-size:13.5px;
-  outline:none;transition:border .2s,box-shadow .2s;width:100%;
-}
+.anim-up{animation:fadeUp .3s ease both}.anim-in{animation:fadeIn .25s ease both}.anim-sl{animation:slideR .28s ease both}
+input,textarea,select{font-family:var(--sans);background:var(--bg-1);border:1px solid var(--border-1);color:var(--tx-0);padding:10px 14px;border-radius:var(--r);font-size:13.5px;outline:none;transition:border .2s,box-shadow .2s;width:100%;}
 input:focus,textarea:focus,select:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-dim)}
-input::placeholder,textarea::placeholder{color:var(--tx-3)}
-textarea{resize:vertical;min-height:72px;line-height:1.55}
-
+input::placeholder,textarea::placeholder{color:var(--tx-3)}textarea{resize:vertical;min-height:72px;line-height:1.55}
 button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r);font-size:12.5px;font-weight:600;padding:8px 16px;transition:all .18s;letter-spacing:.01em;}
-.b-pri{background:var(--gold);color:var(--bg-0)}
-.b-pri:hover{background:#d4af5e;transform:translateY(-1px);box-shadow:0 4px 16px var(--gold-dim)}
-.b-pri:disabled{opacity:.5;transform:none;cursor:default}
-.b-gho{background:transparent;color:var(--tx-1);border:1px solid var(--border-1)}
-.b-gho:hover{background:var(--bg-3);color:var(--tx-0);border-color:var(--border-2)}
-.b-red{background:var(--red-dim);color:var(--red);border:1px solid rgba(232,93,93,.18)}
-.b-red:hover{background:rgba(232,93,93,.18)}
+.b-pri{background:var(--gold);color:var(--bg-0)}.b-pri:hover{background:#d4af5e;transform:translateY(-1px);box-shadow:0 4px 16px var(--gold-dim)}.b-pri:disabled{opacity:.5;transform:none;cursor:default}
+.b-gho{background:transparent;color:var(--tx-1);border:1px solid var(--border-1)}.b-gho:hover{background:var(--bg-3);color:var(--tx-0);border-color:var(--border-2)}
+.b-red{background:var(--red-dim);color:var(--red);border:1px solid rgba(232,93,93,.18)}.b-red:hover{background:rgba(232,93,93,.18)}
 .b-grn{background:var(--green-dim);color:var(--green);border:1px solid rgba(61,214,140,.18)}
-.b-sm{padding:6px 12px;font-size:11.5px}
-.b-xs{padding:4px 9px;font-size:11px}
-
+.b-sm{padding:6px 12px;font-size:11.5px}.b-xs{padding:4px 9px;font-size:11px}
 .tag{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:14px;font-size:10.5px;font-weight:600;font-family:var(--mono);letter-spacing:.03em}
-.tag-gold{background:var(--gold-dim);color:var(--gold)}
-.tag-green{background:var(--green-dim);color:var(--green)}
-.tag-red{background:var(--red-dim);color:var(--red)}
-.tag-blue{background:var(--blue-dim);color:var(--blue)}
-.tag-teal{background:var(--teal-dim);color:var(--teal)}
-.tag-orange{background:var(--orange-dim);color:var(--orange)}
-
+.tag-gold{background:var(--gold-dim);color:var(--gold)}.tag-green{background:var(--green-dim);color:var(--green)}
+.tag-red{background:var(--red-dim);color:var(--red)}.tag-blue{background:var(--blue-dim);color:var(--blue)}
+.tag-teal{background:var(--teal-dim);color:var(--teal)}.tag-orange{background:var(--orange-dim);color:var(--orange)}
+.tag-purple{background:var(--purple-dim);color:var(--purple)}
 .card{background:var(--bg-2);border:1px solid var(--border-0);border-radius:var(--r-lg);padding:20px}
 .card-h{background:var(--bg-2);border:1px solid var(--border-0);border-radius:var(--r-lg);padding:20px;transition:border-color .2s,transform .2s;cursor:pointer}
 .card-h:hover{border-color:var(--gold);transform:translateY(-2px)}
-
 .section-label{font-size:10.5px;font-family:var(--mono);color:var(--tx-2);letter-spacing:.07em;font-weight:500;margin-bottom:10px;display:block}
-
 .toggle-track{width:38px;height:20px;border-radius:10px;position:relative;cursor:pointer;transition:background .2s}
-.toggle-track.on{background:var(--green)}
-.toggle-track.off{background:var(--border-1)}
+.toggle-track.on{background:var(--green)}.toggle-track.off{background:var(--border-1)}
 .toggle-knob{width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
-.toggle-track.on .toggle-knob{left:20px}
-.toggle-track.off .toggle-knob{left:2px}
-
-.grid-bg{
-  background-image:
-    radial-gradient(circle at 20% 20%, rgba(201,163,82,.03) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(91,156,245,.02) 0%, transparent 50%),
-    linear-gradient(var(--border-0) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border-0) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
-}
+.toggle-track.on .toggle-knob{left:20px}.toggle-track.off .toggle-knob{left:2px}
+.grid-bg{background-image:radial-gradient(circle at 20% 20%,rgba(201,163,82,.03) 0%,transparent 50%),radial-gradient(circle at 80% 80%,rgba(91,156,245,.02) 0%,transparent 50%),linear-gradient(var(--border-0) 1px,transparent 1px),linear-gradient(90deg,var(--border-0) 1px,transparent 1px);background-size:100% 100%,100% 100%,48px 48px,48px 48px;}
+.tabs{display:flex;gap:2px;background:var(--bg-1);border-radius:var(--r);padding:3px;margin-bottom:20px}
+.tab{padding:8px 16px;border-radius:var(--r);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--tx-2);background:transparent}
+.tab.active{background:var(--bg-3);color:var(--tx-0);font-weight:600}
+.tab:hover:not(.active){background:var(--bg-2);color:var(--tx-1)}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect,useRef,useCallback,useMemo,createContext,useContext} = React;
+const {useState,useEffect,useRef,useCallback,useMemo} = React;
 
 /* ═══════════════════ ICONS ═══════════════════ */
 const I = ({n,s=17,c})=>{
@@ -147,11 +100,15 @@ alert:<svg {...p}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 
 clock:<svg {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
 msg:<svg {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
 zap:<svg {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+grid:<svg {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
+globe:<svg {...p}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+bar:<svg {...p}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+clipboard:<svg {...p}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>,
 };
 return <span style={{display:'inline-flex',alignItems:'center',flexShrink:0}}>{d[n]}</span>;
 };
 
-/* ═══════════════════ PER-FIELD CRYPTO (Web Crypto AES-GCM) ═══════════════════ */
+/* ═══════════════════ PER-FIELD CRYPTO (AES-256-GCM) ═══════════════════ */
 const FieldCrypto = {
   async generateKey() {
     const key = await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
@@ -163,10 +120,7 @@ const FieldCrypto = {
     const key = await crypto.subtle.importKey('raw', keyBuf, 'AES-GCM', false, ['encrypt']);
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const enc = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, new TextEncoder().encode(plaintext));
-    return {
-      ciphertext: btoa(String.fromCharCode(...new Uint8Array(enc))),
-      iv: btoa(String.fromCharCode(...iv)),
-    };
+    return { ciphertext: btoa(String.fromCharCode(...new Uint8Array(enc))), iv: btoa(String.fromCharCode(...iv)) };
   },
   async decrypt(cipherB64, ivB64, keyB64) {
     try {
@@ -180,27 +134,117 @@ const FieldCrypto = {
   }
 };
 
-/* ═══════════════════ STATE EVENT TYPES ═══════════════════ */
-const NS = 'io.casevault';
+/* ═══════════════════ EO OPERATION LAYER ═══════════════════ */
+const OPERATORS = ['NUL','DES','INS','SEG','CON','SYN','ALT','SUP','REC'];
+
+// Operator adjacency matrix (§5.2) — row can transition to column
+const OP_ADJ = {
+  NUL:['NUL','DES'], DES:['NUL','DES','INS'], INS:['DES','INS','SEG'],
+  SEG:['INS','SEG','CON'], CON:['SEG','CON','SYN'], SYN:['CON','SYN','ALT'],
+  ALT:['SYN','ALT','SUP'], SUP:['ALT','SUP','REC'], REC:['NUL','SUP','REC'],
+};
+
+// BFS pathfinding for auto-intermediate emission
+function findOpPath(from, to) {
+  if (from === to || OP_ADJ[from]?.includes(to)) return [to];
+  const queue = [[from]]; const visited = new Set([from]);
+  while (queue.length > 0) {
+    const path = queue.shift(); const curr = path[path.length-1];
+    for (const next of OP_ADJ[curr]||[]) {
+      if (next === to) return path.slice(1).concat(to);
+      if (!visited.has(next)) { visited.add(next); queue.push([...path, next]); }
+    }
+  }
+  return [to]; // fallback
+}
+
+// Per-entity operation history (session-local)
+const entityOpHist = {};
+function eKey(roomId, field) { return `${roomId}::${field||'_root'}`; }
+
+let opSeq = 0;
+function genOpId() { return `op_${Date.now().toString(36)}${(opSeq++).toString(36)}${Math.random().toString(36).slice(2,5)}`; }
+
+// Emit an EO operation — validates transitions, auto-emits intermediates
+async function emitOp(roomId, op, target, context, frame, provenance = []) {
+  const ek = eKey(roomId, target?.field || target?.entity);
+  const lastOp = entityOpHist[ek];
+  // Auto-emit intermediate operations if transition is invalid
+  if (lastOp && !OP_ADJ[lastOp]?.includes(op)) {
+    const path = findOpPath(lastOp, op);
+    for (let i = 0; i < path.length - 1; i++) {
+      const mid = { id: genOpId(), op: path[i], target, context: { auto_intermediate: true, from: lastOp, to: op }, frame, provenance: [], ts: Date.now() };
+      await svc.sendEvent(roomId, EVT.OP, mid);
+      entityOpHist[ek] = path[i];
+    }
+  }
+  const event = { id: genOpId(), op, target, context, frame, provenance, ts: Date.now() };
+  await svc.sendEvent(roomId, EVT.OP, event);
+  entityOpHist[ek] = op;
+  return event;
+}
+
+// Compute current state from operation history (§9.1)
+function projectCurrentState(operations, frameType) {
+  const state = {};
+  const relevant = operations.filter(o => o.frame?.type === frameType).sort((a,b) => a.ts - b.ts);
+  for (const op of relevant) {
+    switch (op.op) {
+      case 'INS':
+        if (op.target?.field) state[op.target.field] = { value: op.target.value ?? op.context?.value, source_op: op.id, epistemic: op.frame?.epistemic, ts: op.ts };
+        break;
+      case 'ALT':
+        if (op.target?.field && state[op.target.field]) { state[op.target.field].value = op.context?.to; state[op.target.field].source_op = op.id; state[op.target.field].ts = op.ts; }
+        break;
+      case 'NUL':
+        if (op.target?.field) state[op.target.field] = { value: null, nullified_by: op.id, ts: op.ts };
+        break;
+      case 'SUP':
+        if (op.target?.field) state[op.target.field] = { values: op.context?.states, superposition: true, source_op: op.id, ts: op.ts };
+        break;
+      case 'DES':
+        if (op.target?.entity) state[`${op.target.entity}.designation`] = { value: op.target.designation, source_op: op.id, ts: op.ts };
+        break;
+    }
+  }
+  return state;
+}
+
+// SHA-256 cohort hash for metrics anonymization
+async function cohortHash(userId, salt) {
+  const data = new TextEncoder().encode(userId + (salt || 'tessera_default_salt'));
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(hash)));
+}
+
+/* ═══════════════════ EVENT TYPES (§11) ═══════════════════ */
+const NS = 'io.tessera';
 const EVT = {
-  IDENTITY:    `${NS}.identity`,       // account type: client or provider
-  VAULT_DATA:  `${NS}.vault.data`,     // client vault — full data fields
-  VAULT_INDEX: `${NS}.vault.providers`,// client vault — index of bridge rooms
-  BRIDGE_META: `${NS}.bridge.meta`,    // bridge — who, when, permissions
-  BRIDGE_REFS: `${NS}.bridge.refs`,    // bridge — encrypted field refs + keys
-  BRIDGE_NOTE: `${NS}.bridge.note`,    // bridge — bidirectional notes (messages)
-  BRIDGE_REQ:  `${NS}.bridge.request`, // bridge — provider requests for info
-  ROSTER:      `${NS}.roster`,         // provider roster — case index
+  IDENTITY:       `${NS}.identity`,
+  OP:             `${NS}.op`,
+  VAULT_SNAPSHOT: `${NS}.vault.snapshot`,
+  VAULT_PROVIDERS:`${NS}.vault.providers`,
+  BRIDGE_META:    `${NS}.bridge.meta`,
+  BRIDGE_REFS:    `${NS}.bridge.refs`,
+  ROSTER_INDEX:   `${NS}.roster.index`,
+  SCHEMA_PROMPT:  `${NS}.schema.prompt`,
+  SCHEMA_DEF:     `${NS}.schema.definition`,
+  SCHEMA_TRANSFORM:`${NS}.schema.transform`,
+  SCHEMA_SUB:     `${NS}.schema.subscription`,
+  METRIC:         `${NS}.metric`,
+  METRIC_AGG:     `${NS}.metric.aggregate`,
+  METRIC_SUPPRESS:`${NS}.metric.suppression`,
+  NET_MEMBERS:    `${NS}.network.members`,
+  NET_HASH_SALT:  `${NS}.network.hash_salt`,
 };
 
 /* ═══════════════════ MATRIX SERVICE ═══════════════════ */
-class CasevaultService {
+class TesseraService {
   constructor() { this.client = null; this._baseUrl = null; this._token = null; this._userId = null; }
 
   async login(homeserver, user, pass) {
     const baseUrl = homeserver.startsWith('http') ? homeserver : `https://${homeserver}`;
     this._baseUrl = baseUrl;
-    // Use SDK if available
     if (typeof matrixcs !== 'undefined') {
       this.client = matrixcs.createClient({ baseUrl });
       const res = await this.client.login('m.login.password', { user, password: pass });
@@ -208,8 +252,7 @@ class CasevaultService {
       try { await this.client.initCrypto(); } catch (e) { console.warn('Crypto:', e.message); }
       await this.client.startClient({ initialSyncLimit: 30 });
       await new Promise(r => { if (this.client.isInitialSyncComplete()) return r(); this.client.once('sync', s => { if (s === 'PREPARED') r(); }); });
-      this._userId = res.user_id;
-      this._token = res.access_token;
+      this._userId = res.user_id; this._token = res.access_token;
       return { userId: res.user_id };
     } else {
       const resp = await this._api('POST', '/login', { type: 'm.login.password', user, password: pass }, true);
@@ -232,7 +275,6 @@ class CasevaultService {
     return r.json();
   }
 
-  // Room creation helpers
   async createRoom(name, topic, extraState = []) {
     const initial_state = [
       { type: 'm.room.encryption', state_key: '', content: { algorithm: 'm.megolm.v1.aes-sha2' } },
@@ -258,18 +300,22 @@ class CasevaultService {
   }
 
   async setState(roomId, type, content, sk = '') {
-    if (this.client) {
-      await this.client.sendStateEvent(roomId, type, content, sk);
-    } else {
-      await this._api('PUT', `/rooms/${encodeURIComponent(roomId)}/state/${type}/${sk}`, content);
+    if (this.client) { await this.client.sendStateEvent(roomId, type, content, sk); }
+    else { await this._api('PUT', `/rooms/${encodeURIComponent(roomId)}/state/${type}/${sk}`, content); }
+  }
+
+  async sendEvent(roomId, type, content) {
+    if (this.client) { await this.client.sendEvent(roomId, type, content); }
+    else {
+      const txn = 'txn_' + Date.now() + Math.random().toString(36).slice(2);
+      await this._api('PUT', `/rooms/${encodeURIComponent(roomId)}/send/${encodeURIComponent(type)}/${txn}`, content);
     }
   }
 
   async sendMessage(roomId, body, extra = {}) {
     const content = { msgtype: 'm.text', body, ...extra, timestamp: Date.now() };
-    if (this.client) {
-      await this.client.sendMessage(roomId, content);
-    } else {
+    if (this.client) { await this.client.sendMessage(roomId, content); }
+    else {
       const txn = 'txn_' + Date.now() + Math.random().toString(36).slice(2);
       await this._api('PUT', `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txn}`, content);
     }
@@ -300,9 +346,7 @@ class CasevaultService {
   }
 
   async tombstone(roomId, newRoomId) {
-    await this.setState(roomId, 'm.room.tombstone', {
-      body: 'This room has been replaced', replacement_room: newRoomId,
-    });
+    await this.setState(roomId, 'm.room.tombstone', { body: 'This room has been replaced', replacement_room: newRoomId });
   }
 
   async getJoinedRooms() {
@@ -328,27 +372,101 @@ class CasevaultService {
   }
 }
 
-const svc = new CasevaultService();
+const svc = new TesseraService();
 
-/* ═══════════════════ VAULT FIELD DEFINITIONS ═══════════════════ */
+/* ═══════════════════ DEFAULT SCHEMA (§C) ═══════════════════ */
+const DEFAULT_PROMPTS = [
+  { id:'prompt_sleep_location', key:'sleep_location', question:'Where did you sleep last night?', type:'single_select',
+    options:[{v:'own_housing',l:'Own apartment or house (with lease)'},{v:'other_housing',l:"Someone else's apartment or house"},
+      {v:'shelter',l:'Emergency shelter'},{v:'transitional',l:'Transitional housing'},{v:'hotel_paid',l:'Hotel or motel'},
+      {v:'vehicle',l:'Car, van, or RV'},{v:'encampment',l:'Tent or encampment'},{v:'unsheltered',l:'Street, park, or unsheltered'},
+      {v:'institutional',l:'Hospital, treatment, or jail'},{v:'other',l:'Other'}],
+    category:'housing', sensitive:false, metrics:true },
+  { id:'prompt_service_contact', key:'service_contact', question:'What service contact occurred?', type:'single_select',
+    options:[{v:'case_meeting',l:'Met with caseworker'},{v:'phone_call',l:'Phone call with provider'},{v:'called_211',l:'Called 211/helpline'},
+      {v:'shelter_intake',l:'Shelter intake'},{v:'housing_app',l:'Housing application submitted'},{v:'other',l:'Other'}],
+    category:'services', sensitive:false, metrics:true },
+  { id:'prompt_document_event', key:'document_event', question:'What document event occurred?', type:'single_select',
+    options:[{v:'lease_signed',l:'Lease signed'},{v:'eviction_notice',l:'Eviction notice received'},{v:'eviction_filed',l:'Eviction filed'},
+      {v:'voucher_issued',l:'Housing voucher issued'},{v:'id_obtained',l:'ID/document obtained'},{v:'benefits_approved',l:'Benefits approved'},{v:'other',l:'Other'}],
+    category:'documents', sensitive:false, metrics:true },
+  { id:'prompt_income_event', key:'income_event', question:'What income change occurred?', type:'single_select',
+    options:[{v:'started_job',l:'Started new job'},{v:'lost_job',l:'Lost job'},{v:'received_benefit',l:'Received benefit'},
+      {v:'income_increase',l:'Income increased'},{v:'income_decrease',l:'Income decreased'},{v:'other',l:'Other'}],
+    category:'financial', sensitive:false, metrics:true },
+  { id:'prompt_health_event', key:'health_event', question:'What health event occurred?', type:'single_select',
+    options:[{v:'er_visit',l:'Visited ER'},{v:'filled_rx',l:'Filled prescription'},{v:'missed_appt',l:'Missed appointment'},
+      {v:'new_diagnosis',l:'New diagnosis'},{v:'treatment_started',l:'Treatment started'},{v:'other',l:'Other'}],
+    category:'medical', sensitive:true, metrics:true },
+];
+
+const DEFAULT_DEFINITIONS = [
+  { id:'def_housing_status_hud_2025', key:'housing_status', name:'Housing Status (HUD FY2025)', type:'classification_rule',
+    rules:[
+      {category:'literally_homeless', criteria:'sleep_location IN (vehicle,encampment,unsheltered)', hud:1},
+      {category:'imminently_homeless', criteria:'document_event=eviction_notice in 14 days AND no own_housing', hud:2},
+      {category:'stably_housed', criteria:'sleep_location=own_housing for 30+ days', hud:null},
+    ]},
+];
+
+const DEFAULT_TRANSFORMS = {
+  dob:{method:'age_range',buckets:['0-17','18-24','25-34','35-44','45-54','55-64','65+']},
+  address:{method:'census_tract'}, income:{method:'bracket',buckets:['0-15k','15k-25k','25k-35k','35k-50k','50k-75k','75k+']},
+  full_name:{method:'block'}, gov_id:{method:'block'}, phone:{method:'block'}, email:{method:'block'},
+};
+
+/* ═══════════════════ VAULT FIELD DEFINITIONS (§10) ═══════════════════ */
 const VAULT_FIELDS = [
-  { key: 'full_name',   label: 'Full Name',      category: 'identity', sensitive: false },
-  { key: 'dob',         label: 'Date of Birth',   category: 'identity', sensitive: true },
-  { key: 'ssn',         label: 'SSN / Gov ID',    category: 'identity', sensitive: true },
-  { key: 'email',       label: 'Email',            category: 'contact',  sensitive: false },
-  { key: 'phone',       label: 'Phone',            category: 'contact',  sensitive: false },
-  { key: 'address',     label: 'Address',          category: 'contact',  sensitive: true },
-  { key: 'employer',    label: 'Employer',         category: 'financial',sensitive: false },
-  { key: 'income',      label: 'Annual Income',    category: 'financial',sensitive: true },
-  { key: 'case_notes',  label: 'Case Notes',       category: 'case',     sensitive: false },
-  { key: 'documents',   label: 'Documents',        category: 'case',     sensitive: true },
-  { key: 'history',     label: 'Case History',     category: 'case',     sensitive: false },
-  { key: 'medical',     label: 'Medical Info',     category: 'medical',  sensitive: true },
+  {key:'full_name',label:'Full Name',category:'identity',sensitive:false},
+  {key:'dob',label:'Date of Birth',category:'identity',sensitive:true},
+  {key:'gov_id',label:'SSN / Gov ID',category:'identity',sensitive:true},
+  {key:'email',label:'Email',category:'contact',sensitive:false},
+  {key:'phone',label:'Phone',category:'contact',sensitive:false},
+  {key:'address',label:'Address',category:'contact',sensitive:true},
+  {key:'employer',label:'Employer',category:'financial',sensitive:false},
+  {key:'income',label:'Annual Income',category:'financial',sensitive:true},
+  {key:'case_notes',label:'Case Notes',category:'case',sensitive:false},
+  {key:'documents',label:'Documents',category:'case',sensitive:true},
+  {key:'history',label:'Case History',category:'case',sensitive:false},
+  {key:'medical',label:'Medical Info',category:'medical',sensitive:true},
 ];
 const FIELD_CATEGORIES = ['identity','contact','financial','case','medical'];
-const CAT_LABELS = { identity:'Identity', contact:'Contact', financial:'Financial', case:'Case', medical:'Medical' };
-const CAT_ICONS = { identity:'user', contact:'msg', financial:'briefcase', case:'folder', medical:'shieldCheck' };
-const CAT_COLORS = { identity:'blue', contact:'teal', financial:'gold', case:'orange', medical:'green' };
+const CAT_LABELS = {identity:'Identity',contact:'Contact',financial:'Financial',case:'Case',medical:'Medical'};
+const CAT_ICONS = {identity:'user',contact:'msg',financial:'briefcase',case:'folder',medical:'shieldCheck'};
+const CAT_COLORS = {identity:'blue',contact:'teal',financial:'gold',case:'orange',medical:'green'};
+const OBS_CAT_LABELS = {housing:'Housing',services:'Services',documents:'Documents',financial:'Financial',medical:'Medical'};
+const OBS_CAT_COLORS = {housing:'teal',services:'blue',documents:'orange',financial:'gold',medical:'green'};
+
+/* ═══════════════════ ANONYMIZATION (§B.2) ═══════════════════ */
+function anonymizeField(key, value) {
+  const t = DEFAULT_TRANSFORMS[key];
+  if (!t) return {key, value};
+  if (t.method === 'block') return null;
+  if (t.method === 'age_range' && value) {
+    const age = Math.floor((Date.now()-new Date(value).getTime())/(365.25*24*60*60*1000));
+    const bucket = t.buckets.find(b => {const [lo,hi]=b.split('-').map(Number);return age>=lo&&(!hi||age<=hi);});
+    return {key:'age_range', value:bucket||'unknown'};
+  }
+  if (t.method === 'bracket' && value) {
+    const num = parseFloat(String(value).replace(/[^0-9.]/g,''));
+    const bucket = t.buckets.find(b => {const p=b.replace(/k/g,'000').split('-');return num>=parseFloat(p[0])&&(!p[1]||num<parseFloat(p[1]));});
+    return {key:'income_bracket', value:bucket||t.buckets[t.buckets.length-1]};
+  }
+  if (t.method === 'census_tract') return {key:'geo', value:value?`area_${Math.abs([...value].reduce((h,c)=>((h<<5)-h+c.charCodeAt(0))|0,0)).toString(36).slice(0,6)}`:null};
+  return {key, value};
+}
+
+async function emitMetric(metricsRoom, clientId, observation, demographics, program) {
+  const hash = await cohortHash(clientId);
+  const anonDemo = {};
+  for (const [k,v] of Object.entries(demographics||{})) {
+    const a = anonymizeField(k,v);
+    if (a) anonDemo[a.key] = a.value;
+  }
+  const metric = { cohort_hash:hash, observation, demographics:anonDemo, program:program||'general', ts:Date.now() };
+  await svc.sendEvent(metricsRoom, EVT.METRIC, metric);
+  return metric;
+}
 
 /* ═══════════════════ SMALL COMPONENTS ═══════════════════ */
 const Spin = ({s=18}) => <div style={{width:s,height:s,border:'2px solid var(--border-1)',borderTopColor:'var(--gold)',borderRadius:'50%',animation:'spin .6s linear infinite'}} />;
@@ -366,394 +484,223 @@ const Modal = ({open,onClose,title,w=480,children}) => {
   </div>;
 };
 
-const Toggle = ({on, onChange, disabled}) => (
-  <div className={`toggle-track ${on?'on':'off'}`} onClick={disabled ? undefined : onChange} style={disabled?{opacity:.4,cursor:'default'}:{}}>
+const Toggle = ({on,onChange,disabled}) => (
+  <div className={`toggle-track ${on?'on':'off'}`} onClick={disabled?undefined:onChange} style={disabled?{opacity:.4,cursor:'default'}:{}}>
     <div className="toggle-knob"/>
   </div>
 );
 
-const Toast = ({msg, type='info', onClose}) => {
+const Toast = ({msg,type='info',onClose}) => {
   useEffect(()=>{const t=setTimeout(onClose,3500);return()=>clearTimeout(t)},[]);
   const c = {info:'var(--blue)',success:'var(--green)',error:'var(--red)',warn:'var(--gold)'}[type];
   return <div className="anim-up" style={{position:'fixed',bottom:20,right:20,zIndex:9999,background:'var(--bg-2)',border:`1px solid ${c}30`,borderLeft:`3px solid ${c}`,borderRadius:'var(--r)',padding:'11px 18px',fontSize:12.5,boxShadow:'0 8px 32px rgba(0,0,0,.5)',maxWidth:400}}>{msg}</div>;
 };
 
-/* ═══════════════════ ACTIVITY STREAM (DEV) ═══════════════════ */
-const OP_COLORS = { INS:'green', ALT:'blue', DES:'gold', SEG:'teal', NUL:'red', REC:'orange', CON:'blue', SUP:'gold' };
-const ROOM_COLORS = { vault:'teal', bridge:'blue', roster:'gold', unknown:'orange' };
-const OP_LEGEND = [
-  {op:'INS', label:'Insert', desc:'New data enters the system'},
-  {op:'ALT', label:'Alter', desc:'Existing data is modified'},
-  {op:'DES', label:'Describe', desc:'Interpretation or assessment'},
-  {op:'SEG', label:'Segment', desc:'Data shared or partitioned'},
-  {op:'NUL', label:'Nullify', desc:'Data revoked or tombstoned'},
-  {op:'REC', label:'Record Policy', desc:'Rule or consent recorded'},
-  {op:'CON', label:'Connect', desc:'Entities linked together'},
-  {op:'SUP', label:'Supersede', desc:'New version replaces old'},
-];
+/* ═══════════════════ ACTIVITY STREAM ═══════════════════ */
+const OP_COLORS = {INS:'green',ALT:'blue',DES:'gold',SEG:'teal',NUL:'red',REC:'orange',CON:'blue',SYN:'purple',SUP:'gold'};
+const ROOM_COLORS = {vault:'teal',bridge:'blue',roster:'gold',schema:'purple',metrics:'orange',network:'green',unknown:'orange'};
 
 const classifyRoom = async (roomId) => {
-  const identity = await svc.getState(roomId, EVT.IDENTITY);
-  if (identity) {
-    if (identity.type === 'client') return {type:'vault', label:'Client Vault', color:'teal'};
-    if (identity.type === 'provider') return {type:'roster', label:'Provider Roster', color:'gold'};
+  const id = await svc.getState(roomId, EVT.IDENTITY);
+  if (id) {
+    if (id.account_type==='client') return {type:'vault',label:'Client Vault',color:'teal'};
+    if (id.account_type==='provider') return {type:'roster',label:'Provider Roster',color:'gold'};
+    if (id.account_type==='schema') return {type:'schema',label:'Schema Room',color:'purple'};
+    if (id.account_type==='metrics') return {type:'metrics',label:'Metrics Room',color:'orange'};
+    if (id.account_type==='network') return {type:'network',label:'Network Room',color:'green'};
   }
   const meta = await svc.getState(roomId, EVT.BRIDGE_META);
-  if (meta) return {type:'bridge', label:'Bridge Room', color:'blue'};
-  return {type:'unknown', label:'Unknown', color:'orange'};
+  if (meta) return {type:'bridge',label:'Bridge Room',color:'blue'};
+  return {type:'unknown',label:'Unknown',color:'orange'};
 };
 
 const classifyEvent = (ev, roomInfo) => {
-  const type = ev.getType();
-  const content = ev.getContent();
+  const type = ev.getType(); const content = ev.getContent();
+  // Native EO operations
+  if (type === EVT.OP) return { op:content.op||'INS', epistemic:content.frame?.epistemic||'GIVEN',
+    label:`${content.op} Operation`, desc:content.target?.field||content.target?.entity||content.target?.type||'' };
   if (ev.isState && ev.isState()) {
     switch (type) {
-      case EVT.IDENTITY:    return {op:'INS', epistemic:'GIVEN', label:'Identity Declaration', desc:`Type: ${content.type}`};
-      case EVT.VAULT_DATA:  return {op:'ALT', epistemic:'GIVEN', label:'Vault Data Update', desc:`${Object.keys(content.fields||{}).length} fields`};
-      case EVT.VAULT_INDEX: return {op:'SEG', epistemic:'GIVEN', label:'Provider Index', desc:`${(content.providers||[]).length} providers`};
-      case EVT.BRIDGE_META: return {op:'CON', epistemic:'MEANT', label:'Bridge Connection', desc:`${content.status} — ${content.client?.slice(0,16)} ↔ ${content.provider?.slice(0,16)}`};
-      case EVT.BRIDGE_REFS: return {op:'SEG', epistemic:'MEANT', label:'Field Refs Update', desc:`${Object.keys(content.fields||{}).length} encrypted refs${content.revoked?' (REVOKED)':''}`};
-      case EVT.ROSTER:      return {op:'ALT', epistemic:'MEANT', label:'Roster Update', desc:`${(content.cases||[]).length} cases`};
-      case 'm.room.encryption': return {op:'REC', epistemic:'GIVEN', label:'Encryption Policy', desc:content.algorithm};
-      case 'm.room.tombstone':  return {op:'NUL', epistemic:'MEANT', label:'Room Tombstoned', desc:`→ ${content.replacement_room?.slice(0,24)}…`};
-      case 'm.room.create':     return {op:'INS', epistemic:'GIVEN', label:'Room Created', desc:'New room initialized'};
-      case 'm.room.name':       return {op:'ALT', epistemic:'MEANT', label:'Room Name Set', desc:content.name?.slice(0,40)};
-      case 'm.room.topic':      return {op:'ALT', epistemic:'MEANT', label:'Room Topic Set', desc:content.topic?.slice(0,40)};
+      case EVT.IDENTITY: return {op:'INS',epistemic:'GIVEN',label:'Identity Declaration',desc:`Type: ${content.account_type}`};
+      case EVT.VAULT_SNAPSHOT: return {op:'ALT',epistemic:'GIVEN',label:'Vault Snapshot',desc:`${Object.keys(content.fields||{}).length} fields`};
+      case EVT.VAULT_PROVIDERS: return {op:'SEG',epistemic:'GIVEN',label:'Provider Index',desc:`${(content.providers||[]).length} providers`};
+      case EVT.BRIDGE_META: return {op:'CON',epistemic:'MEANT',label:'Bridge Connection',desc:`${content.status} — ${content.client?.slice(0,16)} ↔ ${content.provider?.slice(0,16)}`};
+      case EVT.BRIDGE_REFS: return {op:'SEG',epistemic:'MEANT',label:'Field Refs Update',desc:`${Object.keys(content.fields||{}).length} encrypted refs${content.revoked?' (REVOKED)':''}`};
+      case EVT.ROSTER_INDEX: return {op:'ALT',epistemic:'MEANT',label:'Roster Update',desc:`${(content.cases||[]).length} cases`};
+      case EVT.SCHEMA_PROMPT: return {op:'DES',epistemic:'MEANT',label:'Schema Prompt',desc:content.question?.slice(0,40)};
+      case EVT.SCHEMA_DEF: return {op:'DES',epistemic:'MEANT',label:'Schema Definition',desc:content.name?.slice(0,40)};
+      case EVT.SCHEMA_TRANSFORM: return {op:'REC',epistemic:'MEANT',label:'Transform Rule',desc:`${Object.keys(content.transforms||{}).length} transforms`};
+      case EVT.NET_MEMBERS: return {op:'CON',epistemic:'MEANT',label:'Network Members',desc:`${(content.organizations||[]).length} orgs`};
+      case 'm.room.encryption': return {op:'REC',epistemic:'GIVEN',label:'Encryption Policy',desc:content.algorithm};
+      case 'm.room.tombstone': return {op:'NUL',epistemic:'MEANT',label:'Room Tombstoned',desc:`→ ${content.replacement_room?.slice(0,24)}…`};
+      case 'm.room.create': return {op:'INS',epistemic:'GIVEN',label:'Room Created',desc:'New room initialized'};
       case 'm.room.member': {
-        const ms = content.membership;
-        if (ms==='join')   return {op:'CON', epistemic:'MEANT', label:'Member Joined', desc:ev.getStateKey()};
-        if (ms==='invite') return {op:'CON', epistemic:'MEANT', label:'Member Invited', desc:ev.getStateKey()};
-        if (ms==='leave')  return {op:'NUL', epistemic:'MEANT', label:'Member Left/Kicked', desc:ev.getStateKey()};
-        return {op:'ALT', epistemic:'MEANT', label:`Membership: ${ms}`, desc:ev.getStateKey()};
+        const ms=content.membership;
+        if(ms==='join')return{op:'CON',epistemic:'MEANT',label:'Member Joined',desc:ev.getStateKey()};
+        if(ms==='invite')return{op:'CON',epistemic:'MEANT',label:'Member Invited',desc:ev.getStateKey()};
+        if(ms==='leave')return{op:'NUL',epistemic:'MEANT',label:'Member Left/Kicked',desc:ev.getStateKey()};
+        return{op:'ALT',epistemic:'MEANT',label:`Membership: ${ms}`,desc:ev.getStateKey()};
       }
-      default: return {op:'INS', epistemic:'GIVEN', label:type, desc:'State event'};
+      default: return {op:'INS',epistemic:'GIVEN',label:type,desc:'State event'};
     }
   }
+  if (type === EVT.METRIC) return {op:'INS',epistemic:'MEANT',label:'Metric Event',desc:`${content.observation?.category}: ${content.observation?.value}`};
   if (type === 'm.room.message') {
     const cvType = content[`${NS}.type`];
-    if (cvType==='request') return {op:'DES', epistemic:'MEANT', label:'Info Request', desc:content.body?.slice(0,60)};
-    if (cvType==='note')    return {op:'INS', epistemic: roomInfo.type==='vault'?'GIVEN':'MEANT', label:'Bridge Note', desc:content.body?.slice(0,60)};
-    return {op:'INS', epistemic:'GIVEN', label:'Message', desc:content.body?.slice(0,60)};
+    if (cvType==='request') return {op:'DES',epistemic:'MEANT',label:'Info Request',desc:content.body?.slice(0,60)};
+    if (cvType==='note') return {op:'INS',epistemic:roomInfo.type==='vault'?'GIVEN':'MEANT',label:'Bridge Note',desc:content.body?.slice(0,60)};
+    return {op:'INS',epistemic:'GIVEN',label:'Message',desc:content.body?.slice(0,60)};
   }
-  return {op:'INS', epistemic:'GIVEN', label:type, desc:'Timeline event'};
+  return {op:'INS',epistemic:'GIVEN',label:type,desc:'Timeline event'};
 };
 
-const ActivityStream = ({session, accountType}) => {
-  const [events, setEvents] = useState([]);
-  const [rooms, setRooms] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState({roomType:'all', operator:'all', epistemic:'all'});
-  const [expanded, setExpanded] = useState(new Set());
-  const [autoRefresh, setAutoRefresh] = useState(false);
+const ActivityStream = ({session}) => {
+  const [events,setEvents] = useState([]); const [rooms,setRooms] = useState([]);
+  const [loading,setLoading] = useState(true); const [filter,setFilter] = useState({roomType:'all',operator:'all',epistemic:'all'});
+  const [expanded,setExpanded] = useState(new Set()); const [autoRefresh,setAutoRefresh] = useState(false);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
     try {
-      const roomIds = await svc.getJoinedRooms();
-      const allRooms = [];
-      const allEvents = [];
+      const roomIds = await svc.getJoinedRooms(); const allRooms=[]; const allEvents=[];
       for (const rid of roomIds) {
-        const roomInfo = await classifyRoom(rid);
-        allRooms.push({id:rid, ...roomInfo});
+        const roomInfo = await classifyRoom(rid); allRooms.push({id:rid,...roomInfo});
         if (svc.client) {
           const room = svc.client.getRoom(rid);
           if (room) {
-            const timeline = room.getLiveTimeline().getEvents();
-            for (const ev of timeline) {
+            for (const ev of room.getLiveTimeline().getEvents()) {
               const cls = classifyEvent(ev, roomInfo);
-              allEvents.push({
-                id: ev.getId(), roomId: rid, roomInfo, sender: ev.getSender(),
-                ts: ev.getTs(), type: ev.getType(),
-                stateKey: (ev.isState && ev.isState()) ? ev.getStateKey() : null,
-                content: ev.getContent(),
-                isState: ev.isState && ev.isState(),
-                ...cls,
-              });
+              allEvents.push({ id:ev.getId(),roomId:rid,roomInfo,sender:ev.getSender(),ts:ev.getTs(),type:ev.getType(),
+                stateKey:(ev.isState&&ev.isState())?ev.getStateKey():null,content:ev.getContent(),isState:ev.isState&&ev.isState(),...cls });
             }
           }
         }
       }
-      allEvents.sort((a,b) => b.ts - a.ts);
-      setRooms(allRooms);
-      setEvents(allEvents);
-    } catch (e) { console.error('Activity stream error:', e); }
+      allEvents.sort((a,b)=>b.ts-a.ts); setRooms(allRooms); setEvents(allEvents);
+    } catch(e){console.error('Activity error:',e);}
     setLoading(false);
-  }, []);
+  },[]);
 
-  useEffect(() => { loadEvents(); }, []);
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const iv = setInterval(loadEvents, 5000);
-    return () => clearInterval(iv);
-  }, [autoRefresh]);
+  useEffect(()=>{loadEvents();},[]);
+  useEffect(()=>{if(!autoRefresh)return;const iv=setInterval(loadEvents,5000);return()=>clearInterval(iv);},[autoRefresh]);
 
-  const filtered = useMemo(() => events.filter(ev => {
-    if (filter.roomType !== 'all' && ev.roomInfo.type !== filter.roomType) return false;
-    if (filter.operator !== 'all' && ev.op !== filter.operator) return false;
-    if (filter.epistemic !== 'all' && ev.epistemic !== filter.epistemic) return false;
+  const filtered = useMemo(()=>events.filter(ev=>{
+    if(filter.roomType!=='all'&&ev.roomInfo.type!==filter.roomType)return false;
+    if(filter.operator!=='all'&&ev.op!==filter.operator)return false;
+    if(filter.epistemic!=='all'&&ev.epistemic!==filter.epistemic)return false;
     return true;
-  }), [events, filter]);
+  }),[events,filter]);
 
-  const stats = useMemo(() => {
-    const s = {total:events.length, byOp:{}, byRoom:{}, given:0, meant:0};
-    events.forEach(ev => {
-      s.byOp[ev.op] = (s.byOp[ev.op]||0)+1;
-      s.byRoom[ev.roomInfo.type] = (s.byRoom[ev.roomInfo.type]||0)+1;
-      if (ev.epistemic==='GIVEN') s.given++; else s.meant++;
-    });
+  const stats = useMemo(()=>{const s={total:events.length,byOp:{},byRoom:{},given:0,meant:0};
+    events.forEach(ev=>{s.byOp[ev.op]=(s.byOp[ev.op]||0)+1;s.byRoom[ev.roomInfo.type]=(s.byRoom[ev.roomInfo.type]||0)+1;if(ev.epistemic==='GIVEN')s.given++;else s.meant++;});
     return s;
-  }, [events]);
+  },[events]);
 
-  const toggle = (id) => setExpanded(prev => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
+  const toggle=(id)=>setExpanded(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
 
-  if (loading) return <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}><Spin s={28}/></div>;
+  if(loading)return<div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}><Spin s={28}/></div>;
 
   return <div className="anim-up" style={{maxWidth:960,margin:'0 auto'}}>
-    {/* Header */}
     <div style={{marginBottom:24}}>
       <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
         <I n="zap" s={20} c="var(--orange)"/>
         <h2 style={{fontFamily:'var(--serif)',fontSize:24,fontWeight:700,letterSpacing:'-0.02em'}}>Activity Stream</h2>
         <span className="tag tag-orange">DEV</span>
       </div>
-      <p style={{color:'var(--tx-1)',fontSize:13}}>
-        Live event stream — EO operations across all rooms. Shows internal event structure, epistemic classification, and room topology.
-      </p>
+      <p style={{color:'var(--tx-1)',fontSize:13}}>Live EO event stream across all rooms. Operator classification, epistemic layer, and room topology.</p>
     </div>
 
     {/* Room topology */}
     <div className="card" style={{marginBottom:16,padding:16}}>
-      <span className="section-label">ROOM TOPOLOGY</span>
-      <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:8}}>
-        {rooms.map(r => (
-          <div key={r.id} style={{padding:'8px 12px',borderRadius:'var(--r)',background:`var(--${r.color}-dim)`,border:`1px solid var(--${r.color})20`,display:'flex',alignItems:'center',gap:8}}>
-            <div style={{width:8,height:8,borderRadius:'50%',background:`var(--${r.color})`}}/>
-            <div>
-              <span style={{fontSize:11,fontWeight:600,color:`var(--${r.color})`,display:'block'}}>{r.label}</span>
-              <span style={{fontSize:9,fontFamily:'var(--mono)',color:'var(--tx-3)'}}>{r.id.slice(0,28)}…</span>
-            </div>
-          </div>
-        ))}
-      </div>
-      {/* Flow diagram */}
-      <div style={{marginTop:14,padding:'12px 16px',background:'var(--bg-3)',borderRadius:'var(--r)',fontFamily:'var(--mono)',fontSize:11,color:'var(--tx-2)',lineHeight:1.9,whiteSpace:'pre'}}>
-{`SCHEMA ROOM (MEANT)  →  defines prompts, categories, definitions
-       ↓
-CLIENT VAULT (GIVEN)  →  observations, identity fields, provider index
-       ↓  selective share (SEG, per-field AES-GCM)
-BRIDGE ROOM  (MEANT)  →  encrypted refs, interpretations, messages
-       ↓  anonymized projection (consent-gated)
-METRICS ROOM (MEANT)  →  anonymized observations, demographics, cohort hashes
-
-PROVIDER ROSTER (MEANT)  →  case index, provider-side labels`}
-      </div>
-    </div>
-
-    {/* Stats row */}
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))',gap:10,marginBottom:16}}>
-      {[
-        {l:'TOTAL EVENTS',v:stats.total,c:null},
-        {l:'GIVEN',v:stats.given,c:'teal'},
-        {l:'MEANT',v:stats.meant,c:'gold'},
-        {l:'ROOMS',v:rooms.length,c:null},
-      ].map((s,i) => (
-        <div key={i} className="card" style={{padding:14}}>
-          <span className="section-label">{s.l}</span>
-          <span style={{fontSize:22,fontWeight:700,display:'block',marginTop:2,color:s.c?`var(--${s.c})`:'var(--tx-0)'}}>{s.v}</span>
-        </div>
-      ))}
-    </div>
-
-    {/* Operator breakdown */}
-    <div className="card" style={{marginBottom:16,padding:14}}>
-      <span className="section-label">OPERATOR DISTRIBUTION</span>
+      <span className="section-label">ROOM TOPOLOGY ({rooms.length} rooms)</span>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
-        {Object.entries(stats.byOp).sort((a,b)=>b[1]-a[1]).map(([op,count]) => (
-          <div key={op} style={{padding:'5px 11px',borderRadius:'var(--r)',background:`var(--${OP_COLORS[op]||'blue'}-dim)`,border:`1px solid var(--${OP_COLORS[op]||'blue'})20`,display:'flex',alignItems:'center',gap:6}}>
-            <span style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:`var(--${OP_COLORS[op]||'blue'})`}}>{op}</span>
-            <span style={{fontSize:12,color:'var(--tx-1)'}}>{count}</span>
-          </div>
-        ))}
+        {rooms.map(r=><div key={r.id} style={{padding:'6px 10px',borderRadius:'var(--r)',background:`var(--${r.color}-dim)`,border:`1px solid var(--${r.color})20`,display:'flex',alignItems:'center',gap:6}}>
+          <div style={{width:7,height:7,borderRadius:'50%',background:`var(--${r.color})`}}/>
+          <span style={{fontSize:10,fontWeight:600,color:`var(--${r.color})`}}>{r.label}</span>
+          <span style={{fontSize:8,fontFamily:'var(--mono)',color:'var(--tx-3)'}}>{r.id.slice(0,20)}…</span>
+        </div>)}
       </div>
+    </div>
+
+    {/* Stats */}
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:8,marginBottom:16}}>
+      {[{l:'TOTAL',v:stats.total},{l:'GIVEN',v:stats.given,c:'teal'},{l:'MEANT',v:stats.meant,c:'gold'},{l:'ROOMS',v:rooms.length}].map((s,i)=>
+        <div key={i} className="card" style={{padding:12}}><span className="section-label">{s.l}</span>
+          <span style={{fontSize:20,fontWeight:700,color:s.c?`var(--${s.c})`:'var(--tx-0)'}}>{s.v}</span></div>)}
     </div>
 
     {/* Filters */}
-    <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
-      <select value={filter.roomType} onChange={e=>setFilter({...filter,roomType:e.target.value})} style={{width:'auto',padding:'6px 10px',fontSize:12}}>
+    <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+      <select value={filter.roomType} onChange={e=>setFilter({...filter,roomType:e.target.value})} style={{width:'auto',padding:'5px 8px',fontSize:11}}>
         <option value="all">All Rooms</option>
-        <option value="vault">Vault</option>
-        <option value="bridge">Bridge</option>
-        <option value="roster">Roster</option>
-        <option value="unknown">Unknown</option>
+        {['vault','bridge','roster','schema','metrics','network'].map(t=><option key={t} value={t}>{t}</option>)}
       </select>
-      <select value={filter.operator} onChange={e=>setFilter({...filter,operator:e.target.value})} style={{width:'auto',padding:'6px 10px',fontSize:12}}>
+      <select value={filter.operator} onChange={e=>setFilter({...filter,operator:e.target.value})} style={{width:'auto',padding:'5px 8px',fontSize:11}}>
         <option value="all">All Operators</option>
-        {['INS','ALT','DES','SEG','NUL','REC','CON','SUP'].map(op => <option key={op} value={op}>{op}</option>)}
+        {OPERATORS.map(op=><option key={op} value={op}>{op}</option>)}
       </select>
-      <select value={filter.epistemic} onChange={e=>setFilter({...filter,epistemic:e.target.value})} style={{width:'auto',padding:'6px 10px',fontSize:12}}>
-        <option value="all">All Epistemic</option>
-        <option value="GIVEN">GIVEN</option>
-        <option value="MEANT">MEANT</option>
+      <select value={filter.epistemic} onChange={e=>setFilter({...filter,epistemic:e.target.value})} style={{width:'auto',padding:'5px 8px',fontSize:11}}>
+        <option value="all">All Epistemic</option><option value="GIVEN">GIVEN</option><option value="MEANT">MEANT</option>
       </select>
-      <div style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center'}}>
-        <div style={{display:'flex',alignItems:'center',gap:6}}>
-          <span style={{fontSize:10,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>AUTO</span>
-          <Toggle on={autoRefresh} onChange={()=>setAutoRefresh(!autoRefresh)}/>
-        </div>
-        <button onClick={loadEvents} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:4}}><I n="search" s={11}/>Refresh</button>
+      <div style={{marginLeft:'auto',display:'flex',gap:6,alignItems:'center'}}>
+        <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>AUTO</span>
+        <Toggle on={autoRefresh} onChange={()=>setAutoRefresh(!autoRefresh)}/>
+        <button onClick={loadEvents} className="b-gho b-xs"><I n="search" s={10}/></button>
       </div>
     </div>
+    <div style={{fontSize:10,color:'var(--tx-3)',fontFamily:'var(--mono)',marginBottom:8}}>Showing {filtered.length} of {events.length}</div>
 
-    {/* Showing count */}
-    <div style={{fontSize:11,color:'var(--tx-3)',fontFamily:'var(--mono)',marginBottom:10}}>
-      Showing {filtered.length} of {events.length} events
-    </div>
-
-    {/* Event list */}
-    <div style={{display:'flex',flexDirection:'column',gap:4}}>
-      {filtered.length === 0 && (
-        <div className="card" style={{textAlign:'center',padding:'40px 20px',borderStyle:'dashed'}}>
-          <I n="search" s={28}/><p style={{color:'var(--tx-3)',marginTop:10,fontSize:13}}>No events match current filters</p>
-        </div>
-      )}
-      {filtered.map((ev,i) => {
-        const isExpanded = expanded.has(ev.id);
-        const opC = OP_COLORS[ev.op]||'blue';
-        const rmC = ROOM_COLORS[ev.roomInfo.type]||'orange';
+    {/* Events */}
+    <div style={{display:'flex',flexDirection:'column',gap:3}}>
+      {filtered.length===0&&<div className="card" style={{textAlign:'center',padding:'30px 20px',borderStyle:'dashed'}}><I n="search" s={24}/><p style={{color:'var(--tx-3)',marginTop:8,fontSize:12}}>No events match filters</p></div>}
+      {filtered.slice(0,100).map((ev,i)=>{
+        const isExp=expanded.has(ev.id);const opC=OP_COLORS[ev.op]||'blue';const rmC=ROOM_COLORS[ev.roomInfo.type]||'orange';
         return <div key={ev.id||i} style={{background:'var(--bg-2)',border:'1px solid var(--border-0)',borderRadius:'var(--r)',overflow:'hidden'}}>
-          <div onClick={()=>toggle(ev.id)} style={{padding:'10px 14px',display:'flex',alignItems:'center',gap:8,cursor:'pointer',transition:'background .15s'}}
-            onMouseEnter={e=>e.currentTarget.style.background='var(--bg-3)'}
-            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-            <div style={{width:9,height:9,borderRadius:'50%',background:`var(--${opC})`,flexShrink:0,boxShadow:`0 0 6px var(--${opC}-dim)`}}/>
-            <span className={`tag tag-${opC}`} style={{fontSize:9.5,minWidth:28,textAlign:'center'}}>{ev.op}</span>
-            <span className={`tag tag-${rmC}`} style={{fontSize:9}}>{ev.roomInfo.type.toUpperCase()}</span>
-            <span className={`tag ${ev.epistemic==='GIVEN'?'tag-teal':'tag-gold'}`} style={{fontSize:9}}>{ev.epistemic}</span>
-            <span style={{fontSize:12,fontWeight:500,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.label}</span>
-            <span style={{fontSize:10.5,color:'var(--tx-2)',fontFamily:'var(--mono)',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flexShrink:0}}>{ev.desc}</span>
-            <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)',flexShrink:0}}>{ev.ts?new Date(ev.ts).toLocaleTimeString():''}</span>
-            <I n={isExpanded?'x':'chevR'} s={11} c="var(--tx-3)"/>
+          <div onClick={()=>toggle(ev.id)} style={{padding:'8px 12px',display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}
+            onMouseEnter={e=>e.currentTarget.style.background='var(--bg-3)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+            <div style={{width:7,height:7,borderRadius:'50%',background:`var(--${opC})`,flexShrink:0}}/>
+            <span className={`tag tag-${opC}`} style={{fontSize:9,minWidth:26,textAlign:'center'}}>{ev.op}</span>
+            <span className={`tag tag-${rmC}`} style={{fontSize:8.5}}>{ev.roomInfo.type.toUpperCase()}</span>
+            <span className={`tag ${ev.epistemic==='GIVEN'?'tag-teal':'tag-gold'}`} style={{fontSize:8.5}}>{ev.epistemic}</span>
+            <span style={{fontSize:11.5,fontWeight:500,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.label}</span>
+            <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.desc}</span>
+            <span style={{fontSize:8.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{ev.ts?new Date(ev.ts).toLocaleTimeString():''}</span>
+            <I n={isExp?'x':'chevR'} s={10} c="var(--tx-3)"/>
           </div>
-          {isExpanded && (
-            <div className="anim-in" style={{borderTop:'1px solid var(--border-0)',padding:'14px 16px',background:'var(--bg-1)'}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
-                <div>
-                  <span className="section-label">EVENT TYPE</span>
-                  <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--tx-1)',display:'block',wordBreak:'break-all'}}>{ev.type}</span>
-                </div>
-                <div>
-                  <span className="section-label">SENDER</span>
-                  <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--tx-1)',display:'block',wordBreak:'break-all'}}>{ev.sender}</span>
-                </div>
-                <div>
-                  <span className="section-label">ROOM ID</span>
-                  <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--tx-1)',display:'block',wordBreak:'break-all'}}>{ev.roomId}</span>
-                </div>
-                <div>
-                  <span className="section-label">FULL TIMESTAMP</span>
-                  <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--tx-1)',display:'block'}}>{ev.ts?new Date(ev.ts).toISOString():'—'}</span>
-                </div>
-                {ev.stateKey !== null && <div>
-                  <span className="section-label">STATE KEY</span>
-                  <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--tx-1)',display:'block'}}>{ev.stateKey || '(empty)'}</span>
-                </div>}
-                <div>
-                  <span className="section-label">EVENT ID</span>
-                  <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--tx-1)',display:'block',wordBreak:'break-all'}}>{ev.id}</span>
-                </div>
-              </div>
-              <span className="section-label">RAW CONTENT</span>
-              <pre style={{fontFamily:'var(--mono)',fontSize:10.5,color:'var(--tx-1)',background:'var(--bg-0)',border:'1px solid var(--border-0)',borderRadius:'var(--r)',padding:12,overflow:'auto',maxHeight:280,lineHeight:1.5,whiteSpace:'pre-wrap',wordBreak:'break-all',marginTop:4}}>
-{JSON.stringify(ev.content, null, 2)}
-              </pre>
-              {/* EO classification box */}
-              <div style={{marginTop:12,padding:'10px 14px',background:'var(--bg-3)',borderRadius:'var(--r)'}}>
-                <span className="section-label" style={{marginBottom:8}}>EO MODEL CLASSIFICATION</span>
-                <div style={{display:'flex',gap:20,flexWrap:'wrap',marginTop:6}}>
-                  <div>
-                    <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)',display:'block'}}>OPERATOR</span>
-                    <span style={{fontFamily:'var(--mono)',fontSize:14,fontWeight:700,color:`var(--${opC})`}}>{ev.op}</span>
-                  </div>
-                  <div>
-                    <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)',display:'block'}}>EPISTEMIC</span>
-                    <span style={{fontFamily:'var(--mono)',fontSize:14,fontWeight:700,color:ev.epistemic==='GIVEN'?'var(--teal)':'var(--gold)'}}>{ev.epistemic}</span>
-                  </div>
-                  <div>
-                    <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)',display:'block'}}>FRAME</span>
-                    <span style={{fontFamily:'var(--mono)',fontSize:14,fontWeight:700,color:`var(--${rmC})`}}>{ev.roomInfo.type.toUpperCase()}</span>
-                  </div>
-                  <div>
-                    <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)',display:'block'}}>STATE?</span>
-                    <span style={{fontFamily:'var(--mono)',fontSize:14,fontWeight:700}}>{ev.isState?'YES':'NO'}</span>
-                  </div>
-                </div>
-              </div>
+          {isExp&&<div className="anim-in" style={{borderTop:'1px solid var(--border-0)',padding:'12px 14px',background:'var(--bg-1)'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+              {[['EVENT TYPE',ev.type],['SENDER',ev.sender],['ROOM',ev.roomId],['TIMESTAMP',ev.ts?new Date(ev.ts).toISOString():'—']].map(([l,v])=>
+                <div key={l}><span className="section-label">{l}</span><span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-1)',display:'block',wordBreak:'break-all'}}>{v}</span></div>)}
             </div>
-          )}
+            <span className="section-label">RAW CONTENT</span>
+            <pre style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-1)',background:'var(--bg-0)',border:'1px solid var(--border-0)',borderRadius:'var(--r)',padding:10,overflow:'auto',maxHeight:200,whiteSpace:'pre-wrap',wordBreak:'break-all',marginTop:4}}>
+{JSON.stringify(ev.content,null,2)}</pre>
+          </div>}
         </div>;
       })}
-    </div>
-
-    {/* Legend */}
-    <div className="card" style={{marginTop:20,padding:16}}>
-      <span className="section-label">EO OPERATOR LEGEND</span>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))',gap:6,marginTop:8}}>
-        {OP_LEGEND.map(item => (
-          <div key={item.op} style={{display:'flex',alignItems:'flex-start',gap:8,padding:'5px 0'}}>
-            <span className={`tag tag-${OP_COLORS[item.op]}`} style={{fontSize:10,minWidth:30,textAlign:'center',flexShrink:0}}>{item.op}</span>
-            <div>
-              <span style={{fontSize:12,fontWeight:600,display:'block'}}>{item.label}</span>
-              <span style={{fontSize:10.5,color:'var(--tx-2)'}}>{item.desc}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{marginTop:14,borderTop:'1px solid var(--border-0)',paddingTop:12}}>
-        <span className="section-label">EPISTEMIC TYPES</span>
-        <div style={{display:'flex',gap:24,marginTop:8,flexWrap:'wrap'}}>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span className="tag tag-teal">GIVEN</span>
-            <span style={{fontSize:11.5,color:'var(--tx-1)'}}>Observation — what was seen, reported, or decided by the data owner</span>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span className="tag tag-gold">MEANT</span>
-            <span style={{fontSize:11.5,color:'var(--tx-1)'}}>Interpretation — derived, institutional, always traceable to GIVEN</span>
-          </div>
-        </div>
-      </div>
-      <div style={{marginTop:14,borderTop:'1px solid var(--border-0)',paddingTop:12}}>
-        <span className="section-label">FRAME TYPES (ROOM TOPOLOGY)</span>
-        <div style={{display:'flex',gap:20,marginTop:8,flexWrap:'wrap'}}>
-          {[
-            {type:'VAULT',color:'teal',desc:'Client-owned, private, observations'},
-            {type:'BRIDGE',color:'blue',desc:'Client + provider, shared fields'},
-            {type:'ROSTER',color:'gold',desc:'Provider-only case index'},
-          ].map(f => (
-            <div key={f.type} style={{display:'flex',alignItems:'center',gap:8}}>
-              <span className={`tag tag-${f.color}`}>{f.type}</span>
-              <span style={{fontSize:11.5,color:'var(--tx-1)'}}>{f.desc}</span>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   </div>;
 };
 
 /* ═══════════════════ LOGIN ═══════════════════ */
 const LoginScreen = ({onLogin}) => {
-  const [hs, setHs] = useState('matrix.org');
-  const [user, setUser] = useState('');
-  const [pass, setPass] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
+  const [mode,setMode] = useState('login'); // login | register
+  const [hs,setHs] = useState('matrix.org'); const [user,setUser] = useState(''); const [pass,setPass] = useState('');
+  const [loading,setLoading] = useState(false); const [err,setErr] = useState('');
 
   const go = async (e) => {
     e.preventDefault(); setLoading(true); setErr('');
-    try { const s = await svc.login(hs, user, pass); onLogin(s); }
+    try {
+      if (mode === 'register') {
+        const baseUrl = hs.startsWith('http') ? hs : `https://${hs}`;
+        const resp = await fetch(`${baseUrl}/_matrix/client/v3/register`, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ username: user.replace(/^@/,'').split(':')[0], password: pass, auth: { type: 'm.login.dummy' } })
+        });
+        if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.error || `Registration failed (${resp.status}). Try logging in if account exists.`); }
+      }
+      const s = await svc.login(hs, user, pass); onLogin(s);
+    }
     catch (e) { setErr(e.message); }
     setLoading(false);
   };
@@ -762,33 +709,35 @@ const LoginScreen = ({onLogin}) => {
     <div className="anim-up" style={{width:'100%',maxWidth:440,padding:20}}>
       <div style={{background:'var(--bg-1)',border:'1px solid var(--border-0)',borderRadius:'var(--r-lg)',padding:'44px 40px',position:'relative',overflow:'hidden'}}>
         <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:'linear-gradient(90deg, var(--gold), var(--teal), var(--blue))'}}/>
-
         <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:10}}>
-          <div style={{width:44,height:44,borderRadius:'var(--r-lg)',background:'var(--gold-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold)'}}>
-            <I n="shield" s={24}/>
-          </div>
-          <div>
-            <h1 style={{fontSize:24,fontWeight:800,fontFamily:'var(--serif)',letterSpacing:'-0.02em'}}>Casevault</h1>
-            <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-2)',letterSpacing:'.08em'}}>SOVEREIGN CASE MANAGEMENT</span>
-          </div>
+          <div style={{width:44,height:44,borderRadius:'var(--r-lg)',background:'var(--gold-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold)'}}><I n="shield" s={24}/></div>
+          <div><h1 style={{fontSize:24,fontWeight:800,fontFamily:'var(--serif)',letterSpacing:'-0.02em'}}>Tessera</h1>
+            <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-2)',letterSpacing:'.08em'}}>SOVEREIGN CASE MANAGEMENT</span></div>
+        </div>
+        <p style={{color:'var(--tx-1)',fontSize:13,marginTop:18,marginBottom:24,lineHeight:1.65}}>
+          Client-owned data vaults on Matrix. Per-field encryption. Providers see only what clients share. Each tile is yours to place.
+        </p>
+
+        <div className="tabs" style={{marginBottom:20}}>
+          <div className={`tab ${mode==='login'?'active':''}`} onClick={()=>{setMode('login');setErr('')}}>Sign In</div>
+          <div className={`tab ${mode==='register'?'active':''}`} onClick={()=>{setMode('register');setErr('')}}>Create Account</div>
         </div>
 
-        <p style={{color:'var(--tx-1)',fontSize:13,marginTop:18,marginBottom:30,lineHeight:1.65}}>
-          Client-owned data vaults on Matrix. Per-field encryption. Providers see only what clients share. Revocable at any time.
-        </p>
+        {mode==='register'&&<div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'10px 14px',marginBottom:16,fontSize:11.5,color:'var(--tx-1)',lineHeight:1.6}}>
+          <strong style={{color:'var(--teal)'}}>Create a free Matrix account</strong> at matrix.org — or enter your own homeserver URL if you run one. Matrix is a decentralized protocol; your data stays on your server.
+        </div>}
 
         <form onSubmit={go}>
           <div style={{marginBottom:14}}><span className="section-label">HOMESERVER</span><input value={hs} onChange={e=>setHs(e.target.value)} placeholder="matrix.org"/></div>
-          <div style={{marginBottom:14}}><span className="section-label">USERNAME</span><input value={user} onChange={e=>setUser(e.target.value)} placeholder="@you:matrix.org" autoComplete="username"/></div>
-          <div style={{marginBottom:24}}><span className="section-label">PASSWORD</span><input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" autoComplete="current-password"/></div>
-          {err && <div style={{background:'var(--red-dim)',border:'1px solid rgba(232,93,93,.2)',borderRadius:'var(--r)',padding:'9px 14px',fontSize:12.5,color:'var(--red)',marginBottom:16}}>{err}</div>}
+          <div style={{marginBottom:14}}><span className="section-label">USERNAME</span><input value={user} onChange={e=>setUser(e.target.value)} placeholder={mode==='register'?'choose a username':'@you:matrix.org'} autoComplete="username"/></div>
+          <div style={{marginBottom:24}}><span className="section-label">PASSWORD</span><input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" autoComplete={mode==='register'?'new-password':'current-password'}/></div>
+          {err&&<div style={{background:'var(--red-dim)',border:'1px solid rgba(232,93,93,.2)',borderRadius:'var(--r)',padding:'9px 14px',fontSize:12.5,color:'var(--red)',marginBottom:16}}>{err}</div>}
           <button type="submit" className="b-pri" disabled={loading} style={{width:'100%',padding:12,fontSize:14,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-            {loading?<Spin s={16}/>:<I n="lock" s={16}/>} {loading?'Connecting...':'Connect'}
+            {loading?<Spin s={16}/>:<I n="lock" s={16}/>} {loading?'Connecting...':(mode==='register'?'Create Account & Connect':'Connect')}
           </button>
         </form>
-
-        <div style={{marginTop:20,display:'flex',alignItems:'center',gap:8,justifyContent:'center'}}>
-          <div style={{width:6,height:6,borderRadius:'50%',background: typeof matrixcs!=='undefined'?'var(--green)':'var(--gold)'}}/>
+        <div style={{marginTop:16,display:'flex',alignItems:'center',gap:8,justifyContent:'center'}}>
+          <div style={{width:6,height:6,borderRadius:'50%',background:typeof matrixcs!=='undefined'?'var(--green)':'var(--gold)'}}/>
           <span style={{fontFamily:'var(--mono)',fontSize:10.5,color:'var(--tx-3)'}}>
             {typeof matrixcs!=='undefined'?'matrix-js-sdk + Megolm E2EE':'SDK loading — fallback ready'}
           </span>
@@ -803,23 +752,17 @@ const AccountTypeScreen = ({onSelect}) => (
   <div className="grid-bg" style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
     <div className="anim-up" style={{textAlign:'center',maxWidth:600,padding:20}}>
       <h2 style={{fontFamily:'var(--serif)',fontSize:28,fontWeight:700,letterSpacing:'-0.02em',marginBottom:8}}>Choose your role</h2>
-      <p style={{color:'var(--tx-1)',fontSize:14,marginBottom:36}}>This determines your data access model</p>
+      <p style={{color:'var(--tx-1)',fontSize:14,marginBottom:36}}>This determines your data access model and room topology</p>
       <div style={{display:'flex',gap:20,justifyContent:'center',flexWrap:'wrap'}}>
         {[
-          {type:'client', icon:'shield', title:'Client', desc:'Own your data vault. Share specific fields with chosen providers. Revoke access at any time.', color:'teal'},
-          {type:'provider', icon:'briefcase', title:'Provider', desc:'View only what clients share with you. Add case notes and status updates. Request additional information.', color:'gold'},
-        ].map(o => (
-          <div key={o.type} className="card-h" onClick={()=>onSelect(o.type)} style={{width:260,textAlign:'left',padding:28}}>
-            <div style={{width:48,height:48,borderRadius:'var(--r-lg)',background:`var(--${o.color}-dim)`,display:'flex',alignItems:'center',justifyContent:'center',color:`var(--${o.color})`,marginBottom:16}}>
-              <I n={o.icon} s={24}/>
-            </div>
-            <h3 style={{fontSize:18,fontWeight:700,marginBottom:8}}>{o.title}</h3>
-            <p style={{fontSize:12.5,color:'var(--tx-1)',lineHeight:1.6}}>{o.desc}</p>
-            <div style={{marginTop:16}}>
-              <span className={`tag tag-${o.color}`}>{o.type === 'client' ? 'DATA OWNER' : 'DATA CONSUMER'}</span>
-            </div>
-          </div>
-        ))}
+          {type:'client',icon:'shield',title:'Client',desc:'Own your data vault. Record observations. Share specific fields with chosen providers. Revoke access at any time.',color:'teal'},
+          {type:'provider',icon:'briefcase',title:'Provider',desc:'View only what clients share. Add case notes and assessments. Create or join networks. Discover clients by ID.',color:'gold'},
+        ].map(o=><div key={o.type} className="card-h" onClick={()=>onSelect(o.type)} style={{width:260,textAlign:'left',padding:28}}>
+          <div style={{width:48,height:48,borderRadius:'var(--r-lg)',background:`var(--${o.color}-dim)`,display:'flex',alignItems:'center',justifyContent:'center',color:`var(--${o.color})`,marginBottom:16}}><I n={o.icon} s={24}/></div>
+          <h3 style={{fontSize:18,fontWeight:700,marginBottom:8}}>{o.title}</h3>
+          <p style={{fontSize:12.5,color:'var(--tx-1)',lineHeight:1.6}}>{o.desc}</p>
+          <div style={{marginTop:16}}><span className={`tag tag-${o.color}`}>{o.type==='client'?'DATA OWNER':'DATA CONSUMER'}</span></div>
+        </div>)}
       </div>
     </div>
   </div>
@@ -828,9 +771,12 @@ const AccountTypeScreen = ({onSelect}) => (
 /* ═══════════════════ CLIENT APP ═══════════════════ */
 const ClientApp = ({session, onLogout, showToast}) => {
   const [vaultRoom, setVaultRoom] = useState(null);
+  const [schemaRoom, setSchemaRoom] = useState(null);
   const [vaultData, setVaultData] = useState({});
-  const [providers, setProviders] = useState([]); // [{bridgeRoomId, providerUserId, sharedFields:{fieldKey:true/false}, providerName}]
-  const [view, setView] = useState('vault'); // vault | providers | bridge:roomId
+  const [observations, setObservations] = useState([]);
+  const [metricsConsent, setMetricsConsent] = useState({enabled:false,categories:[]});
+  const [providers, setProviders] = useState([]);
+  const [view, setView] = useState('vault');
   const [activeBridge, setActiveBridge] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editModal, setEditModal] = useState(false);
@@ -840,501 +786,545 @@ const ClientApp = ({session, onLogout, showToast}) => {
   const [bridgeMessages, setBridgeMessages] = useState([]);
   const [msgText, setMsgText] = useState('');
   const [hardRevokeTarget, setHardRevokeTarget] = useState(null);
+  const [obsModal, setObsModal] = useState(null); // prompt object or null
+  const [obsValue, setObsValue] = useState('');
+  const [obsDate, setObsDate] = useState(new Date().toISOString().slice(0,10));
+  const [obsFreeText, setObsFreeText] = useState('');
 
-  // Init: find or create vault room
   useEffect(() => { initVault(); }, []);
+
+  const vaultFrame = (room) => ({type:'vault',room:room||vaultRoom,role:'client',epistemic:'GIVEN'});
+  const bridgeFrame = (room) => ({type:'bridge',room,role:'client',epistemic:'MEANT'});
 
   const initVault = async () => {
     setLoading(true);
     const rooms = await svc.getJoinedRooms();
-    let found = null;
+    let vault = null, schema = null;
     for (const rid of rooms) {
       const id = await svc.getState(rid, EVT.IDENTITY);
-      if (id && id.type === 'client' && id.owner === svc.userId) { found = rid; break; }
+      if (id?.account_type === 'client' && id.owner === svc.userId) vault = rid;
+      if (id?.account_type === 'schema' && id.owner === svc.userId) schema = rid;
     }
-    if (!found) {
-      found = await svc.createRoom('[Vault] My Data', 'Personal data vault', [
-        { type: EVT.IDENTITY, state_key: '', content: { type: 'client', owner: svc.userId, created: Date.now() } },
-        { type: EVT.VAULT_DATA, state_key: '', content: { fields: {} } },
-        { type: EVT.VAULT_INDEX, state_key: '', content: { providers: [] } },
+    if (!vault) {
+      vault = await svc.createRoom('[Tessera Vault]', 'Personal data vault', [
+        {type:EVT.IDENTITY,state_key:'',content:{account_type:'client',owner:svc.userId,created:Date.now()}},
+        {type:EVT.VAULT_SNAPSHOT,state_key:'',content:{fields:{},observations:[],metrics_consent:{enabled:false,categories:[]}}},
+        {type:EVT.VAULT_PROVIDERS,state_key:'',content:{providers:[]}},
       ]);
-      showToast('Vault created — encrypted room ready', 'success');
+      showToast('Vault created — encrypted room ready','success');
     }
-    setVaultRoom(found);
-    await loadVault(found);
+    if (!schema) {
+      schema = await svc.createRoom('[Tessera Schema]','Schema definitions', [
+        {type:EVT.IDENTITY,state_key:'',content:{account_type:'schema',owner:svc.userId,created:Date.now()}},
+      ]);
+      // Seed default prompts
+      for (const p of DEFAULT_PROMPTS) await svc.setState(schema, EVT.SCHEMA_PROMPT, p, p.key);
+      for (const d of DEFAULT_DEFINITIONS) await svc.setState(schema, EVT.SCHEMA_DEF, d, d.key);
+      await svc.setState(schema, EVT.SCHEMA_TRANSFORM, {id:'transform_default',transforms:DEFAULT_TRANSFORMS}, 'default');
+    }
+    setVaultRoom(vault); setSchemaRoom(schema);
+    await loadVault(vault);
     setLoading(false);
   };
 
   const loadVault = async (rid) => {
-    const data = await svc.getState(rid, EVT.VAULT_DATA);
-    setVaultData(data?.fields || {});
-    const idx = await svc.getState(rid, EVT.VAULT_INDEX);
+    const snap = await svc.getState(rid, EVT.VAULT_SNAPSHOT);
+    setVaultData(snap?.fields || {});
+    setObservations(snap?.observations || []);
+    setMetricsConsent(snap?.metrics_consent || {enabled:false,categories:[]});
+    const idx = await svc.getState(rid, EVT.VAULT_PROVIDERS);
     setProviders(idx?.providers || []);
   };
 
-  const saveVaultData = async (fields) => {
-    await svc.setState(vaultRoom, EVT.VAULT_DATA, { fields });
-    setVaultData(fields);
+  const saveSnapshot = async (fields, obs, mc) => {
+    const snapshot = {fields:fields??vaultData, observations:obs??observations, metrics_consent:mc??metricsConsent};
+    await svc.setState(vaultRoom, EVT.VAULT_SNAPSHOT, snapshot);
+    setVaultData(snapshot.fields); setObservations(snapshot.observations); setMetricsConsent(snapshot.metrics_consent);
   };
 
   const saveProviderIndex = async (provs) => {
-    await svc.setState(vaultRoom, EVT.VAULT_INDEX, { providers: provs });
+    await svc.setState(vaultRoom, EVT.VAULT_PROVIDERS, {providers:provs});
     setProviders(provs);
   };
 
+  // Edit identity fields — emits INS or ALT per field
   const handleEditSave = async () => {
-    const updated = { ...vaultData, ...editData };
-    await saveVaultData(updated);
+    const updated = {...vaultData, ...editData};
+    for (const [key, val] of Object.entries(editData)) {
+      if (val && !vaultData[key]) {
+        await emitOp(vaultRoom, 'INS', {field:key,value:val}, {source:'client_input'}, vaultFrame());
+      } else if (val && vaultData[key] && val !== vaultData[key]) {
+        await emitOp(vaultRoom, 'ALT', {field:key,entity:'client_profile'}, {from:vaultData[key],to:val,source:'client_input'}, vaultFrame());
+      } else if (!val && vaultData[key]) {
+        await emitOp(vaultRoom, 'NUL', {field:key,entity:'client_profile'}, {reason:'client_cleared',previous_value:vaultData[key]}, vaultFrame());
+      }
+    }
+    await saveSnapshot(updated);
     setEditModal(false);
-    showToast('Vault updated', 'success');
-    // Sync changed fields to any bridges that share them
+    showToast('Vault updated','success');
+    // Propagate to bridges (§8.3)
     for (const prov of providers) {
       const changedShared = Object.keys(editData).filter(k => prov.sharedFields?.[k]);
-      if (changedShared.length > 0) {
-        await syncFieldsToBridge(prov.bridgeRoomId, prov.sharedFields, updated);
+      if (changedShared.length > 0) await syncFieldsToBridge(prov.bridgeRoomId, prov.sharedFields, updated);
+    }
+  };
+
+  // Record structured observation (Addendum A)
+  const handleRecordObservation = async () => {
+    if (!obsValue || !obsModal) return;
+    const obs = { id:genOpId(), category:obsModal.key, value:obsValue, date:obsDate, prompt_id:obsModal.id,
+      free_text:obsFreeText||undefined, ts:Date.now() };
+    await emitOp(vaultRoom, 'INS', {type:'observation',category:obsModal.key,value:obsValue,date:obsDate},
+      {reported_by:'client',method:'self_report',prompt:obsModal.question,free_text:obsFreeText||undefined}, vaultFrame());
+    const newObs = [...observations, obs];
+    await saveSnapshot(undefined, newObs);
+    setObsModal(null); setObsValue(''); setObsFreeText('');
+    showToast(`Observation recorded: ${obsModal.question}`,'success');
+    // Emit to metrics if consent
+    if (metricsConsent.enabled && obsModal.metrics && metricsConsent.categories?.includes(obsModal.category)) {
+      for (const prov of providers) {
+        if (prov.metricsRoom) {
+          await emitMetric(prov.metricsRoom, svc.userId, {category:obsModal.key,value:obsValue,date_bucket:`${obsDate.slice(0,7)}`}, vaultData);
+        }
       }
     }
   };
 
-  // Create bridge room + share selected fields
   const handleAddProvider = async () => {
     if (!newProviderId.trim()) return;
     try {
-      // Create bridge room
-      const bridgeId = await svc.createRoom(
-        `[Bridge] ${svc.userId} ↔ ${newProviderId}`,
-        'Casevault bridge — shared data room',
-        [
-          { type: EVT.BRIDGE_META, state_key: '', content: {
-            client: svc.userId, provider: newProviderId, created: Date.now(), status: 'active',
-          }},
-          { type: EVT.BRIDGE_REFS, state_key: '', content: { fields: {} } },
-        ]
-      );
-      // Invite provider
+      const bridgeId = await svc.createRoom(`[Tessera Bridge] ${svc.userId} ↔ ${newProviderId}`, 'Tessera bridge — shared data room', [
+        {type:EVT.BRIDGE_META,state_key:'',content:{client:svc.userId,provider:newProviderId,created:Date.now(),status:'active'}},
+        {type:EVT.BRIDGE_REFS,state_key:'',content:{fields:{}}},
+      ]);
       await svc.invite(bridgeId, newProviderId);
-      // Add to index
-      const newProv = { bridgeRoomId: bridgeId, providerUserId: newProviderId, sharedFields: {}, providerName: newProviderId };
-      const updated = [...providers, newProv];
-      await saveProviderIndex(updated);
-      setAddProviderModal(false);
-      setNewProviderId('');
-      showToast(`Bridge created — invite sent to ${newProviderId}`, 'success');
-    } catch (e) {
-      showToast('Failed: ' + e.message, 'error');
-    }
+      await emitOp(vaultRoom, 'CON', {source:svc.userId,destination:newProviderId,relationship:'client_provider'},
+        {bridge_room:bridgeId,initiated_by:'client'}, vaultFrame());
+      const newProv = {bridgeRoomId:bridgeId,providerUserId:newProviderId,sharedFields:{},providerName:newProviderId};
+      await saveProviderIndex([...providers, newProv]);
+      setAddProviderModal(false); setNewProviderId('');
+      showToast(`Bridge created — invite sent to ${newProviderId}`,'success');
+    } catch(e) { showToast('Failed: '+e.message,'error'); }
   };
 
-  // Sync encrypted field refs to bridge room
   const syncFieldsToBridge = async (bridgeRoomId, sharedFields, data) => {
     const refs = {};
-    for (const [fieldKey, shared] of Object.entries(sharedFields)) {
-      if (shared && data[fieldKey]) {
-        const fieldKeyB64 = await FieldCrypto.generateKey();
-        const encrypted = await FieldCrypto.encrypt(data[fieldKey], fieldKeyB64);
-        refs[fieldKey] = { ...encrypted, key: fieldKeyB64 };
+    for (const [fk, shared] of Object.entries(sharedFields)) {
+      if (shared && data[fk]) {
+        const keyB64 = await FieldCrypto.generateKey();
+        const enc = await FieldCrypto.encrypt(data[fk], keyB64);
+        refs[fk] = {...enc, key:keyB64};
       }
-      // If not shared, field is simply absent from refs — no key = no access
     }
-    await svc.setState(bridgeRoomId, EVT.BRIDGE_REFS, { fields: refs, updated: Date.now() });
+    await svc.setState(bridgeRoomId, EVT.BRIDGE_REFS, {fields:refs, updated:Date.now()});
   };
 
-  // Toggle a field on/off for a provider
-  const handleToggleField = async (provIndex, fieldKey) => {
-    const prov = providers[provIndex];
-    const newShared = { ...prov.sharedFields, [fieldKey]: !prov.sharedFields[fieldKey] };
-    const updatedProvs = [...providers];
-    updatedProvs[provIndex] = { ...prov, sharedFields: newShared };
-    await saveProviderIndex(updatedProvs);
-    // Re-encrypt and sync to bridge
+  const handleToggleField = async (pi, fk) => {
+    const prov = providers[pi];
+    const newShared = {...prov.sharedFields, [fk]:!prov.sharedFields[fk]};
+    const ups = [...providers]; ups[pi] = {...prov, sharedFields:newShared};
+    await saveProviderIndex(ups);
+    await emitOp(prov.bridgeRoomId, 'SEG', {field:fk,visibility:newShared[fk]?'shared':'revoked'},
+      {provider:prov.providerUserId}, bridgeFrame(prov.bridgeRoomId), newShared[fk]?[]:[`prev_seg_${fk}`]);
     await syncFieldsToBridge(prov.bridgeRoomId, newShared, vaultData);
-    showToast(newShared[fieldKey] ? `Shared ${VAULT_FIELDS.find(f=>f.key===fieldKey)?.label} — new encryption key issued` : `Revoked ${VAULT_FIELDS.find(f=>f.key===fieldKey)?.label} — key destroyed`, newShared[fieldKey] ? 'success' : 'warn');
+    const label = VAULT_FIELDS.find(f=>f.key===fk)?.label||fk;
+    showToast(newShared[fk]?`Shared ${label} — new key issued`:`Revoked ${label} — key destroyed`, newShared[fk]?'success':'warn');
   };
 
-  // Hard revoke — destroy bridge, create new one with remaining shared fields
-  const handleHardRevoke = async (provIndex) => {
-    const prov = providers[provIndex];
+  const handleHardRevoke = async (pi) => {
+    const prov = providers[pi];
     try {
-      // Create new bridge room
-      const newBridgeId = await svc.createRoom(
-        `[Bridge] ${svc.userId} ↔ ${prov.providerUserId}`,
-        'Casevault bridge — replaced',
-        [
-          { type: EVT.BRIDGE_META, state_key: '', content: {
-            client: svc.userId, provider: prov.providerUserId, created: Date.now(), status: 'active', previous: prov.bridgeRoomId,
-          }},
-          { type: EVT.BRIDGE_REFS, state_key: '', content: { fields: {} } },
-        ]
-      );
-
-      // Sync still-shared fields with fresh keys to new room
-      const stillShared = Object.fromEntries(Object.entries(prov.sharedFields).filter(([,v]) => v));
-      if (Object.keys(stillShared).length > 0) {
-        await syncFieldsToBridge(newBridgeId, stillShared, vaultData);
-      }
-
-      // Invite provider to new room
+      const newBridgeId = await svc.createRoom(`[Tessera Bridge] ${svc.userId} ↔ ${prov.providerUserId}`, 'Tessera bridge — replaced', [
+        {type:EVT.BRIDGE_META,state_key:'',content:{client:svc.userId,provider:prov.providerUserId,created:Date.now(),status:'active',previous:prov.bridgeRoomId}},
+        {type:EVT.BRIDGE_REFS,state_key:'',content:{fields:{}}},
+      ]);
+      await emitOp(prov.bridgeRoomId, 'NUL', {entity:'bridge',field:'relationship'}, {reason:'hard_revoke'}, bridgeFrame(prov.bridgeRoomId));
+      const stillShared = Object.fromEntries(Object.entries(prov.sharedFields).filter(([,v])=>v));
+      if (Object.keys(stillShared).length > 0) await syncFieldsToBridge(newBridgeId, stillShared, vaultData);
       await svc.invite(newBridgeId, prov.providerUserId);
-
-      // Tombstone old room
       await svc.tombstone(prov.bridgeRoomId, newBridgeId);
-      // Kick provider from old room
       try { await svc.kick(prov.bridgeRoomId, prov.providerUserId, 'Bridge rotated — data revoked'); } catch {}
-
-      // Update index
-      const updatedProvs = [...providers];
-      updatedProvs[provIndex] = { ...prov, bridgeRoomId: newBridgeId };
-      await saveProviderIndex(updatedProvs);
-
+      await emitOp(newBridgeId, 'CON', {source:svc.userId,destination:prov.providerUserId,relationship:'client_provider'},
+        {bridge_room:newBridgeId,initiated_by:'client',reason:'hard_revoke_replacement'}, bridgeFrame(newBridgeId));
+      const ups = [...providers]; ups[pi] = {...prov, bridgeRoomId:newBridgeId};
+      await saveProviderIndex(ups);
       setHardRevokeTarget(null);
-      showToast('Hard revoke complete — old room tombstoned, all keys rotated, new bridge created', 'success');
-    } catch (e) {
-      showToast('Hard revoke failed: ' + e.message, 'error');
-    }
+      showToast('Hard revoke complete — old room tombstoned, all keys rotated','success');
+    } catch(e) { showToast('Hard revoke failed: '+e.message,'error'); }
   };
 
-  // Remove provider entirely
-  const handleRemoveProvider = async (provIndex) => {
-    const prov = providers[provIndex];
+  const handleRemoveProvider = async (pi) => {
+    const prov = providers[pi];
     try {
       try { await svc.kick(prov.bridgeRoomId, prov.providerUserId); } catch {}
-      await svc.setState(prov.bridgeRoomId, EVT.BRIDGE_REFS, { fields: {}, revoked: true, updated: Date.now() });
-      const updatedProvs = providers.filter((_,i) => i !== provIndex);
-      await saveProviderIndex(updatedProvs);
-      showToast('Provider removed, all keys destroyed', 'warn');
-    } catch (e) { showToast('Error: ' + e.message, 'error'); }
+      await svc.setState(prov.bridgeRoomId, EVT.BRIDGE_REFS, {fields:{},revoked:true,updated:Date.now()});
+      await emitOp(vaultRoom, 'NUL', {entity:'provider_relationship',field:prov.providerUserId},
+        {reason:'full_severance',bridge:prov.bridgeRoomId}, vaultFrame());
+      await saveProviderIndex(providers.filter((_,i)=>i!==pi));
+      showToast('Provider removed, all keys destroyed','warn');
+    } catch(e) { showToast('Error: '+e.message,'error'); }
   };
 
-  // Load bridge messages
-  const loadBridgeMessages = async (bridgeRoomId) => {
-    const msgs = await svc.getMessages(bridgeRoomId);
-    setBridgeMessages(msgs);
+  const handleMetricsToggle = async () => {
+    const newConsent = {...metricsConsent, enabled:!metricsConsent.enabled,
+      categories:!metricsConsent.enabled? DEFAULT_PROMPTS.filter(p=>p.metrics).map(p=>p.category) : []};
+    await emitOp(vaultRoom, 'REC', {rule:'metrics_consent',scope:'vault'},
+      {consent_level:newConsent.enabled?'anonymized_demographics':'none',categories:newConsent.categories}, vaultFrame());
+    await saveSnapshot(undefined, undefined, newConsent);
+    showToast(newConsent.enabled?'Metrics consent enabled — anonymized data will flow':'Metrics consent revoked',newConsent.enabled?'success':'warn');
   };
 
+  const loadBridgeMessages = async (bid) => { setBridgeMessages(await svc.getMessages(bid)); };
   const handleSendBridgeMsg = async () => {
-    if (!msgText.trim() || !activeBridge) return;
-    await svc.sendMessage(activeBridge, msgText, { [`${NS}.type`]: 'note' });
-    setMsgText('');
-    setTimeout(() => loadBridgeMessages(activeBridge), 500);
+    if (!msgText.trim()||!activeBridge) return;
+    await svc.sendMessage(activeBridge, msgText, {[`${NS}.type`]:'note'});
+    setMsgText(''); setTimeout(()=>loadBridgeMessages(activeBridge),500);
   };
+  const openBridge = (bid) => { setActiveBridge(bid); setView('bridge'); loadBridgeMessages(bid); };
 
-  const openBridge = (bridgeRoomId) => {
-    setActiveBridge(bridgeRoomId);
-    setView('bridge');
-    loadBridgeMessages(bridgeRoomId);
-  };
+  const activeProviderIdx = providers.findIndex(p=>p.bridgeRoomId===activeBridge);
+  const activeProvider = activeProviderIdx>=0?providers[activeProviderIdx]:null;
+  const filledFields = VAULT_FIELDS.filter(f=>vaultData[f.key]);
+  const sharedCount = providers.reduce((s,p)=>s+Object.values(p.sharedFields||{}).filter(Boolean).length,0);
 
-  const activeProviderIdx = providers.findIndex(p => p.bridgeRoomId === activeBridge);
-  const activeProvider = activeProviderIdx >= 0 ? providers[activeProviderIdx] : null;
-
-  const filledFields = VAULT_FIELDS.filter(f => vaultData[f.key]);
-  const sharedCount = providers.reduce((s, p) => s + Object.values(p.sharedFields||{}).filter(Boolean).length, 0);
-
-  if (loading) return <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}><Spin s={28}/></div>;
+  if(loading)return<div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}><Spin s={28}/></div>;
 
   return <div style={{display:'flex',height:'100%'}}>
     {/* Sidebar */}
-    <div style={{width:260,minWidth:260,height:'100%',background:'var(--bg-1)',borderRight:'1px solid var(--border-0)',display:'flex',flexDirection:'column'}}>
-      <div style={{padding:'20px 16px 16px',borderBottom:'1px solid var(--border-0)'}}>
+    <div style={{width:250,minWidth:250,height:'100%',background:'var(--bg-1)',borderRight:'1px solid var(--border-0)',display:'flex',flexDirection:'column'}}>
+      <div style={{padding:'18px 14px 14px',borderBottom:'1px solid var(--border-0)'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
-          <div style={{width:30,height:30,borderRadius:'var(--r)',background:'var(--teal-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--teal)'}}><I n="shield" s={16}/></div>
-          <span style={{fontFamily:'var(--serif)',fontWeight:700,fontSize:16}}>Casevault</span>
+          <div style={{width:28,height:28,borderRadius:'var(--r)',background:'var(--teal-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--teal)'}}><I n="shield" s={15}/></div>
+          <span style={{fontFamily:'var(--serif)',fontWeight:700,fontSize:15}}>Tessera</span>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:6,marginTop:10}}>
-          <div style={{width:20,height:20,borderRadius:'50%',background:'var(--bg-4)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700}}>
-            {(svc.userId||'?')[1]?.toUpperCase()}
-          </div>
-          <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{svc.userId}</span>
-          <span className="tag tag-teal" style={{marginLeft:'auto'}}>CLIENT</span>
+        <div style={{display:'flex',alignItems:'center',gap:6,marginTop:8}}>
+          <span style={{fontFamily:'var(--mono)',fontSize:9.5,color:'var(--tx-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{svc.userId}</span>
+          <span className="tag tag-teal">CLIENT</span>
         </div>
       </div>
-
-      <div style={{flex:1,overflow:'auto',padding:'8px 8px'}}>
-        {[
-          {id:'vault', icon:'folder', label:'My Vault'},
-          {id:'providers', icon:'users', label:'My Providers'},
-          {id:'activity', icon:'zap', label:'Activity Stream'},
-        ].map(item => (
-          <div key={item.id} onClick={()=>{setView(item.id);setActiveBridge(null)}}
-            style={{padding:'11px 12px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:2,
-              background:view===item.id&&!activeBridge?'var(--bg-4)':'transparent',
-              borderLeft:view===item.id&&!activeBridge?'2px solid var(--teal)':'2px solid transparent',
-              display:'flex',alignItems:'center',gap:10,transition:'all .15s',
-              color:view===item.id&&!activeBridge?'var(--tx-0)':'var(--tx-1)'}}
-            onMouseEnter={e=>{if(!(view===item.id&&!activeBridge))e.currentTarget.style.background='var(--bg-3)'}}
-            onMouseLeave={e=>{if(!(view===item.id&&!activeBridge))e.currentTarget.style.background='transparent'}}>
-            <I n={item.icon} s={15}/><span style={{fontSize:13,fontWeight:view===item.id?600:400}}>{item.label}</span>
-          </div>
-        ))}
-
-        {providers.length > 0 && <>
-          <div style={{padding:'16px 12px 6px'}}><span className="section-label">BRIDGES</span></div>
-          {providers.map((p,i) => (
-            <div key={p.bridgeRoomId} onClick={()=>openBridge(p.bridgeRoomId)}
-              className="anim-sl" style={{animationDelay:`${i*40}ms`,padding:'10px 12px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:2,
-                background:activeBridge===p.bridgeRoomId?'var(--bg-4)':'transparent',
-                borderLeft:activeBridge===p.bridgeRoomId?'2px solid var(--gold)':'2px solid transparent',
-                transition:'all .15s'}}
-              onMouseEnter={e=>{if(activeBridge!==p.bridgeRoomId)e.currentTarget.style.background='var(--bg-3)'}}
-              onMouseLeave={e=>{if(activeBridge!==p.bridgeRoomId)e.currentTarget.style.background='transparent'}}>
-              <span style={{fontSize:12.5,fontWeight:activeBridge===p.bridgeRoomId?600:400,color:activeBridge===p.bridgeRoomId?'var(--tx-0)':'var(--tx-1)',display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                {p.providerName || p.providerUserId}
-              </span>
-              <span style={{fontSize:10,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>
-                {Object.values(p.sharedFields||{}).filter(Boolean).length} fields shared
-              </span>
-            </div>
-          ))}
-        </>}
+      <div style={{flex:1,overflow:'auto',padding:'6px 6px'}}>
+        {[{id:'vault',icon:'folder',label:'My Vault'},{id:'observations',icon:'clipboard',label:'Observations'},
+          {id:'providers',icon:'users',label:'My Providers'},{id:'schema',icon:'grid',label:'Schema'},
+          {id:'metrics',icon:'bar',label:'Metrics'},{id:'activity',icon:'zap',label:'Activity Stream'}
+        ].map(item=><div key={item.id} onClick={()=>{setView(item.id);setActiveBridge(null)}}
+          style={{padding:'9px 10px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:1,
+            background:view===item.id&&!activeBridge?'var(--bg-4)':'transparent',
+            borderLeft:view===item.id&&!activeBridge?'2px solid var(--teal)':'2px solid transparent',
+            display:'flex',alignItems:'center',gap:8,transition:'all .15s',
+            color:view===item.id&&!activeBridge?'var(--tx-0)':'var(--tx-1)'}}
+          onMouseEnter={e=>{if(!(view===item.id&&!activeBridge))e.currentTarget.style.background='var(--bg-3)'}}
+          onMouseLeave={e=>{if(!(view===item.id&&!activeBridge))e.currentTarget.style.background='transparent'}}>
+          <I n={item.icon} s={14}/><span style={{fontSize:12.5,fontWeight:view===item.id?600:400}}>{item.label}</span>
+        </div>)}
+        {providers.length>0&&<><div style={{padding:'14px 10px 4px'}}><span className="section-label">BRIDGES</span></div>
+          {providers.map((p,i)=><div key={p.bridgeRoomId} onClick={()=>openBridge(p.bridgeRoomId)}
+            style={{padding:'8px 10px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:1,
+              background:activeBridge===p.bridgeRoomId?'var(--bg-4)':'transparent',
+              borderLeft:activeBridge===p.bridgeRoomId?'2px solid var(--gold)':'2px solid transparent',transition:'all .15s'}}
+            onMouseEnter={e=>{if(activeBridge!==p.bridgeRoomId)e.currentTarget.style.background='var(--bg-3)'}}
+            onMouseLeave={e=>{if(activeBridge!==p.bridgeRoomId)e.currentTarget.style.background='transparent'}}>
+            <span style={{fontSize:12,fontWeight:activeBridge===p.bridgeRoomId?600:400,display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.providerName||p.providerUserId}</span>
+            <span style={{fontSize:9.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{Object.values(p.sharedFields||{}).filter(Boolean).length} fields shared</span>
+          </div>)}</>}
       </div>
-
-      <div style={{padding:'10px 12px',borderTop:'1px solid var(--border-0)',display:'flex',gap:6}}>
-        <button onClick={onLogout} className="b-gho b-sm" style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:5}}><I n="logout" s={13}/>Logout</button>
+      <div style={{padding:'8px 10px',borderTop:'1px solid var(--border-0)'}}>
+        <button onClick={onLogout} className="b-gho b-sm" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}><I n="logout" s={12}/>Logout</button>
       </div>
     </div>
 
     {/* Main content */}
-    <div style={{flex:1,overflow:'auto',padding:28}}>
+    <div style={{flex:1,overflow:'auto',padding:24}}>
+
       {/* VAULT VIEW */}
-      {view === 'vault' && !activeBridge && (
-        <div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:28}}>
-            <div>
-              <h2 style={{fontFamily:'var(--serif)',fontSize:24,fontWeight:700,letterSpacing:'-0.02em'}}>Your Vault</h2>
-              <p style={{color:'var(--tx-1)',fontSize:13,marginTop:4}}>All data encrypted in your private Matrix room. Only you can read this.</p>
-            </div>
-            <button onClick={()=>{setEditData({...vaultData});setEditModal(true)}} className="b-pri" style={{display:'flex',alignItems:'center',gap:6}}>
-              <I n="key" s={14}/>Edit Vault
-            </button>
-          </div>
-
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))',gap:12,marginBottom:28}}>
-            {[
-              {l:'Fields',v:filledFields.length+'/'+VAULT_FIELDS.length,c:'teal',i:'folder'},
-              {l:'Providers',v:providers.length,c:'gold',i:'users'},
-              {l:'Shared Fields',v:sharedCount,c:'blue',i:'share'},
-              {l:'Encryption',v:'AES-256-GCM',c:'green',i:'lock'},
-            ].map((s,i)=>(
-              <div key={i} className="card">
-                <span className="section-label">{s.l.toUpperCase()}</span>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:4}}>
-                  <span style={{fontSize:20,fontWeight:700}}>{s.v}</span>
-                  <span style={{color:`var(--${s.c})`,opacity:.5}}><I n={s.i} s={16}/></span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {FIELD_CATEGORIES.map(cat => {
-            const fields = VAULT_FIELDS.filter(f=>f.category===cat);
-            const color = CAT_COLORS[cat];
-            return <div key={cat} style={{marginBottom:20}}>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-                <span style={{color:`var(--${color})`}}><I n={CAT_ICONS[cat]} s={14}/></span>
-                <span className="section-label" style={{marginBottom:0}}>{CAT_LABELS[cat].toUpperCase()}</span>
-              </div>
-              <div className="card" style={{padding:0,overflow:'hidden'}}>
-                {fields.map((field, fi) => (
-                  <div key={field.key} style={{padding:'12px 18px',borderBottom:fi<fields.length-1?'1px solid var(--border-0)':'none',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                    <div style={{display:'flex',alignItems:'center',gap:10}}>
-                      <span style={{fontSize:13,fontWeight:500}}>{field.label}</span>
-                      {field.sensitive && <span className="tag tag-red" style={{fontSize:9}}>SENSITIVE</span>}
-                    </div>
-                    <span style={{fontFamily:'var(--mono)',fontSize:12,color:vaultData[field.key]?'var(--tx-1)':'var(--tx-3)',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                      {vaultData[field.key] ? (field.sensitive ? '••••••••' : vaultData[field.key]) : '—'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>;
-          })}
+      {view==='vault'&&!activeBridge&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:24}}>
+          <div><h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Your Vault</h2>
+            <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>All data encrypted in your private Matrix room. Only you can read this.</p></div>
+          <button onClick={()=>{setEditData({...vaultData});setEditModal(true)}} className="b-pri" style={{display:'flex',alignItems:'center',gap:6}}><I n="key" s={14}/>Edit Vault</button>
         </div>
-      )}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:10,marginBottom:24}}>
+          {[{l:'Fields',v:`${filledFields.length}/${VAULT_FIELDS.length}`,c:'teal',i:'folder'},
+            {l:'Providers',v:providers.length,c:'gold',i:'users'},
+            {l:'Observations',v:observations.length,c:'blue',i:'clipboard'},
+            {l:'Shared Fields',v:sharedCount,c:'orange',i:'share'},
+          ].map((s,i)=><div key={i} className="card" style={{padding:14}}><span className="section-label">{s.l.toUpperCase()}</span>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:2}}>
+              <span style={{fontSize:18,fontWeight:700}}>{s.v}</span>
+              <span style={{color:`var(--${s.c})`,opacity:.5}}><I n={s.i} s={15}/></span></div></div>)}
+        </div>
+        {FIELD_CATEGORIES.map(cat=>{const fields=VAULT_FIELDS.filter(f=>f.category===cat);const color=CAT_COLORS[cat];
+          return <div key={cat} style={{marginBottom:16}}>
+            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
+              <span style={{color:`var(--${color})`}}><I n={CAT_ICONS[cat]} s={13}/></span>
+              <span className="section-label" style={{marginBottom:0}}>{CAT_LABELS[cat].toUpperCase()}</span></div>
+            <div className="card" style={{padding:0,overflow:'hidden'}}>
+              {fields.map((f,fi)=><div key={f.key} style={{padding:'10px 16px',borderBottom:fi<fields.length-1?'1px solid var(--border-0)':'none',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:12.5,fontWeight:500}}>{f.label}</span>
+                  {f.sensitive&&<span className="tag tag-red" style={{fontSize:8.5}}>SENSITIVE</span>}</div>
+                <span style={{fontFamily:'var(--mono)',fontSize:11.5,color:vaultData[f.key]?'var(--tx-1)':'var(--tx-3)',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  {vaultData[f.key]?(f.sensitive?'••••••••':vaultData[f.key]):'—'}</span>
+              </div>)}
+            </div>
+          </div>;
+        })}
+      </div>}
+
+      {/* OBSERVATIONS VIEW (Addendum A) */}
+      {view==='observations'&&!activeBridge&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:24}}>
+          <div><h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Observations</h2>
+            <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>Structured observations — the thermometer readings. What happened, not what it means.</p></div>
+        </div>
+        <div className="card" style={{marginBottom:20}}>
+          <span className="section-label">RECORD NEW OBSERVATION</span>
+          <p style={{fontSize:12,color:'var(--tx-2)',marginBottom:12}}>Choose a prompt to record what you observed. Each observation is an immutable GIVEN event in your vault.</p>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:8}}>
+            {DEFAULT_PROMPTS.map(p=><div key={p.id} className="card-h" onClick={()=>{setObsModal(p);setObsValue('');setObsFreeText('');setObsDate(new Date().toISOString().slice(0,10))}}
+              style={{padding:14}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6}}>
+                <span className={`tag tag-${OBS_CAT_COLORS[p.category]||'blue'}`}>{p.category}</span>
+                {p.sensitive&&<span className="tag tag-red" style={{fontSize:8}}>SENSITIVE</span>}
+              </div>
+              <span style={{fontSize:13,fontWeight:600,display:'block'}}>{p.question}</span>
+              <span style={{fontSize:10.5,color:'var(--tx-3)',marginTop:4,display:'block'}}>{p.options.length} response options</span>
+            </div>)}
+          </div>
+        </div>
+        {/* Observation history */}
+        <div className="card">
+          <span className="section-label">OBSERVATION HISTORY ({observations.length})</span>
+          {observations.length===0?<p style={{color:'var(--tx-3)',fontSize:12.5,padding:'16px 0',textAlign:'center'}}>No observations recorded yet</p>
+          :<div style={{display:'flex',flexDirection:'column',gap:4,marginTop:8}}>
+            {[...observations].reverse().map((obs,i)=>{
+              const prompt = DEFAULT_PROMPTS.find(p=>p.key===obs.category);
+              const optLabel = prompt?.options.find(o=>o.v===obs.value)?.l || obs.value;
+              return <div key={obs.id||i} style={{padding:'10px 14px',background:'var(--bg-3)',borderRadius:'var(--r)',display:'flex',alignItems:'center',gap:10}}>
+                <span className={`tag tag-${OBS_CAT_COLORS[obs.category]||'blue'}`} style={{fontSize:9}}>{obs.category}</span>
+                <span className="tag tag-teal" style={{fontSize:8.5}}>GIVEN</span>
+                <span style={{fontSize:12,flex:1}}>{optLabel}</span>
+                {obs.free_text&&<span style={{fontSize:10.5,color:'var(--tx-2)',fontStyle:'italic'}}>{obs.free_text}</span>}
+                <span style={{fontSize:10,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{obs.date}</span>
+              </div>;
+            })}
+          </div>}
+        </div>
+      </div>}
 
       {/* PROVIDERS VIEW */}
-      {view === 'providers' && !activeBridge && (
-        <div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:28}}>
-            <div>
-              <h2 style={{fontFamily:'var(--serif)',fontSize:24,fontWeight:700,letterSpacing:'-0.02em'}}>My Providers</h2>
-              <p style={{color:'var(--tx-1)',fontSize:13,marginTop:4}}>Each provider gets a dedicated encrypted bridge room. You control what they see.</p>
-            </div>
-            <button onClick={()=>setAddProviderModal(true)} className="b-pri" style={{display:'flex',alignItems:'center',gap:6}}>
-              <I n="plus" s={14}/>Add Provider
-            </button>
-          </div>
-
-          {providers.length === 0 ? (
-            <div className="card" style={{textAlign:'center',padding:'50px 20px',borderStyle:'dashed'}}>
-              <I n="users" s={36}/><p style={{color:'var(--tx-2)',marginTop:12,fontSize:14}}>No providers yet</p>
-              <p style={{color:'var(--tx-3)',fontSize:12,marginTop:4}}>Add a provider to create an encrypted bridge room</p>
-            </div>
-          ) : (
-            <div style={{display:'flex',flexDirection:'column',gap:12}}>
-              {providers.map((prov, pi) => {
-                const shCount = Object.values(prov.sharedFields||{}).filter(Boolean).length;
-                return <div key={prov.bridgeRoomId} className="card" style={{padding:0,overflow:'hidden'}}>
-                  <div style={{padding:'18px 22px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid var(--border-0)'}}>
-                    <div>
-                      <div style={{display:'flex',alignItems:'center',gap:8}}>
-                        <span style={{fontSize:15,fontWeight:600}}>{prov.providerName || prov.providerUserId}</span>
-                        <span className="tag tag-green"><I n="lock" s={9}/>E2EE</span>
-                      </div>
-                      <span style={{fontFamily:'var(--mono)',fontSize:10.5,color:'var(--tx-3)'}}>Bridge: {prov.bridgeRoomId.slice(0,20)}…</span>
-                    </div>
-                    <div style={{display:'flex',gap:6}}>
-                      <button onClick={()=>openBridge(prov.bridgeRoomId)} className="b-gho b-sm">Open Bridge</button>
-                      <button onClick={()=>setHardRevokeTarget(pi)} className="b-red b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="zap" s={12}/>Hard Revoke</button>
-                      <button onClick={()=>handleRemoveProvider(pi)} className="b-gho b-sm" style={{color:'var(--red)'}}><I n="trash" s={13}/></button>
-                    </div>
-                  </div>
-
-                  {/* Per-field sharing toggles */}
-                  <div style={{padding:'14px 22px'}}>
-                    <span className="section-label">FIELD-LEVEL SHARING</span>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0'}}>
-                      {VAULT_FIELDS.map(field => {
-                        const isShared = prov.sharedFields?.[field.key] || false;
-                        const hasData = !!vaultData[field.key];
-                        return <div key={field.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--border-0)',marginRight:20}}>
-                          <div style={{display:'flex',alignItems:'center',gap:8}}>
-                            <span style={{fontSize:12.5,color:hasData?'var(--tx-0)':'var(--tx-3)'}}>{field.label}</span>
-                            {field.sensitive && <I n="alert" s={11} c="var(--red)"/>}
-                          </div>
-                          <Toggle on={isShared} onChange={()=>handleToggleField(pi, field.key)} disabled={!hasData}/>
-                        </div>;
-                      })}
-                    </div>
-                    <div style={{marginTop:12,display:'flex',alignItems:'center',gap:8}}>
-                      <I n="key" s={13} c="var(--tx-3)"/>
-                      <span style={{fontSize:11,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>
-                        {shCount} of {VAULT_FIELDS.length} fields shared — each with unique AES-256-GCM key
-                      </span>
-                    </div>
-                  </div>
-                </div>;
-              })}
-            </div>
-          )}
+      {view==='providers'&&!activeBridge&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:24}}>
+          <div><h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>My Providers</h2>
+            <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>Each provider gets a dedicated encrypted bridge room. You control what they see.</p></div>
+          <button onClick={()=>setAddProviderModal(true)} className="b-pri" style={{display:'flex',alignItems:'center',gap:6}}><I n="plus" s={14}/>Add Provider</button>
         </div>
-      )}
+        {providers.length===0?<div className="card" style={{textAlign:'center',padding:'40px 20px',borderStyle:'dashed'}}><I n="users" s={32}/><p style={{color:'var(--tx-2)',marginTop:10}}>No providers yet</p></div>
+        :<div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {providers.map((prov,pi)=>{const shCount=Object.values(prov.sharedFields||{}).filter(Boolean).length;
+            return <div key={prov.bridgeRoomId} className="card" style={{padding:0,overflow:'hidden'}}>
+              <div style={{padding:'14px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid var(--border-0)'}}>
+                <div><div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:14,fontWeight:600}}>{prov.providerName||prov.providerUserId}</span>
+                  <span className="tag tag-green"><I n="lock" s={9}/>E2EE</span></div>
+                  <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-3)'}}>Bridge: {prov.bridgeRoomId.slice(0,20)}…</span></div>
+                <div style={{display:'flex',gap:4}}>
+                  <button onClick={()=>openBridge(prov.bridgeRoomId)} className="b-gho b-sm">Open Bridge</button>
+                  <button onClick={()=>setHardRevokeTarget(pi)} className="b-red b-sm"><I n="zap" s={11}/></button>
+                  <button onClick={()=>handleRemoveProvider(pi)} className="b-gho b-sm" style={{color:'var(--red)'}}><I n="trash" s={12}/></button>
+                </div>
+              </div>
+              <div style={{padding:'12px 18px'}}>
+                <span className="section-label">FIELD-LEVEL SHARING</span>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0'}}>
+                  {VAULT_FIELDS.map(f=>{const isShared=prov.sharedFields?.[f.key]||false;const hasData=!!vaultData[f.key];
+                    return <div key={f.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border-0)',marginRight:16}}>
+                      <span style={{fontSize:12,color:hasData?'var(--tx-0)':'var(--tx-3)'}}>{f.label}</span>
+                      <Toggle on={isShared} onChange={()=>handleToggleField(pi,f.key)} disabled={!hasData}/>
+                    </div>;})}
+                </div>
+                <div style={{marginTop:10,display:'flex',alignItems:'center',gap:6}}>
+                  <I n="key" s={12} c="var(--tx-3)"/>
+                  <span style={{fontSize:10.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{shCount}/{VAULT_FIELDS.length} fields — unique AES-256-GCM keys</span>
+                </div>
+              </div>
+            </div>;})}
+        </div>}
+      </div>}
 
-      {/* BRIDGE VIEW */}
-      {view === 'bridge' && activeBridge && activeProvider && (
-        <div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
-          <button onClick={()=>{setView('providers');setActiveBridge(null)}} className="b-gho b-sm" style={{marginBottom:16,display:'flex',alignItems:'center',gap:5}}><I n="back" s={14}/>Back to Providers</button>
+      {/* SCHEMA VIEW (§C) */}
+      {view==='schema'&&!activeBridge&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700,marginBottom:6}}>Schema</h2>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:20}}>Community-owned definitions — observation prompts, classification rules, and anonymization transforms.</p>
+        <div className="card" style={{marginBottom:16}}>
+          <span className="section-label">OBSERVATION PROMPTS ({DEFAULT_PROMPTS.length})</span>
+          {DEFAULT_PROMPTS.map(p=><div key={p.id} style={{padding:'10px 0',borderBottom:'1px solid var(--border-0)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+              <span className={`tag tag-${OBS_CAT_COLORS[p.category]||'blue'}`}>{p.category}</span>
+              <span style={{fontSize:13,fontWeight:600}}>{p.question}</span>
+            </div>
+            <div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:4}}>
+              {p.options.map(o=><span key={o.v} style={{fontSize:10,padding:'2px 8px',background:'var(--bg-3)',borderRadius:10,color:'var(--tx-1)'}}>{o.l}</span>)}
+            </div>
+          </div>)}
+        </div>
+        <div className="card" style={{marginBottom:16}}>
+          <span className="section-label">CLASSIFICATION DEFINITIONS ({DEFAULT_DEFINITIONS.length})</span>
+          {DEFAULT_DEFINITIONS.map(d=><div key={d.id} style={{padding:'10px 0'}}>
+            <span style={{fontSize:13,fontWeight:600,display:'block',marginBottom:6}}>{d.name}</span>
+            {d.rules.map((r,i)=><div key={i} style={{display:'flex',gap:8,padding:'4px 0',fontSize:11.5}}>
+              <span className="tag tag-gold" style={{fontSize:9}}>{r.category}</span>
+              <span style={{color:'var(--tx-1)'}}>{r.criteria}</span>
+              {r.hud!=null&&<span style={{color:'var(--tx-3)',fontFamily:'var(--mono)'}}>HUD Cat {r.hud}</span>}
+            </div>)}
+          </div>)}
+        </div>
+        <div className="card">
+          <span className="section-label">ANONYMIZATION TRANSFORMS</span>
+          {Object.entries(DEFAULT_TRANSFORMS).map(([k,t])=><div key={k} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border-0)'}}>
+            <span style={{fontSize:12.5,fontWeight:500}}>{k}</span>
+            <span className={`tag ${t.method==='block'?'tag-red':'tag-teal'}`} style={{fontSize:9}}>{t.method}</span>
+          </div>)}
+        </div>
+      </div>}
 
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
-            <div>
-              <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Bridge: {activeProvider.providerName || activeProvider.providerUserId}</h2>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6}}>
-                <span className="tag tag-green"><I n="lock" s={9}/>Megolm + AES-GCM</span>
-                <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-3)'}}>{activeBridge}</span>
+      {/* METRICS VIEW (§B) */}
+      {view==='metrics'&&!activeBridge&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700,marginBottom:6}}>Metrics Consent</h2>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:20}}>Control whether anonymized observations flow to provider metrics rooms. Your name, DOB, SSN, and address are never transmitted.</p>
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+            <div><span style={{fontSize:14,fontWeight:600}}>Anonymized Metrics Reporting</span>
+              <p style={{fontSize:11.5,color:'var(--tx-2)',marginTop:2}}>Observations are anonymized before leaving your bridge. PII is always blocked.</p></div>
+            <Toggle on={metricsConsent.enabled} onChange={handleMetricsToggle}/>
+          </div>
+          {metricsConsent.enabled&&<div>
+            <span className="section-label">CONSENTED CATEGORIES</span>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              {metricsConsent.categories?.map(c=><span key={c} className="tag tag-green">{c}</span>)}
+            </div>
+            <div style={{marginTop:12,padding:'10px 14px',background:'var(--bg-3)',borderRadius:'var(--r)'}}>
+              <span className="section-label" style={{marginBottom:6}}>WHAT GETS SENT</span>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:4,fontSize:11}}>
+                {[['Sleep location','pass-through'],['Service contacts','pass-through'],['DOB','age range only'],['Address','census tract only'],
+                  ['Income','bracket only'],['Name','BLOCKED'],['SSN','BLOCKED'],['Phone','BLOCKED'],['Email','BLOCKED']].map(([f,t])=>
+                  <div key={f} style={{display:'flex',justifyContent:'space-between',padding:'3px 0'}}>
+                    <span style={{color:'var(--tx-1)'}}>{f}</span>
+                    <span className={`tag ${t==='BLOCKED'?'tag-red':'tag-teal'}`} style={{fontSize:8.5}}>{t}</span>
+                  </div>)}
               </div>
             </div>
-            <button onClick={()=>setHardRevokeTarget(activeProviderIdx)} className="b-red b-sm" style={{display:'flex',alignItems:'center',gap:5}}>
-              <I n="zap" s={13}/>Hard Revoke
-            </button>
-          </div>
+          </div>}
+        </div>
+        <div style={{background:'var(--gold-dim)',border:'1px solid var(--gold-mid)',borderRadius:'var(--r)',padding:'14px 18px',display:'flex',gap:10,alignItems:'flex-start'}}>
+          <I n="eye" s={16} c="var(--gold)"/>
+          <span style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.6}}>
+            <strong>K-anonymity (k=5):</strong> No demographic combination with fewer than 5 matching individuals is reported. Data is generalized or suppressed to prevent re-identification.
+          </span>
+        </div>
+      </div>}
 
-          {/* What's shared */}
-          <div className="card" style={{marginBottom:20}}>
-            <span className="section-label">CURRENTLY SHARED</span>
-            <div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:6}}>
-              {VAULT_FIELDS.filter(f => activeProvider.sharedFields?.[f.key]).map(f => (
-                <span key={f.key} className="tag tag-blue">{f.label}</span>
-              ))}
-              {Object.values(activeProvider.sharedFields||{}).filter(Boolean).length===0 &&
-                <span style={{fontSize:12,color:'var(--tx-3)'}}>No fields shared</span>}
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="card" style={{marginBottom:0}}>
-            <span className="section-label">BRIDGE MESSAGES</span>
-            <div style={{maxHeight:300,overflow:'auto',marginBottom:14}}>
-              {bridgeMessages.length===0?
-                <p style={{color:'var(--tx-3)',fontSize:12.5,padding:'16px 0',textAlign:'center'}}>No messages yet</p>
-              : bridgeMessages.map((msg,i) => (
-                <div key={msg.id||i} style={{padding:'10px 0',borderBottom:'1px solid var(--border-0)'}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-                    <span style={{fontFamily:'var(--mono)',fontSize:10.5,color:msg.sender===svc.userId?'var(--teal)':'var(--gold)'}}>{msg.sender===svc.userId?'You':msg.sender}</span>
-                    <span style={{fontFamily:'var(--mono)',fontSize:9.5,color:'var(--tx-3)'}}>{msg.ts?new Date(msg.ts).toLocaleString():''}</span>
-                  </div>
-                  <p style={{fontSize:13,lineHeight:1.55,color:'var(--tx-1)'}}>{msg.content?.body}</p>
-                </div>
-              ))}
-            </div>
-            <div style={{display:'flex',gap:8}}>
-              <input value={msgText} onChange={e=>setMsgText(e.target.value)} placeholder="Message your provider (E2EE)..."
-                onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)handleSendBridgeMsg()}} style={{flex:1}}/>
-              <button onClick={handleSendBridgeMsg} className="b-pri" style={{display:'flex',alignItems:'center',gap:5}}><I n="send" s={14}/></button>
-            </div>
+      {/* BRIDGE VIEW */}
+      {view==='bridge'&&activeBridge&&activeProvider&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <button onClick={()=>{setView('providers');setActiveBridge(null)}} className="b-gho b-sm" style={{marginBottom:14,display:'flex',alignItems:'center',gap:4}}><I n="back" s={13}/>Back</button>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+          <div><h2 style={{fontFamily:'var(--serif)',fontSize:20,fontWeight:700}}>Bridge: {activeProvider.providerName||activeProvider.providerUserId}</h2>
+            <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
+              <span className="tag tag-green"><I n="lock" s={9}/>Megolm + AES-GCM</span>
+              <span style={{fontFamily:'var(--mono)',fontSize:9.5,color:'var(--tx-3)'}}>{activeBridge}</span></div></div>
+          <button onClick={()=>setHardRevokeTarget(activeProviderIdx)} className="b-red b-sm"><I n="zap" s={12}/>Hard Revoke</button>
+        </div>
+        <div className="card" style={{marginBottom:16}}>
+          <span className="section-label">CURRENTLY SHARED</span>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:4}}>
+            {VAULT_FIELDS.filter(f=>activeProvider.sharedFields?.[f.key]).map(f=><span key={f.key} className="tag tag-blue">{f.label}</span>)}
+            {Object.values(activeProvider.sharedFields||{}).filter(Boolean).length===0&&<span style={{fontSize:12,color:'var(--tx-3)'}}>No fields shared</span>}
           </div>
         </div>
-      )}
+        <div className="card">
+          <span className="section-label">BRIDGE MESSAGES</span>
+          <div style={{maxHeight:280,overflow:'auto',marginBottom:12}}>
+            {bridgeMessages.length===0?<p style={{color:'var(--tx-3)',fontSize:12,padding:'14px 0',textAlign:'center'}}>No messages yet</p>
+            :bridgeMessages.map((msg,i)=><div key={msg.id||i} style={{padding:'8px 0',borderBottom:'1px solid var(--border-0)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                <span style={{fontFamily:'var(--mono)',fontSize:10,color:msg.sender===svc.userId?'var(--teal)':'var(--gold)'}}>{msg.sender===svc.userId?'You':msg.sender}</span>
+                <span style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--tx-3)'}}>{msg.ts?new Date(msg.ts).toLocaleString():''}</span></div>
+              <p style={{fontSize:12.5,color:'var(--tx-1)'}}>{msg.content?.body}</p>
+            </div>)}
+          </div>
+          <div style={{display:'flex',gap:6}}>
+            <input value={msgText} onChange={e=>setMsgText(e.target.value)} placeholder="Message (E2EE)..." onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)handleSendBridgeMsg()}} style={{flex:1}}/>
+            <button onClick={handleSendBridgeMsg} className="b-pri"><I n="send" s={13}/></button>
+          </div>
+        </div>
+      </div>}
 
-      {/* ACTIVITY STREAM VIEW */}
-      {view === 'activity' && !activeBridge && (
-        <ActivityStream session={session} accountType="client"/>
-      )}
+      {/* ACTIVITY STREAM */}
+      {view==='activity'&&!activeBridge&&<ActivityStream session={session}/>}
     </div>
 
     {/* EDIT VAULT MODAL */}
-    <Modal open={editModal} onClose={()=>setEditModal(false)} title="Edit Vault Data" w={560}>
-      <p style={{fontSize:12.5,color:'var(--tx-1)',marginBottom:20,lineHeight:1.6}}>This data is encrypted in your private vault room. Changes to shared fields will be re-encrypted with new keys for each provider.</p>
-      {FIELD_CATEGORIES.map(cat => (
-        <div key={cat} style={{marginBottom:18}}>
-          <span className="section-label">{CAT_LABELS[cat].toUpperCase()}</span>
-          {VAULT_FIELDS.filter(f=>f.category===cat).map(field => (
-            <div key={field.key} style={{marginBottom:10}}>
-              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
-                <label style={{fontSize:12,color:'var(--tx-1)'}}>{field.label}</label>
-                {field.sensitive && <span className="tag tag-red" style={{fontSize:8}}>SENSITIVE</span>}
-              </div>
-              {field.key==='case_notes'||field.key==='history'||field.key==='medical'||field.key==='documents' ?
-                <textarea value={editData[field.key]||''} onChange={e=>setEditData({...editData,[field.key]:e.target.value})} placeholder={`Enter ${field.label.toLowerCase()}...`} style={{minHeight:60}}/> :
-                <input value={editData[field.key]||''} onChange={e=>setEditData({...editData,[field.key]:e.target.value})} placeholder={`Enter ${field.label.toLowerCase()}...`}/>
-              }
-            </div>
-          ))}
-        </div>
-      ))}
+    <Modal open={editModal} onClose={()=>setEditModal(false)} title="Edit Vault Data" w={540}>
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:16,lineHeight:1.6}}>Changes to shared fields are re-encrypted with new keys per provider. Each edit emits EO operations (INS/ALT/NUL) to the vault timeline.</p>
+      {FIELD_CATEGORIES.map(cat=><div key={cat} style={{marginBottom:14}}>
+        <span className="section-label">{CAT_LABELS[cat].toUpperCase()}</span>
+        {VAULT_FIELDS.filter(f=>f.category===cat).map(f=><div key={f.key} style={{marginBottom:8}}>
+          <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
+            <label style={{fontSize:11.5,color:'var(--tx-1)'}}>{f.label}</label>
+            {f.sensitive&&<span className="tag tag-red" style={{fontSize:8}}>SENSITIVE</span>}</div>
+          {['case_notes','history','medical','documents'].includes(f.key)?
+            <textarea value={editData[f.key]||''} onChange={e=>setEditData({...editData,[f.key]:e.target.value})} placeholder={`Enter ${f.label.toLowerCase()}...`} style={{minHeight:50}}/>:
+            <input value={editData[f.key]||''} onChange={e=>setEditData({...editData,[f.key]:e.target.value})} placeholder={`Enter ${f.label.toLowerCase()}...`}/>}
+        </div>)}
+      </div>)}
       <button onClick={handleEditSave} className="b-pri" style={{width:'100%'}}>Save & Re-encrypt Shared Fields</button>
     </Modal>
 
     {/* ADD PROVIDER MODAL */}
     <Modal open={addProviderModal} onClose={()=>setAddProviderModal(false)} title="Add Provider">
-      <p style={{fontSize:12.5,color:'var(--tx-1)',marginBottom:18,lineHeight:1.6}}>
-        This creates a new encrypted bridge room and invites the provider. No data is shared until you toggle fields on.
-      </p>
-      <div style={{marginBottom:18}}>
-        <span className="section-label">PROVIDER MATRIX ID</span>
-        <input value={newProviderId} onChange={e=>setNewProviderId(e.target.value)} placeholder="@provider:matrix.org"/>
-      </div>
-      <div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'12px 16px',marginBottom:18,display:'flex',gap:10,alignItems:'flex-start'}}>
-        <I n="shieldCheck" s={16} c="var(--teal)"/>
-        <span style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.55}}>The bridge room will use Megolm encryption. Each shared field gets a separate AES-256-GCM key that is destroyed on revocation.</span>
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>Creates a new encrypted bridge room and invites the provider. No data shared until you toggle fields on.</p>
+      <div style={{marginBottom:14}}><span className="section-label">PROVIDER MATRIX ID</span>
+        <input value={newProviderId} onChange={e=>setNewProviderId(e.target.value)} placeholder="@provider:matrix.org"/></div>
+      <div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'10px 14px',marginBottom:14}}>
+        <span style={{fontSize:11.5,color:'var(--tx-1)',lineHeight:1.5}}>Bridge uses Megolm + per-field AES-256-GCM. Keys destroyed on revocation.</span>
       </div>
       <button onClick={handleAddProvider} className="b-pri" style={{width:'100%'}}>Create Bridge Room</button>
     </Modal>
 
+    {/* OBSERVATION MODAL */}
+    <Modal open={!!obsModal} onClose={()=>setObsModal(null)} title={obsModal?.question||'Record Observation'} w={500}>
+      {obsModal&&<>
+        <div style={{marginBottom:14}}><span className="section-label">DATE</span>
+          <input type="date" value={obsDate} onChange={e=>setObsDate(e.target.value)}/></div>
+        <div style={{marginBottom:14}}><span className="section-label">RESPONSE</span>
+          <div style={{display:'flex',flexDirection:'column',gap:4}}>
+            {obsModal.options.map(o=><div key={o.v} onClick={()=>setObsValue(o.v)}
+              style={{padding:'10px 14px',borderRadius:'var(--r)',cursor:'pointer',border:`1px solid ${obsValue===o.v?'var(--teal)':'var(--border-1)'}`,
+                background:obsValue===o.v?'var(--teal-dim)':'var(--bg-3)',transition:'all .15s'}}>
+              <span style={{fontSize:12.5,color:obsValue===o.v?'var(--teal)':'var(--tx-1)'}}>{o.l}</span>
+            </div>)}
+          </div>
+        </div>
+        <div style={{marginBottom:14}}><span className="section-label">ADDITIONAL NOTES (OPTIONAL)</span>
+          <textarea value={obsFreeText} onChange={e=>setObsFreeText(e.target.value)} placeholder="Any additional context..." style={{minHeight:50}}/></div>
+        <div style={{background:'var(--teal-dim)',borderRadius:'var(--r)',padding:'8px 12px',marginBottom:14,fontSize:11,color:'var(--teal)'}}>
+          This observation will be recorded as a GIVEN event in your vault — immutable, append-only.
+        </div>
+        <button onClick={handleRecordObservation} className="b-pri" disabled={!obsValue} style={{width:'100%'}}>Record Observation</button>
+      </>}
+    </Modal>
+
     {/* HARD REVOKE CONFIRM */}
-    <Modal open={hardRevokeTarget!==null} onClose={()=>setHardRevokeTarget(null)} title="⚡ Hard Revoke" w={440}>
-      <div style={{background:'var(--red-dim)',border:'1px solid rgba(232,93,93,.15)',borderRadius:'var(--r)',padding:'14px 18px',marginBottom:18}}>
-        <p style={{fontSize:13,color:'var(--red)',fontWeight:600,marginBottom:6}}>This is a destructive operation</p>
-        <p style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.6}}>
-          The current bridge room will be <strong>tombstoned</strong> and the provider <strong>kicked</strong>. A new bridge room will be created with <strong>fresh encryption keys</strong> for any fields you still want to share. The provider's old Megolm keys will no longer decrypt future data.
-        </p>
+    <Modal open={hardRevokeTarget!==null} onClose={()=>setHardRevokeTarget(null)} title="Hard Revoke" w={440}>
+      <div style={{background:'var(--red-dim)',border:'1px solid rgba(232,93,93,.15)',borderRadius:'var(--r)',padding:'12px 16px',marginBottom:14}}>
+        <p style={{fontSize:12.5,color:'var(--red)',fontWeight:600,marginBottom:4}}>Destructive operation</p>
+        <p style={{fontSize:11.5,color:'var(--tx-1)',lineHeight:1.6}}>Current bridge will be <strong>tombstoned</strong>, provider <strong>kicked</strong>. A new bridge with <strong>fresh encryption keys</strong> is created for any still-shared fields.</p>
       </div>
-      <p style={{fontSize:12,color:'var(--tx-2)',marginBottom:18,lineHeight:1.6}}>
-        <strong>Caveat:</strong> If the provider previously decrypted and cached data on their device, we cannot delete it from their local storage. This revocation prevents future access, not retroactive memory erasure.
+      <p style={{fontSize:11.5,color:'var(--tx-2)',marginBottom:14,lineHeight:1.6}}>
+        <strong>Caveat:</strong> If the provider previously decrypted and cached data, we cannot delete it from their device. This prevents future access, not retroactive erasure.
       </p>
-      <div style={{display:'flex',gap:10}}>
+      <div style={{display:'flex',gap:8}}>
         <button onClick={()=>setHardRevokeTarget(null)} className="b-gho" style={{flex:1}}>Cancel</button>
-        <button onClick={()=>handleHardRevoke(hardRevokeTarget)} className="b-red" style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
-          <I n="zap" s={14}/>Execute Hard Revoke
-        </button>
+        <button onClick={()=>handleHardRevoke(hardRevokeTarget)} className="b-red" style={{flex:1}}><I n="zap" s={13}/>Execute</button>
       </div>
     </Modal>
   </div>;
@@ -1343,35 +1333,64 @@ const ClientApp = ({session, onLogout, showToast}) => {
 /* ═══════════════════ PROVIDER APP ═══════════════════ */
 const ProviderApp = ({session, onLogout, showToast}) => {
   const [rosterRoom, setRosterRoom] = useState(null);
-  const [cases, setCases] = useState([]); // [{bridgeRoomId, clientUserId, sharedData:{}, meta:{}}]
+  const [metricsRoom, setMetricsRoom] = useState(null);
+  const [schemaRoom, setSchemaRoom] = useState(null);
+  const [networkRoom, setNetworkRoom] = useState(null);
+  const [cases, setCases] = useState([]);
+  const [metrics, setMetrics] = useState([]);
+  const [networkMembers, setNetworkMembers] = useState([]);
   const [activeCase, setActiveCase] = useState(null);
-  const [showActivity, setShowActivity] = useState(false);
+  const [view, setView] = useState('dashboard'); // dashboard|case|metrics|schema|network|activity
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState([]);
   const [msgText, setMsgText] = useState('');
   const [requestText, setRequestText] = useState('');
+  const [discoverModal, setDiscoverModal] = useState(false);
+  const [discoverUserId, setDiscoverUserId] = useState('');
+  const [networkModal, setNetworkModal] = useState(false);
+  const [networkName, setNetworkName] = useState('');
+  const [joinNetworkModal, setJoinNetworkModal] = useState(false);
+  const [joinNetworkId, setJoinNetworkId] = useState('');
 
   useEffect(() => { initProvider(); }, []);
 
+  const rosterFrame = (room) => ({type:'roster',room:room||rosterRoom,role:'provider',epistemic:'MEANT'});
+  const bridgeFrame = (room) => ({type:'bridge',room,role:'provider',epistemic:'MEANT'});
+  const networkFrame = (room) => ({type:'network',room:room||networkRoom,role:'provider',epistemic:'MEANT'});
+
   const initProvider = async () => {
     setLoading(true);
-    // Find or create roster room
     const rooms = await svc.getJoinedRooms();
-    let roster = null;
+    let roster=null, metricsR=null, schema=null, network=null;
     for (const rid of rooms) {
       const id = await svc.getState(rid, EVT.IDENTITY);
-      if (id && id.type === 'provider' && id.owner === svc.userId) { roster = rid; break; }
+      if (id?.account_type==='provider'&&id.owner===svc.userId) roster=rid;
+      if (id?.account_type==='metrics'&&id.owner===svc.userId) metricsR=rid;
+      if (id?.account_type==='schema'&&id.owner===svc.userId) schema=rid;
+      if (id?.account_type==='network') network=rid;
     }
     if (!roster) {
-      roster = await svc.createRoom('[Roster] Provider Cases', 'Provider case index', [
-        { type: EVT.IDENTITY, state_key: '', content: { type: 'provider', owner: svc.userId, created: Date.now() } },
-        { type: EVT.ROSTER, state_key: '', content: { cases: [] } },
+      roster = await svc.createRoom('[Tessera Roster]','Provider case index',[
+        {type:EVT.IDENTITY,state_key:'',content:{account_type:'provider',owner:svc.userId,created:Date.now()}},
+        {type:EVT.ROSTER_INDEX,state_key:'',content:{cases:[]}},
       ]);
     }
-    setRosterRoom(roster);
-
-    // Scan all joined rooms for bridge rooms where we're the provider
-    await loadCases(rooms);
+    if (!metricsR) {
+      metricsR = await svc.createRoom('[Tessera Metrics]','Anonymized metrics',[
+        {type:EVT.IDENTITY,state_key:'',content:{account_type:'metrics',owner:svc.userId,created:Date.now()}},
+      ]);
+    }
+    if (!schema) {
+      schema = await svc.createRoom('[Tessera Schema]','Schema definitions',[
+        {type:EVT.IDENTITY,state_key:'',content:{account_type:'schema',owner:svc.userId,created:Date.now()}},
+      ]);
+      for (const p of DEFAULT_PROMPTS) await svc.setState(schema, EVT.SCHEMA_PROMPT, p, p.key);
+      for (const d of DEFAULT_DEFINITIONS) await svc.setState(schema, EVT.SCHEMA_DEF, d, d.key);
+      await svc.setState(schema, EVT.SCHEMA_TRANSFORM, {id:'transform_default',transforms:DEFAULT_TRANSFORMS}, 'default');
+    }
+    setRosterRoom(roster); setMetricsRoom(metricsR); setSchemaRoom(schema);
+    if (network) { setNetworkRoom(network); await loadNetworkMembers(network); }
+    await loadCases(rooms); await loadMetrics(metricsR);
     setLoading(false);
   };
 
@@ -1380,270 +1399,416 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     const found = [];
     for (const rid of roomList) {
       const meta = await svc.getState(rid, EVT.BRIDGE_META);
-      if (meta && meta.provider === svc.userId && meta.status !== 'tombstoned') {
-        // Decrypt shared field refs
+      if (meta && meta.provider===svc.userId && meta.status!=='tombstoned') {
         const refsData = await svc.getState(rid, EVT.BRIDGE_REFS);
         const decrypted = {};
         if (refsData?.fields) {
-          for (const [key, ref] of Object.entries(refsData.fields)) {
-            if (ref.key && ref.ciphertext && ref.iv) {
+          for (const [key,ref] of Object.entries(refsData.fields)) {
+            if (ref.key&&ref.ciphertext&&ref.iv) {
               const plain = await FieldCrypto.decrypt(ref.ciphertext, ref.iv, ref.key);
-              if (plain !== null) decrypted[key] = plain;
+              if (plain!==null) decrypted[key]=plain;
             }
           }
         }
-        found.push({ bridgeRoomId: rid, clientUserId: meta.client, meta, sharedData: decrypted });
+        found.push({bridgeRoomId:rid, clientUserId:meta.client, meta, sharedData:decrypted, metricsRoom:metricsRoom});
       }
     }
     setCases(found);
   };
 
-  const loadMessages = async (bridgeRoomId) => {
-    const msgs = await svc.getMessages(bridgeRoomId);
-    setMessages(msgs);
+  const loadMetrics = async (mRoom) => {
+    if (!svc.client || !mRoom) return;
+    const room = svc.client.getRoom(mRoom);
+    if (!room) return;
+    const evts = room.getLiveTimeline().getEvents().filter(e=>e.getType()===EVT.METRIC).map(e=>e.getContent());
+    setMetrics(evts);
   };
 
+  const loadNetworkMembers = async (nRoom) => {
+    const members = await svc.getState(nRoom, EVT.NET_MEMBERS);
+    setNetworkMembers(members?.organizations || []);
+  };
+
+  const loadMessages = async (bid) => { setMessages(await svc.getMessages(bid)); };
+
   const handleSendMsg = async () => {
-    if (!msgText.trim() || !activeCase) return;
-    await svc.sendMessage(activeCase, msgText, { [`${NS}.type`]: 'note' });
-    setMsgText('');
-    setTimeout(() => loadMessages(activeCase), 500);
+    if (!msgText.trim()||!activeCase) return;
+    await svc.sendMessage(activeCase, msgText, {[`${NS}.type`]:'note'});
+    await emitOp(activeCase, 'INS', {type:'provider_note',field:'message'}, {body:msgText}, bridgeFrame(activeCase));
+    setMsgText(''); setTimeout(()=>loadMessages(activeCase),500);
   };
 
   const handleSendRequest = async () => {
-    if (!requestText.trim() || !activeCase) return;
-    await svc.sendMessage(activeCase, `📋 Information Request: ${requestText}`, { [`${NS}.type`]: 'request' });
-    setRequestText('');
-    showToast('Request sent to client', 'success');
-    setTimeout(() => loadMessages(activeCase), 500);
+    if (!requestText.trim()||!activeCase) return;
+    await svc.sendMessage(activeCase, `Information Request: ${requestText}`, {[`${NS}.type`]:'request'});
+    await emitOp(activeCase, 'DES', {type:'information_request',entity:'case'}, {request:requestText}, bridgeFrame(activeCase));
+    setRequestText(''); showToast('Request sent to client','success'); setTimeout(()=>loadMessages(activeCase),500);
   };
 
-  const openCase = (bridgeRoomId) => {
-    setShowActivity(false);
-    setActiveCase(bridgeRoomId);
-    loadMessages(bridgeRoomId);
+  // Discover client by Matrix ID
+  const handleDiscoverClient = async () => {
+    if (!discoverUserId.trim()) return;
+    try {
+      // Check if we already have a bridge with this client
+      const existing = cases.find(c=>c.clientUserId===discoverUserId);
+      if (existing) { showToast('Already connected with this client','info'); setDiscoverModal(false); return; }
+      // We can't create the bridge — the client must initiate. But we can check if one exists.
+      const rooms = await svc.getJoinedRooms();
+      let found = false;
+      for (const rid of rooms) {
+        const meta = await svc.getState(rid, EVT.BRIDGE_META);
+        if (meta && meta.client===discoverUserId && meta.provider===svc.userId) { found=true; break; }
+      }
+      if (found) {
+        await loadCases(); showToast('Bridge found — refreshing cases','success');
+      } else {
+        showToast(`No bridge found for ${discoverUserId}. The client must create a bridge and invite you.`,'warn');
+      }
+      setDiscoverModal(false);
+    } catch(e) { showToast('Error: '+e.message,'error'); }
   };
 
-  const activeCaseData = cases.find(c => c.bridgeRoomId === activeCase);
+  // Create a network
+  const handleCreateNetwork = async () => {
+    if (!networkName.trim()) return;
+    try {
+      const nRoom = await svc.createRoom(`[Tessera Network] ${networkName}`, 'Network governance room', [
+        {type:EVT.IDENTITY,state_key:'',content:{account_type:'network',name:networkName,owner:svc.userId,created:Date.now()}},
+        {type:EVT.NET_MEMBERS,state_key:'',content:{organizations:[{id:svc.userId,joined:Date.now(),role:'admin'}],
+          governance:{schema_changes_require:'admin_approval',admins:[svc.userId]}}},
+      ]);
+      // Seed network schema
+      for (const p of DEFAULT_PROMPTS) await svc.setState(nRoom, EVT.SCHEMA_PROMPT, {...p, propagation:'standard', network:networkName}, `net:${p.key}`);
+      for (const d of DEFAULT_DEFINITIONS) await svc.setState(nRoom, EVT.SCHEMA_DEF, {...d, propagation:'required', network:networkName}, `net:${d.key}`);
+      await emitOp(nRoom, 'INS', {entity:'network',field:networkName}, {created_by:svc.userId}, networkFrame(nRoom));
+      setNetworkRoom(nRoom);
+      await loadNetworkMembers(nRoom);
+      setNetworkModal(false); setNetworkName('');
+      showToast(`Network "${networkName}" created`,'success');
+    } catch(e) { showToast('Error: '+e.message,'error'); }
+  };
 
-  if (loading) return <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}><Spin s={28}/></div>;
+  // Join existing network by room ID
+  const handleJoinNetwork = async () => {
+    if (!joinNetworkId.trim()) return;
+    try {
+      // Try to join the room
+      if (svc.client) { await svc.client.joinRoom(joinNetworkId); }
+      else { await svc._api('POST', `/join/${encodeURIComponent(joinNetworkId)}`, {}); }
+      setNetworkRoom(joinNetworkId);
+      await loadNetworkMembers(joinNetworkId);
+      setJoinNetworkModal(false); setJoinNetworkId('');
+      showToast('Joined network','success');
+    } catch(e) { showToast('Failed to join: '+e.message,'error'); }
+  };
+
+  const openCase = (bid) => { setView('case'); setActiveCase(bid); loadMessages(bid); };
+  const activeCaseData = cases.find(c=>c.bridgeRoomId===activeCase);
+
+  // Aggregate metrics for dashboard
+  const metricsByCategory = useMemo(() => {
+    const agg = {};
+    metrics.forEach(m => {
+      const cat = m.observation?.category||'unknown';
+      const val = m.observation?.value||'unknown';
+      if (!agg[cat]) agg[cat]={};
+      agg[cat][val] = (agg[cat][val]||0) + 1;
+    });
+    return agg;
+  }, [metrics]);
+
+  if(loading) return <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}><Spin s={28}/></div>;
 
   return <div style={{display:'flex',height:'100%'}}>
     {/* Sidebar */}
-    <div style={{width:260,minWidth:260,height:'100%',background:'var(--bg-1)',borderRight:'1px solid var(--border-0)',display:'flex',flexDirection:'column'}}>
-      <div style={{padding:'20px 16px 16px',borderBottom:'1px solid var(--border-0)'}}>
+    <div style={{width:250,minWidth:250,height:'100%',background:'var(--bg-1)',borderRight:'1px solid var(--border-0)',display:'flex',flexDirection:'column'}}>
+      <div style={{padding:'18px 14px 14px',borderBottom:'1px solid var(--border-0)'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
-          <div style={{width:30,height:30,borderRadius:'var(--r)',background:'var(--gold-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold)'}}><I n="briefcase" s={16}/></div>
-          <span style={{fontFamily:'var(--serif)',fontWeight:700,fontSize:16}}>Casevault</span>
+          <div style={{width:28,height:28,borderRadius:'var(--r)',background:'var(--gold-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold)'}}><I n="briefcase" s={15}/></div>
+          <span style={{fontFamily:'var(--serif)',fontWeight:700,fontSize:15}}>Tessera</span>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:6,marginTop:10}}>
-          <div style={{width:20,height:20,borderRadius:'50%',background:'var(--bg-4)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700}}>
-            {(svc.userId||'?')[1]?.toUpperCase()}
-          </div>
-          <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{svc.userId}</span>
-          <span className="tag tag-gold" style={{marginLeft:'auto'}}>PROVIDER</span>
+        <div style={{display:'flex',alignItems:'center',gap:6,marginTop:8}}>
+          <span style={{fontFamily:'var(--mono)',fontSize:9.5,color:'var(--tx-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{svc.userId}</span>
+          <span className="tag tag-gold">PROVIDER</span>
         </div>
       </div>
-
-      <div style={{flex:1,overflow:'auto',padding:'8px 8px'}}>
-        {[
-          {id:'dashboard', icon:'briefcase', label:'Dashboard'},
-          {id:'activity', icon:'zap', label:'Activity Stream'},
-        ].map(item => (
-          <div key={item.id} onClick={()=>{
-            if(item.id==='dashboard'){setShowActivity(false);setActiveCase(null);}
-            if(item.id==='activity'){setShowActivity(true);setActiveCase(null);}
-          }}
-            style={{padding:'11px 12px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:2,
-              background:(item.id==='dashboard'&&!showActivity&&!activeCase)||(item.id==='activity'&&showActivity)?'var(--bg-4)':'transparent',
-              borderLeft:(item.id==='dashboard'&&!showActivity&&!activeCase)||(item.id==='activity'&&showActivity)?'2px solid var(--gold)':'2px solid transparent',
-              display:'flex',alignItems:'center',gap:10,transition:'all .15s',
-              color:(item.id==='dashboard'&&!showActivity&&!activeCase)||(item.id==='activity'&&showActivity)?'var(--tx-0)':'var(--tx-1)'}}
-            onMouseEnter={e=>{const isActive=(item.id==='dashboard'&&!showActivity&&!activeCase)||(item.id==='activity'&&showActivity);if(!isActive)e.currentTarget.style.background='var(--bg-3)'}}
-            onMouseLeave={e=>{const isActive=(item.id==='dashboard'&&!showActivity&&!activeCase)||(item.id==='activity'&&showActivity);if(!isActive)e.currentTarget.style.background='transparent'}}>
-            <I n={item.icon} s={15}/><span style={{fontSize:13,fontWeight:((item.id==='dashboard'&&!showActivity)||(item.id==='activity'&&showActivity))?600:400}}>{item.label}</span>
-          </div>
-        ))}
-
-        <div style={{padding:'16px 12px 6px'}}><span className="section-label">CASES ({cases.length})</span></div>
-        {cases.length === 0 && <p style={{color:'var(--tx-3)',fontSize:12,padding:'16px 12px',textAlign:'center'}}>No clients have shared with you yet</p>}
-        {cases.map((c,i) => (
-          <div key={c.bridgeRoomId} onClick={()=>openCase(c.bridgeRoomId)} className="anim-sl"
-            style={{animationDelay:`${i*40}ms`,padding:'11px 12px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:2,
-              background:activeCase===c.bridgeRoomId?'var(--bg-4)':'transparent',
-              borderLeft:activeCase===c.bridgeRoomId?'2px solid var(--gold)':'2px solid transparent',transition:'all .15s'}}
-            onMouseEnter={e=>{if(activeCase!==c.bridgeRoomId)e.currentTarget.style.background='var(--bg-3)'}}
-            onMouseLeave={e=>{if(activeCase!==c.bridgeRoomId)e.currentTarget.style.background='transparent'}}>
-            <span style={{fontSize:13,fontWeight:activeCase===c.bridgeRoomId?600:400,display:'block',color:activeCase===c.bridgeRoomId?'var(--tx-0)':'var(--tx-1)'}}>
-              {c.sharedData.full_name || c.clientUserId}
-            </span>
-            <span style={{fontSize:10,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{Object.keys(c.sharedData).length} fields visible</span>
-          </div>
-        ))}
-        <div style={{padding:'16px 12px'}}>
-          <button onClick={()=>loadCases()} className="b-gho b-sm" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>
-            <I n="search" s={13}/>Refresh Cases
-          </button>
+      <div style={{flex:1,overflow:'auto',padding:'6px 6px'}}>
+        {[{id:'dashboard',icon:'briefcase',label:'Dashboard'},{id:'metrics',icon:'bar',label:'Metrics'},
+          {id:'schema',icon:'grid',label:'Schema'},{id:'network',icon:'globe',label:'Network'},
+          {id:'activity',icon:'zap',label:'Activity Stream'}
+        ].map(item=><div key={item.id} onClick={()=>{setView(item.id);setActiveCase(null)}}
+          style={{padding:'9px 10px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:1,
+            background:view===item.id&&!activeCase?'var(--bg-4)':'transparent',
+            borderLeft:view===item.id&&!activeCase?'2px solid var(--gold)':'2px solid transparent',
+            display:'flex',alignItems:'center',gap:8,transition:'all .15s',
+            color:view===item.id&&!activeCase?'var(--tx-0)':'var(--tx-1)'}}
+          onMouseEnter={e=>{if(!(view===item.id&&!activeCase))e.currentTarget.style.background='var(--bg-3)'}}
+          onMouseLeave={e=>{if(!(view===item.id&&!activeCase))e.currentTarget.style.background='transparent'}}>
+          <I n={item.icon} s={14}/><span style={{fontSize:12.5,fontWeight:view===item.id?600:400}}>{item.label}</span>
+        </div>)}
+        <div style={{padding:'14px 10px 4px'}}><span className="section-label">CASES ({cases.length})</span></div>
+        {cases.length===0&&<p style={{color:'var(--tx-3)',fontSize:11.5,padding:'12px 10px',textAlign:'center'}}>No clients shared with you yet</p>}
+        {cases.map((c,i)=><div key={c.bridgeRoomId} onClick={()=>openCase(c.bridgeRoomId)}
+          style={{padding:'8px 10px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:1,
+            background:activeCase===c.bridgeRoomId?'var(--bg-4)':'transparent',
+            borderLeft:activeCase===c.bridgeRoomId?'2px solid var(--gold)':'2px solid transparent',transition:'all .15s'}}
+          onMouseEnter={e=>{if(activeCase!==c.bridgeRoomId)e.currentTarget.style.background='var(--bg-3)'}}
+          onMouseLeave={e=>{if(activeCase!==c.bridgeRoomId)e.currentTarget.style.background='transparent'}}>
+          <span style={{fontSize:12,fontWeight:activeCase===c.bridgeRoomId?600:400,display:'block'}}>{c.sharedData.full_name||c.clientUserId}</span>
+          <span style={{fontSize:9.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{Object.keys(c.sharedData).length} fields</span>
+        </div>)}
+        <div style={{padding:'12px 10px',display:'flex',flexDirection:'column',gap:4}}>
+          <button onClick={()=>setDiscoverModal(true)} className="b-gho b-sm" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:4}}>
+            <I n="search" s={12}/>Find Client</button>
+          <button onClick={()=>loadCases()} className="b-gho b-xs" style={{width:'100%'}}><I n="search" s={10}/>Refresh</button>
         </div>
       </div>
-
-      <div style={{padding:'10px 12px',borderTop:'1px solid var(--border-0)'}}>
-        <button onClick={onLogout} className="b-gho b-sm" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}><I n="logout" s={13}/>Logout</button>
+      <div style={{padding:'8px 10px',borderTop:'1px solid var(--border-0)'}}>
+        <button onClick={onLogout} className="b-gho b-sm" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}><I n="logout" s={12}/>Logout</button>
       </div>
     </div>
 
     {/* Main */}
-    <div style={{flex:1,overflow:'auto',padding:28}}>
-      {showActivity ? (
-        <ActivityStream session={session} accountType="provider"/>
-      ) : !activeCase ? (
-        <div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
-          <h2 style={{fontFamily:'var(--serif)',fontSize:24,fontWeight:700,letterSpacing:'-0.02em',marginBottom:6}}>Provider Dashboard</h2>
-          <p style={{color:'var(--tx-1)',fontSize:13,marginBottom:28}}>You can only see data that clients have explicitly shared with you. Each case is a separate encrypted bridge room.</p>
+    <div style={{flex:1,overflow:'auto',padding:24}}>
 
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))',gap:12,marginBottom:28}}>
-            {[
-              {l:'Active Cases',v:cases.length,c:'gold',i:'briefcase'},
-              {l:'Encryption',v:'Dual-layer',c:'green',i:'lock'},
-              {l:'Access Model',v:'Client-granted',c:'teal',i:'shield'},
-            ].map((s,i)=>(
-              <div key={i} className="card"><span className="section-label">{s.l.toUpperCase()}</span>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:4}}>
-                  <span style={{fontSize:20,fontWeight:700}}>{s.v}</span>
-                  <span style={{color:`var(--${s.c})`,opacity:.5}}><I n={s.i} s={16}/></span>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* DASHBOARD */}
+      {view==='dashboard'&&!activeCase&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700,marginBottom:4}}>Provider Dashboard</h2>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:24}}>You can only see data clients have explicitly shared. Each case is a separate encrypted bridge room.</p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10,marginBottom:24}}>
+          {[{l:'Active Cases',v:cases.length,c:'gold',i:'briefcase'},{l:'Encryption',v:'Dual-layer',c:'green',i:'lock'},
+            {l:'Access Model',v:'Client-granted',c:'teal',i:'shield'},{l:'Metric Events',v:metrics.length,c:'orange',i:'bar'}
+          ].map((s,i)=><div key={i} className="card" style={{padding:14}}><span className="section-label">{s.l.toUpperCase()}</span>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:2}}>
+              <span style={{fontSize:18,fontWeight:700}}>{s.v}</span>
+              <span style={{color:`var(--${s.c})`,opacity:.5}}><I n={s.i} s={15}/></span></div></div>)}
+        </div>
+        {cases.length>0&&<><span className="section-label">ALL CASES</span>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(250px,1fr))',gap:10,marginTop:6}}>
+            {cases.map(c=><div key={c.bridgeRoomId} className="card-h" onClick={()=>openCase(c.bridgeRoomId)}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+                <span style={{fontSize:14,fontWeight:600}}>{c.sharedData.full_name||'Anonymous Client'}</span>
+                <I n="chevR" s={13} c="var(--tx-3)"/></div>
+              {c.sharedData.email&&<span style={{fontFamily:'var(--mono)',fontSize:10.5,color:'var(--tx-2)',display:'block',marginBottom:6}}>{c.sharedData.email}</span>}
+              <div style={{display:'flex',gap:4}}>
+                <span className="tag tag-green"><I n="lock" s={9}/>E2EE</span>
+                <span className="tag tag-blue">{Object.keys(c.sharedData).length} fields</span></div>
+            </div>)}
+          </div></>}
+        <div style={{background:'var(--gold-dim)',border:'1px solid var(--gold-mid)',borderRadius:'var(--r)',padding:'14px 18px',marginTop:20,display:'flex',gap:10,alignItems:'flex-start'}}>
+          <I n="eye" s={16} c="var(--gold)"/>
+          <span style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.6}}>As a provider, you cannot modify client vault data. Clients can revoke your access at any time — including hard revoke, which destroys all keys.</span>
+        </div>
+      </div>}
 
-          {cases.length > 0 && <div>
-            <span className="section-label">ALL CASES</span>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))',gap:12,marginTop:8}}>
-              {cases.map((c,i)=>(
-                <div key={c.bridgeRoomId} className="card-h" onClick={()=>openCase(c.bridgeRoomId)}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-                    <span style={{fontSize:15,fontWeight:600}}>{c.sharedData.full_name || 'Anonymous Client'}</span>
-                    <I n="chevR" s={14} c="var(--tx-3)"/>
-                  </div>
-                  {c.sharedData.email && <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--tx-2)',display:'block',marginBottom:8}}>{c.sharedData.email}</span>}
-                  <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                    <span className="tag tag-green"><I n="lock" s={9}/>E2EE</span>
-                    <span className="tag tag-blue">{Object.keys(c.sharedData).length} fields</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>}
-
-          <div style={{background:'var(--gold-dim)',border:'1px solid var(--gold-mid)',borderRadius:'var(--r)',padding:'16px 20px',marginTop:24,display:'flex',gap:12,alignItems:'flex-start'}}>
-            <I n="eye" s={18} c="var(--gold)"/>
-            <div>
-              <span style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>Read-Only Data Access</span>
-              <span style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.6}}>As a provider, you cannot modify client vault data. You can view shared fields, send messages, and request additional information. Clients can revoke your access at any time — including hard revoke, which destroys all encryption keys and rotates the bridge room.</span>
-            </div>
+      {/* CASE VIEW */}
+      {view==='case'&&activeCaseData&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <button onClick={()=>{setView('dashboard');setActiveCase(null)}} className="b-gho b-sm" style={{marginBottom:14,display:'flex',alignItems:'center',gap:4}}><I n="back" s={13}/>All Cases</button>
+        <div style={{marginBottom:20}}>
+          <h2 style={{fontFamily:'var(--serif)',fontSize:20,fontWeight:700}}>{activeCaseData.sharedData.full_name||activeCaseData.clientUserId}</h2>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
+            <span className="tag tag-green"><I n="lock" s={9}/>Megolm + AES-GCM</span>
+            <span style={{fontFamily:'var(--mono)',fontSize:9.5,color:'var(--tx-3)'}}>Client-owned bridge</span></div>
+        </div>
+        <div className="card" style={{marginBottom:16}}>
+          <span className="section-label">SHARED DATA — CLIENT CONTROLLED</span>
+          {FIELD_CATEGORIES.map(cat=>{const fields=VAULT_FIELDS.filter(f=>f.category===cat&&activeCaseData.sharedData[f.key]);
+            if(!fields.length) return null;
+            return <div key={cat} style={{marginBottom:10}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6}}>
+                <span style={{color:`var(--${CAT_COLORS[cat]})`}}><I n={CAT_ICONS[cat]} s={12}/></span>
+                <span style={{fontSize:10.5,fontFamily:'var(--mono)',color:'var(--tx-2)',letterSpacing:'.05em'}}>{CAT_LABELS[cat].toUpperCase()}</span></div>
+              {fields.map(f=><div key={f.key} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border-0)'}}>
+                <span style={{fontSize:12,color:'var(--tx-1)'}}>{f.label}</span>
+                <span style={{fontSize:12.5,fontWeight:500,maxWidth:260,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{activeCaseData.sharedData[f.key]}</span>
+              </div>)}
+            </div>;})}
+          {Object.keys(activeCaseData.sharedData).length===0&&<p style={{color:'var(--tx-3)',fontSize:12,padding:'10px 0'}}>No fields shared yet</p>}
+          <div style={{marginTop:10,padding:'8px 12px',background:'var(--bg-3)',borderRadius:'var(--r)',display:'flex',alignItems:'center',gap:6}}>
+            <I n="eyeOff" s={13} c="var(--tx-3)"/>
+            <span style={{fontSize:10.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{VAULT_FIELDS.length-Object.keys(activeCaseData.sharedData).length} fields exist but not shared</span>
           </div>
         </div>
-      ) : activeCaseData ? (
-        <div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
-          <button onClick={()=>setActiveCase(null)} className="b-gho b-sm" style={{marginBottom:16,display:'flex',alignItems:'center',gap:5}}><I n="back" s={14}/>All Cases</button>
-
-          <div style={{marginBottom:24}}>
-            <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>
-              {activeCaseData.sharedData.full_name || activeCaseData.clientUserId}
-            </h2>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6}}>
-              <span className="tag tag-green"><I n="lock" s={9}/>Megolm + AES-GCM</span>
-              <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-3)'}}>Client-owned bridge</span>
-            </div>
-          </div>
-
-          {/* Shared data by category */}
-          <div className="card" style={{marginBottom:20}}>
-            <span className="section-label">SHARED DATA — CLIENT CONTROLLED</span>
-            <div style={{marginTop:8}}>
-              {FIELD_CATEGORIES.map(cat => {
-                const fields = VAULT_FIELDS.filter(f => f.category === cat && activeCaseData.sharedData[f.key]);
-                if (fields.length === 0) return null;
-                return <div key={cat} style={{marginBottom:14}}>
-                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
-                    <span style={{color:`var(--${CAT_COLORS[cat]})`}}><I n={CAT_ICONS[cat]} s={13}/></span>
-                    <span style={{fontSize:11,fontFamily:'var(--mono)',color:'var(--tx-2)',letterSpacing:'.05em'}}>{CAT_LABELS[cat].toUpperCase()}</span>
-                  </div>
-                  {fields.map(f => (
-                    <div key={f.key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border-0)'}}>
-                      <span style={{fontSize:12.5,color:'var(--tx-1)'}}>{f.label}</span>
-                      <span style={{fontSize:13,fontFamily:f.sensitive?'var(--mono)':'var(--sans)',fontWeight:500,maxWidth:280,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                        {activeCaseData.sharedData[f.key]}
-                      </span>
-                    </div>
-                  ))}
-                </div>;
-              })}
-              {Object.keys(activeCaseData.sharedData).length === 0 && <p style={{color:'var(--tx-3)',fontSize:12.5,padding:'12px 0'}}>Client hasn't shared any fields yet</p>}
-            </div>
-            <div style={{marginTop:12,padding:'10px 14px',background:'var(--bg-3)',borderRadius:'var(--r)',display:'flex',alignItems:'center',gap:8}}>
-              <I n="eyeOff" s={14} c="var(--tx-3)"/>
-              <span style={{fontSize:11,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>
-                {VAULT_FIELDS.length - Object.keys(activeCaseData.sharedData).length} fields exist but are not shared with you
-              </span>
-            </div>
-          </div>
-
-          {/* Request info */}
-          <div className="card" style={{marginBottom:20}}>
-            <span className="section-label">REQUEST INFORMATION</span>
-            <p style={{fontSize:12,color:'var(--tx-2)',marginBottom:10}}>Ask the client to share additional fields or documents</p>
-            <div style={{display:'flex',gap:8}}>
-              <input value={requestText} onChange={e=>setRequestText(e.target.value)} placeholder="e.g. Could you share your employment documents?"
-                onKeyDown={e=>{if(e.key==='Enter')handleSendRequest()}}/>
-              <button onClick={handleSendRequest} className="b-pri" style={{whiteSpace:'nowrap',display:'flex',alignItems:'center',gap:5}}><I n="send" s={13}/>Request</button>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="card">
-            <span className="section-label">BRIDGE MESSAGES</span>
-            <div style={{maxHeight:280,overflow:'auto',marginBottom:14}}>
-              {messages.length===0?
-                <p style={{color:'var(--tx-3)',fontSize:12.5,padding:'16px 0',textAlign:'center'}}>No messages yet</p>
-              : messages.map((msg,i) => (
-                <div key={msg.id||i} style={{padding:'10px 0',borderBottom:'1px solid var(--border-0)'}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-                    <span style={{fontFamily:'var(--mono)',fontSize:10.5,color:msg.sender===svc.userId?'var(--gold)':'var(--teal)'}}>
-                      {msg.sender===svc.userId?'You (Provider)':'Client'}
-                    </span>
-                    <span style={{fontFamily:'var(--mono)',fontSize:9.5,color:'var(--tx-3)'}}>{msg.ts?new Date(msg.ts).toLocaleString():''}</span>
-                  </div>
-                  <p style={{fontSize:13,lineHeight:1.55,color:'var(--tx-1)'}}>{msg.content?.body}</p>
-                </div>
-              ))}
-            </div>
-            <div style={{display:'flex',gap:8}}>
-              <input value={msgText} onChange={e=>setMsgText(e.target.value)} placeholder="Message (E2EE)..."
-                onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)handleSendMsg()}} style={{flex:1}}/>
-              <button onClick={handleSendMsg} className="b-pri" style={{display:'flex',alignItems:'center',gap:5}}><I n="send" s={14}/></button>
-            </div>
+        <div className="card" style={{marginBottom:16}}>
+          <span className="section-label">REQUEST INFORMATION</span>
+          <div style={{display:'flex',gap:6}}>
+            <input value={requestText} onChange={e=>setRequestText(e.target.value)} placeholder="e.g. Could you share employment docs?" onKeyDown={e=>{if(e.key==='Enter')handleSendRequest()}}/>
+            <button onClick={handleSendRequest} className="b-pri" style={{whiteSpace:'nowrap'}}><I n="send" s={12}/>Request</button>
           </div>
         </div>
-      ) : null}
+        <div className="card">
+          <span className="section-label">BRIDGE MESSAGES</span>
+          <div style={{maxHeight:260,overflow:'auto',marginBottom:12}}>
+            {messages.length===0?<p style={{color:'var(--tx-3)',fontSize:12,padding:'12px 0',textAlign:'center'}}>No messages</p>
+            :messages.map((msg,i)=><div key={msg.id||i} style={{padding:'8px 0',borderBottom:'1px solid var(--border-0)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                <span style={{fontFamily:'var(--mono)',fontSize:10,color:msg.sender===svc.userId?'var(--gold)':'var(--teal)'}}>{msg.sender===svc.userId?'You (Provider)':'Client'}</span>
+                <span style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--tx-3)'}}>{msg.ts?new Date(msg.ts).toLocaleString():''}</span></div>
+              <p style={{fontSize:12.5,color:'var(--tx-1)'}}>{msg.content?.body}</p>
+            </div>)}
+          </div>
+          <div style={{display:'flex',gap:6}}>
+            <input value={msgText} onChange={e=>setMsgText(e.target.value)} placeholder="Message (E2EE)..." onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)handleSendMsg()}} style={{flex:1}}/>
+            <button onClick={handleSendMsg} className="b-pri"><I n="send" s={13}/></button>
+          </div>
+        </div>
+      </div>}
+
+      {/* METRICS DASHBOARD (§B.5) */}
+      {view==='metrics'&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700,marginBottom:4}}>Metrics Dashboard</h2>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:20}}>Anonymized, aggregate data from consenting clients. No PII — names, DOBs, SSNs, and addresses are never present.</p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:10,marginBottom:20}}>
+          {[{l:'Metric Events',v:metrics.length,c:'orange'},{l:'Unique Cohorts',v:new Set(metrics.map(m=>m.cohort_hash)).size,c:'blue'},
+            {l:'Categories',v:Object.keys(metricsByCategory).length,c:'teal'}
+          ].map((s,i)=><div key={i} className="card" style={{padding:14}}><span className="section-label">{s.l.toUpperCase()}</span>
+            <span style={{fontSize:18,fontWeight:700,color:`var(--${s.c})`}}>{s.v}</span></div>)}
+        </div>
+        {Object.keys(metricsByCategory).length===0?
+          <div className="card" style={{textAlign:'center',padding:'30px',borderStyle:'dashed'}}><I n="bar" s={28}/><p style={{color:'var(--tx-3)',marginTop:8}}>No metric events yet. Clients must consent to anonymized reporting.</p></div>
+        :Object.entries(metricsByCategory).map(([cat,vals])=><div key={cat} className="card" style={{marginBottom:12}}>
+          <span className="section-label">{cat.toUpperCase()}</span>
+          <div style={{display:'flex',flexDirection:'column',gap:4,marginTop:6}}>
+            {Object.entries(vals).sort((a,b)=>b[1]-a[1]).map(([val,count])=>{
+              const max = Math.max(...Object.values(vals));
+              return <div key={val} style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:11.5,width:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{val}</span>
+                <div style={{flex:1,height:16,background:'var(--bg-3)',borderRadius:3,overflow:'hidden'}}>
+                  <div style={{width:`${(count/max)*100}%`,height:'100%',background:'var(--teal)',borderRadius:3,transition:'width .3s'}}/>
+                </div>
+                <span style={{fontSize:11,fontFamily:'var(--mono)',color:'var(--tx-1)',minWidth:30,textAlign:'right'}}>{count}</span>
+              </div>;
+            })}
+          </div>
+        </div>)}
+        <div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'12px 16px',marginTop:16,fontSize:11.5,color:'var(--tx-1)',lineHeight:1.6}}>
+          <strong style={{color:'var(--teal)'}}>K-anonymity (k=5):</strong> Combinations with fewer than 5 matching individuals are suppressed. This data is suitable for HUD APR, LSA, and PIT reporting.
+        </div>
+      </div>}
+
+      {/* SCHEMA VIEW */}
+      {view==='schema'&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700,marginBottom:6}}>Schema</h2>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:20}}>Community-owned definitions. Prompts define what clients observe. Definitions determine how observations become interpretations.</p>
+        <div className="card" style={{marginBottom:16}}>
+          <span className="section-label">OBSERVATION PROMPTS</span>
+          {DEFAULT_PROMPTS.map(p=><div key={p.id} style={{padding:'8px 0',borderBottom:'1px solid var(--border-0)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <span className={`tag tag-${OBS_CAT_COLORS[p.category]||'blue'}`}>{p.category}</span>
+              <span style={{fontSize:12.5,fontWeight:600}}>{p.question}</span></div>
+            <div style={{display:'flex',gap:3,flexWrap:'wrap',marginTop:4}}>
+              {p.options.map(o=><span key={o.v} style={{fontSize:9.5,padding:'1px 7px',background:'var(--bg-3)',borderRadius:8,color:'var(--tx-1)'}}>{o.l}</span>)}</div>
+          </div>)}
+        </div>
+        <div className="card">
+          <span className="section-label">CLASSIFICATION DEFINITIONS</span>
+          {DEFAULT_DEFINITIONS.map(d=><div key={d.id}>
+            <span style={{fontSize:13,fontWeight:600,display:'block',marginBottom:4}}>{d.name}</span>
+            {d.rules.map((r,i)=><div key={i} style={{display:'flex',gap:6,alignItems:'center',padding:'3px 0',fontSize:11}}>
+              <span className="tag tag-gold" style={{fontSize:8.5}}>{r.category}</span>
+              <span style={{color:'var(--tx-1)',flex:1}}>{r.criteria}</span>
+              {r.hud!=null&&<span style={{fontFamily:'var(--mono)',color:'var(--tx-3)',fontSize:10}}>HUD {r.hud}</span>}
+            </div>)}
+          </div>)}
+        </div>
+      </div>}
+
+      {/* NETWORK VIEW (Addendum E) */}
+      {view==='network'&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700,marginBottom:4}}>Network</h2>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:20}}>Shared definitions that propagate. A CoC, coalition, or partnership. Organizations join voluntarily; the network defines shared vocabulary.</p>
+
+        {!networkRoom?<div>
+          <div className="card" style={{textAlign:'center',padding:'30px',borderStyle:'dashed',marginBottom:16}}>
+            <I n="globe" s={32}/><p style={{color:'var(--tx-2)',marginTop:8}}>Not part of a network yet</p>
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button onClick={()=>setNetworkModal(true)} className="b-pri" style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+              <I n="plus" s={14}/>Create Network</button>
+            <button onClick={()=>setJoinNetworkModal(true)} className="b-gho" style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+              <I n="globe" s={14}/>Join Network</button>
+          </div>
+        </div>
+        :<div>
+          <div className="card" style={{marginBottom:16}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span className="tag tag-green"><I n="globe" s={10}/>NETWORK</span>
+                <span style={{fontSize:15,fontWeight:700}}>Connected</span></div>
+              <span style={{fontFamily:'var(--mono)',fontSize:9.5,color:'var(--tx-3)'}}>{networkRoom.slice(0,24)}…</span>
+            </div>
+            <span className="section-label">MEMBER ORGANIZATIONS ({networkMembers.length})</span>
+            <div style={{display:'flex',flexDirection:'column',gap:4}}>
+              {networkMembers.map((m,i)=><div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border-0)'}}>
+                <span style={{fontSize:12,fontFamily:'var(--mono)'}}>{m.id}</span>
+                <span className={`tag ${m.role==='admin'?'tag-gold':'tag-blue'}`} style={{fontSize:9}}>{m.role}</span>
+              </div>)}
+            </div>
+          </div>
+          <div className="card" style={{marginBottom:16}}>
+            <span className="section-label">PROPAGATION MODEL</span>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:6}}>
+              {[{level:'Required',desc:'Must use exactly as defined',color:'red'},
+                {level:'Standard',desc:'Additive extensions OK',color:'gold'},
+                {level:'Recommended',desc:'Can modify or replace',color:'blue'},
+                {level:'Optional',desc:'Available, no expectation',color:'teal'}
+              ].map(p=><div key={p.level} style={{padding:'8px 12px',background:'var(--bg-3)',borderRadius:'var(--r)'}}>
+                <span className={`tag tag-${p.color}`} style={{marginBottom:4,fontSize:9}}>{p.level.toUpperCase()}</span>
+                <p style={{fontSize:11,color:'var(--tx-2)',marginTop:2}}>{p.desc}</p>
+              </div>)}
+            </div>
+          </div>
+          <div style={{background:'var(--green-dim)',border:'1px solid rgba(61,214,140,.15)',borderRadius:'var(--r)',padding:'12px 16px',fontSize:11.5,color:'var(--tx-1)',lineHeight:1.6}}>
+            <strong style={{color:'var(--green)'}}>Polycentric governance:</strong> Shared prompts propagate Network → Org → Provider → Client. Observations vary locally; interpretations feeding into shared metrics use network-level definitions for consistency.
+          </div>
+        </div>}
+      </div>}
+
+      {/* ACTIVITY */}
+      {view==='activity'&&<ActivityStream session={session}/>}
     </div>
+
+    {/* DISCOVER CLIENT MODAL */}
+    <Modal open={discoverModal} onClose={()=>setDiscoverModal(false)} title="Find Client">
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>Look up a client by their Matrix ID. If they've created a bridge room and invited you, it will appear in your cases.</p>
+      <div style={{marginBottom:14}}><span className="section-label">CLIENT MATRIX ID</span>
+        <input value={discoverUserId} onChange={e=>setDiscoverUserId(e.target.value)} placeholder="@client:matrix.org"/></div>
+      <button onClick={handleDiscoverClient} className="b-pri" style={{width:'100%'}}>Search for Bridge</button>
+    </Modal>
+
+    {/* CREATE NETWORK MODAL */}
+    <Modal open={networkModal} onClose={()=>setNetworkModal(false)} title="Create Network">
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>Create a new governance network (CoC, coalition, or partnership). You'll be the admin. Other providers can join.</p>
+      <div style={{marginBottom:14}}><span className="section-label">NETWORK NAME</span>
+        <input value={networkName} onChange={e=>setNetworkName(e.target.value)} placeholder="e.g. Nashville CoC"/></div>
+      <div style={{background:'var(--green-dim)',border:'1px solid rgba(61,214,140,.15)',borderRadius:'var(--r)',padding:'10px 14px',marginBottom:14,fontSize:11.5,color:'var(--tx-1)'}}>
+        The network room will contain shared schema definitions that propagate to all member organizations.
+      </div>
+      <button onClick={handleCreateNetwork} className="b-pri" style={{width:'100%'}}>Create Network</button>
+    </Modal>
+
+    {/* JOIN NETWORK MODAL */}
+    <Modal open={joinNetworkModal} onClose={()=>setJoinNetworkModal(false)} title="Join Network">
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>Enter the Matrix room ID of an existing Tessera network to join it.</p>
+      <div style={{marginBottom:14}}><span className="section-label">NETWORK ROOM ID</span>
+        <input value={joinNetworkId} onChange={e=>setJoinNetworkId(e.target.value)} placeholder="!roomid:matrix.org"/></div>
+      <button onClick={handleJoinNetwork} className="b-pri" style={{width:'100%'}}>Join Network</button>
+    </Modal>
   </div>;
 };
 
 /* ═══════════════════ MAIN APP ═══════════════════ */
 const App = () => {
   const [session, setSession] = useState(null);
-  const [accountType, setAccountType] = useState(null); // 'client' | 'provider'
+  const [accountType, setAccountType] = useState(null);
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, type='info') => setToast({msg, type, k:Date.now()});
 
-  const handleLogin = (s) => { setSession(s); };
-  const handleLogout = async () => { await svc.logout(); setSession(null); setAccountType(null); };
-  const handleAccountType = (type) => { setAccountType(type); };
+  if (!session) return <LoginScreen onLogin={s => setSession(s)}/>;
+  if (!accountType) return <AccountTypeScreen onSelect={t => setAccountType(t)}/>;
 
-  if (!session) return <LoginScreen onLogin={handleLogin}/>;
-  if (!accountType) return <AccountTypeScreen onSelect={handleAccountType}/>;
+  const handleLogout = async () => { await svc.logout(); setSession(null); setAccountType(null); };
 
   return <>
     {accountType === 'client' ?
