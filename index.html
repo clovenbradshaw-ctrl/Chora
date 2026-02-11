@@ -708,8 +708,8 @@ const GOV_RHYTHMS = {
 /* Roles are detected from room memberships — no account-type selector.
  * A user can have multiple roles simultaneously. */
 const ROLES = {
-  client:    { id: 'client',    label: 'Client',            icon: 'shield',    color: 'teal',   desc: 'Data owner with a Client Vault' },
-  provider:  { id: 'provider',  label: 'Provider',          icon: 'briefcase', color: 'gold',   desc: 'Case manager or outreach worker' },
+  client:    { id: 'client',    label: 'Individual',         icon: 'shield',    color: 'teal',   desc: 'Data owner with a personal Vault' },
+  provider:  { id: 'provider',  label: 'Team Member',        icon: 'briefcase', color: 'gold',   desc: 'Case manager or outreach worker' },
   org_admin: { id: 'org_admin', label: 'Org Admin',         icon: 'users',     color: 'blue',   desc: 'Organization administrator' },
   network:   { id: 'network',   label: 'Network Coordinator',icon: 'globe',    color: 'green',  desc: 'Network governance steward' },
 };
@@ -1487,10 +1487,10 @@ const DOMAIN_CONFIG = {
   /* ── Org Terminology Defaults ── */
   // Admins can override these terms at the org level to match their sector vocabulary
   terminologyDefaults: {
-    client_term: 'Client',
-    client_term_plural: 'Clients',
-    provider_term: 'Provider',
-    provider_term_plural: 'Providers',
+    client_term: 'Individual',
+    client_term_plural: 'Individuals',
+    provider_term: 'Team Member',
+    provider_term_plural: 'Team Members',
   },
 };
 
@@ -2713,7 +2713,7 @@ const RecordGivenMeant = ({promptKey, value, reporter, timestamp}) => {
     prompt: prompt.question,
     value: value,
     valueLabel: option?.l || value,
-    reporter: reporter || 'Client self-report',
+    reporter: reporter || `${ROLES.client.label} self-report`,
     timestamp: timestamp,
     eoTrace: prompt.eo?.trace,
     frameworks: binding?.frameworks || []
@@ -4041,7 +4041,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
       await emitOp(vaultRoom, 'NUL', {entity:'provider_relationship',field:prov.providerUserId},
         {reason:'full_severance',bridge:prov.bridgeRoomId}, vaultFrame());
       await saveProviderIndex(providers.filter((_,i)=>i!==pi));
-      showToast('Provider removed, all keys destroyed','warn');
+      showToast(`${ROLES.provider.label} removed, all keys destroyed`,'warn');
     } catch(e) { showToast('Error: '+e.message,'error'); }
   };
 
@@ -4171,13 +4171,13 @@ const ClientApp = ({session, onLogout, showToast}) => {
         </div>
         <div style={{display:'flex',alignItems:'center',gap:6,marginTop:8}}>
           <span style={{fontFamily:'var(--mono)',fontSize:9.5,color:'var(--tx-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{svc.userId}</span>
-          <span className="tag tag-teal">CLIENT</span>
+          <span className="tag tag-teal">{ROLES.client.label.toUpperCase()}</span>
         </div>
       </div>
       <div style={{flex:1,overflow:'auto',padding:'6px 6px'}}>
         {[{id:'vault',icon:'folder',label:'My Vault'},{id:'inbox',icon:'inbox',label:'Inbox'},
           {id:'observations',icon:'clipboard',label:'Observations'},
-          {id:'providers',icon:'users',label:'My Providers'},{id:'records',icon:'shield',label:'My Records'},
+          {id:'providers',icon:'users',label:`My ${ROLES.provider.label}s`},{id:'records',icon:'shield',label:'My Records'},
           {id:'metrics',icon:'bar',label:'Metrics'},{id:'activity',icon:'zap',label:'Activity Stream'}
         ].map(item=><div key={item.id} onClick={()=>{setView(item.id);setActiveBridge(null);if(item.id!=='inbox')setInboxConvo(null)}}
           style={{padding:'9px 10px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:1,
@@ -4226,7 +4226,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:10,marginBottom:24}}>
           {[{l:'Fields',v:`${filledFields.length}/${allFields.length}`,c:'teal',i:'folder'},
-            {l:'Providers',v:providers.length,c:'gold',i:'users'},
+            {l:ROLES.provider.label+'s',v:providers.length,c:'gold',i:'users'},
             {l:'Observations',v:observations.length,c:'blue',i:'clipboard'},
             {l:'Shared Fields',v:sharedCount,c:'orange',i:'share'},
           ].map((s,i)=><div key={i} className="card" style={{padding:14}}><span className="section-label">{s.l.toUpperCase()}</span>
@@ -4312,7 +4312,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
             {observations.filter(obs => FRAMEWORK_BINDINGS[obs.category]?.bindings?.[obs.value]).slice(-3).reverse().map((obs,i) =>
               <RecordGivenMeant key={obs.id||i} promptKey={obs.category} value={obs.value}
-                reporter="Client self-report" timestamp={obs.ts}/>
+                reporter={`${ROLES.client.label} self-report`} timestamp={obs.ts}/>
             )}
           </div>
         </div>}
@@ -4321,11 +4321,11 @@ const ClientApp = ({session, onLogout, showToast}) => {
       {/* PROVIDERS VIEW */}
       {view==='providers'&&!activeBridge&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:24}}>
-          <div><h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>My Providers</h2>
-            <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>Each provider gets a dedicated encrypted bridge room. You control what they see.</p></div>
-          <button onClick={()=>setAddProviderModal(true)} className="b-pri" style={{display:'flex',alignItems:'center',gap:6}}><I n="plus" s={14}/>Add Provider</button>
+          <div><h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>My {ROLES.provider.label}s</h2>
+            <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>Each {ROLES.provider.label.toLowerCase()} gets a dedicated encrypted bridge room. You control what they see.</p></div>
+          <button onClick={()=>setAddProviderModal(true)} className="b-pri" style={{display:'flex',alignItems:'center',gap:6}}><I n="plus" s={14}/>Add {ROLES.provider.label}</button>
         </div>
-        {providers.length===0?<div className="card" style={{textAlign:'center',padding:'40px 20px',borderStyle:'dashed'}}><I n="users" s={32}/><p style={{color:'var(--tx-2)',marginTop:10}}>No providers yet</p></div>
+        {providers.length===0?<div className="card" style={{textAlign:'center',padding:'40px 20px',borderStyle:'dashed'}}><I n="users" s={32}/><p style={{color:'var(--tx-2)',marginTop:10}}>No {ROLES.provider.label.toLowerCase()}s yet</p></div>
         :<div style={{display:'flex',flexDirection:'column',gap:10}}>
           {providers.map((prov,pi)=>{const shCount=Object.values(prov.sharedFields||{}).filter(Boolean).length;
             const pp = prov.providerProfile;
@@ -7211,7 +7211,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:12}}>
           <I n="shield" s={14} c="var(--teal)"/>
           <span style={{fontSize:13,fontWeight:700}}>Service Recipient Term</span>
-          <span style={{fontSize:10,color:'var(--tx-3)'}}>(default: Client)</span>
+          <span style={{fontSize:10,color:'var(--tx-3)'}}>(default: Individual)</span>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
           <div>
@@ -7224,7 +7224,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           </div>
         </div>
         <div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:8}}>
-          {['Client','Patient','Participant','Member','Resident','Student','Guest'].map(t=>
+          {['Individual','Client','Patient','Participant','Member','Resident','Student','Guest'].map(t=>
             <span key={t} onClick={()=>setTerminologyDraft({...terminologyDraft,client_term:t,client_term_plural:t+'s'})}
               className={`tag ${terminologyDraft.client_term===t?'tag-teal':'tag-blue'}`}
               style={{fontSize:9,cursor:'pointer',transition:'all .15s'}}>{t}</span>)}
@@ -7234,7 +7234,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:12}}>
           <I n="briefcase" s={14} c="var(--gold)"/>
           <span style={{fontSize:13,fontWeight:700}}>Service Provider Term</span>
-          <span style={{fontSize:10,color:'var(--tx-3)'}}>(default: Provider)</span>
+          <span style={{fontSize:10,color:'var(--tx-3)'}}>(default: Team Member)</span>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
           <div>
@@ -7247,7 +7247,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           </div>
         </div>
         <div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:8}}>
-          {['Provider','Counselor','Therapist','Advocate','Case Worker','Coordinator','Staff'].map(t=>
+          {['Team Member','Provider','Counselor','Therapist','Advocate','Case Worker','Coordinator','Staff'].map(t=>
             <span key={t} onClick={()=>setTerminologyDraft({...terminologyDraft,provider_term:t,provider_term_plural:t+(t.endsWith('f')?'s':t.endsWith('or')?'s':'s')})}
               className={`tag ${terminologyDraft.provider_term===t?'tag-gold':'tag-blue'}`}
               style={{fontSize:9,cursor:'pointer',transition:'all .15s'}}>{t}</span>)}
@@ -7564,7 +7564,7 @@ const App = () => {
     }
     {/* Context switcher — visible when user has multiple role contexts */}
     {availableContexts.length > 1 && <div style={{position:'fixed',bottom:14,right:14,zIndex:30,display:'flex',gap:6,padding:'6px',border:'1px solid var(--border-0)',background:'var(--bg-2)',borderRadius:'999px',backdropFilter:'blur(4px)'}}>
-      {[{id:'provider',label:'Provider',icon:'briefcase'},{id:'client',label:'Client',icon:'shield'}]
+      {[{id:'provider',label:ROLES.provider.label,icon:'briefcase'},{id:'client',label:ROLES.client.label,icon:'shield'}]
         .filter(opt => availableContexts.includes(opt.id))
         .map(opt => <button key={opt.id} onClick={()=>switchContext(opt.id)} className={activeContext===opt.id?'b-pri b-xs':'b-gho b-xs'} style={{display:'inline-flex',alignItems:'center',gap:4,borderRadius:'999px'}}>
           <I n={opt.icon} s={11}/>{opt.label}
