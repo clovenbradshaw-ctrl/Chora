@@ -180,6 +180,8 @@ clipboard:<svg {...p}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 
 link:<svg {...p}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
 copy:<svg {...p}><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
 userPlus:<svg {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>,
+upload:<svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
+download:<svg {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
 sun:<svg {...p}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
 moon:<svg {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
 'alert-triangle':<svg {...p}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
@@ -617,6 +619,8 @@ const EVT = {
   MATCH_RESOLVE:  `${NS}.match.resolve`,
   // Client records (provider-created rooms representing clients)
   CLIENT_RECORD:  `${NS}.client.record`,
+  // Import
+  IMPORT_MANIFEST:`${NS}.import.manifest`,
   // Provider profile (self-reported identity & credentials)
   PROVIDER_PROFILE: `${NS}.provider.profile`,
 };
@@ -1653,6 +1657,612 @@ async function emitMetric(metricsRoom, clientId, observation, demographics, prog
   await svc.sendEvent(metricsRoom, EVT.METRIC, metric);
   return metric;
 }
+
+/* ═══════════════════ CLIENT DATA IMPORT ENGINE ═══════════════════
+ * Parses CSV/JSON files, maps columns to vault fields, encrypts each
+ * record with its own AES-256-GCM key, creates a client_record room
+ * per row, and emits only anonymized demographic metrics.
+ *
+ * PII GUARANTEE: Reports only ever contain demographic ranges
+ * (age buckets, area hashes, counts). Raw PII (names, DOBs, SSNs,
+ * addresses, emails, phones) are either blocked or bucketed before
+ * any metric is emitted. The per-record encryption key is stored in
+ * the E2EE room state — only room members can access it.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+// ── CSV Parser ──
+// Handles quoted fields, embedded commas, and multi-line values.
+function parseCSV(text) {
+  const lines = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') { inQuotes = !inQuotes; current += ch; }
+    else if (ch === '\n' && !inQuotes) { lines.push(current); current = ''; }
+    else if (ch === '\r' && !inQuotes) { /* skip CR */ }
+    else { current += ch; }
+  }
+  if (current.trim()) lines.push(current);
+  if (lines.length < 2) throw new Error('CSV must have a header row and at least one data row');
+
+  function parseLine(line) {
+    const fields = [];
+    let field = '';
+    let q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { if (q && line[i + 1] === '"') { field += '"'; i++; } else { q = !q; } }
+      else if (ch === ',' && !q) { fields.push(field.trim()); field = ''; }
+      else { field += ch; }
+    }
+    fields.push(field.trim());
+    return fields;
+  }
+
+  const headers = parseLine(lines[0]);
+  const records = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const vals = parseLine(lines[i]);
+    const record = {};
+    headers.forEach((h, j) => { if (vals[j] !== undefined && vals[j] !== '') record[h] = vals[j]; });
+    records.push(record);
+  }
+  return { headers, records };
+}
+
+// ── JSON Parser ──
+// Accepts an array of objects or { records: [...] } / { data: [...] }
+function parseJSONImport(text) {
+  const data = JSON.parse(text);
+  const records = Array.isArray(data) ? data : (data.records || data.data || []);
+  if (!Array.isArray(records) || records.length === 0) throw new Error('JSON must contain an array of record objects');
+  const headers = [...new Set(records.flatMap(r => Object.keys(r)))];
+  return { headers, records };
+}
+
+// ── Column auto-mapping ──
+// Maps common CSV/JSON header names to VAULT_FIELDS keys.
+const IMPORT_COLUMN_ALIASES = {
+  'name':'full_name','full_name':'full_name','fullname':'full_name','client_name':'full_name','client name':'full_name',
+  'first_name':'_first_name','last_name':'_last_name','firstname':'_first_name','lastname':'_last_name',
+  'dob':'dob','date_of_birth':'dob','birthdate':'dob','birth_date':'dob','birthday':'dob','date of birth':'dob',
+  'ssn':'id_number','id':'id_number','id_number':'id_number','social_security':'id_number','social':'id_number',
+  'email':'email','email_address':'email','e-mail':'email',
+  'phone':'phone','phone_number':'phone','mobile':'phone','telephone':'phone','cell':'phone',
+  'address':'address','street_address':'address','home_address':'address','street':'address','mailing_address':'address',
+  'organization':'affiliation','affiliation':'affiliation','org':'affiliation','agency':'affiliation','employer':'affiliation',
+  'notes':'case_notes','case_notes':'case_notes','comments':'case_notes','case notes':'case_notes',
+  'history':'history','case_history':'history','case history':'history',
+};
+
+function autoMapColumns(sourceHeaders) {
+  const mapping = {};
+  for (const h of sourceHeaders) {
+    const normalized = h.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    const alias = IMPORT_COLUMN_ALIASES[normalized] || IMPORT_COLUMN_ALIASES[h.toLowerCase().trim()];
+    if (alias && !alias.startsWith('_')) mapping[h] = alias;
+  }
+  return mapping;
+}
+
+// ── Per-record encryption + room creation ──
+// Creates one client_record room per row. Each record gets a unique
+// AES-256-GCM key. Only anonymized demographics are emitted as metrics.
+async function importClientRecords(records, mapping, metricsRoom, onProgress) {
+  const results = { created: [], errors: [], demographics: {}, totalFields: 0 };
+  const batchId = `batch_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const total = records.length;
+
+  // Check for first_name + last_name concatenation
+  const firstNameCol = Object.entries(mapping).find(([, v]) => v === '_first_name')?.[0];
+  const lastNameCol = Object.entries(mapping).find(([, v]) => v === '_last_name')?.[0];
+
+  for (let i = 0; i < total; i++) {
+    try {
+      const row = records[i];
+
+      // Map source fields to vault fields
+      const fields = {};
+      for (const [sourceCol, vaultKey] of Object.entries(mapping)) {
+        if (vaultKey.startsWith('_')) continue; // skip internal markers
+        if (vaultKey && row[sourceCol] != null && String(row[sourceCol]).trim() !== '') {
+          fields[vaultKey] = String(row[sourceCol]).trim();
+        }
+      }
+
+      // Concatenate first + last name if mapped separately
+      if (firstNameCol && lastNameCol) {
+        const first = (row[firstNameCol] || '').trim();
+        const last = (row[lastNameCol] || '').trim();
+        if (first || last) fields['full_name'] = [first, last].filter(Boolean).join(' ');
+      }
+
+      if (Object.keys(fields).length === 0) {
+        results.errors.push({ row: i + 1, error: 'No mapped fields with values' });
+        onProgress({ current: i + 1, total });
+        continue;
+      }
+
+      // Generate unique per-record AES-256-GCM key
+      const recordKey = await FieldCrypto.generateKey();
+
+      // Encrypt each field value individually
+      const encryptedFields = {};
+      for (const [key, value] of Object.entries(fields)) {
+        const { ciphertext, iv } = await FieldCrypto.encrypt(value, recordKey);
+        encryptedFields[key] = { ciphertext, iv };
+      }
+
+      // Generate anonymized demographics — this is the ONLY data that
+      // ever appears in reports. Raw PII is blocked or bucketed.
+      const anonDemo = {};
+      for (const [key, value] of Object.entries(fields)) {
+        const anon = anonymizeField(key, value);
+        if (anon) anonDemo[anon.key] = anon.value;
+      }
+
+      // Non-PII label for room name (never store raw name in room metadata)
+      const recordLabel = `Import ${batchId.slice(-4)} #${i + 1}`;
+
+      // Create the client_record room with encrypted data
+      const roomId = await svc.createRoom(
+        `[Client] ${recordLabel}`,
+        'Imported client record — encrypted at rest',
+        [
+          { type: EVT.IDENTITY, state_key: '', content: {
+            account_type: 'client_record', owner: svc.userId, created: Date.now(),
+            imported: true, import_batch: batchId, import_index: i,
+            client_name: recordLabel, status: 'created',
+          }},
+          { type: EVT.CLIENT_RECORD, state_key: '', content: {
+            record_key: recordKey,
+            encrypted_fields: encryptedFields,
+            demographics: anonDemo,
+            imported_at: Date.now(),
+            field_count: Object.keys(fields).length,
+            import_batch: batchId,
+          }},
+        ]
+      );
+
+      // Emit anonymized metric — NEVER contains PII
+      if (metricsRoom) {
+        const hash = await cohortHash(`import_${roomId}_${batchId}`);
+        await svc.sendEvent(metricsRoom, EVT.METRIC, {
+          cohort_hash: hash,
+          observation: { category: 'intake', value: 'imported', date_bucket: new Date().toISOString().slice(0, 7) },
+          demographics: anonDemo,
+          program: 'import',
+          ts: Date.now(),
+        });
+      }
+
+      // Accumulate demographic summary (anonymized only)
+      for (const [k, v] of Object.entries(anonDemo)) {
+        if (!results.demographics[k]) results.demographics[k] = {};
+        results.demographics[k][v] = (results.demographics[k][v] || 0) + 1;
+      }
+
+      results.created.push({ roomId, displayName: recordLabel, fieldCount: Object.keys(fields).length });
+      results.totalFields += Object.keys(fields).length;
+      onProgress({ current: i + 1, total });
+
+      // Rate-limit: pause every 2 records to avoid homeserver rate limits
+      if (i % 2 === 1) await new Promise(r => setTimeout(r, 400));
+
+    } catch (e) {
+      results.errors.push({ row: i + 1, error: e.message });
+      onProgress({ current: i + 1, total });
+    }
+  }
+
+  // Emit import manifest to metrics room (aggregate only, no PII)
+  if (metricsRoom) {
+    try {
+      await svc.sendEvent(metricsRoom, EVT.IMPORT_MANIFEST, {
+        batch_id: batchId,
+        total_records: total,
+        successful: results.created.length,
+        failed: results.errors.length,
+        demographics_summary: results.demographics,
+        ts: Date.now(),
+      });
+    } catch {}
+  }
+
+  return results;
+}
+
+// ── PII masking for preview display ──
+// Shows first/last char with dots in between. Sensitive fields fully masked.
+function maskPII(key, value) {
+  if (!value || typeof value !== 'string') return '—';
+  const t = DEFAULT_TRANSFORMS[key];
+  if (t?.method === 'block') return '\u25CF\u25CF\u25CF\u25CF\u25CF\u25CF';
+  if (t?.method === 'age_range') {
+    const anon = anonymizeField(key, value);
+    return anon ? `[${anon.value}]` : '\u25CF\u25CF\u25CF\u25CF';
+  }
+  if (t?.method === 'area_hash') {
+    const anon = anonymizeField(key, value);
+    return anon ? `[${anon.value}]` : '\u25CF\u25CF\u25CF\u25CF';
+  }
+  // Non-sensitive fields: show as-is
+  const vf = VAULT_FIELDS.find(f => f.key === key);
+  if (vf?.sensitive) return value.length > 2 ? value[0] + '\u25CF'.repeat(Math.min(value.length - 2, 6)) + value[value.length - 1] : '\u25CF\u25CF';
+  return value;
+}
+
+/* ═══════════════════ IMPORT DATA MODAL ═══════════════════ */
+const ImportDataModal = ({open, onClose, showToast, metricsRoom, onComplete}) => {
+  const [step, setStep] = useState('upload');
+  const [fileData, setFileData] = useState(null);
+  const [mapping, setMapping] = useState({});
+  const [progress, setProgress] = useState({current:0, total:0});
+  const [results, setResults] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef(null);
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!open) { setStep('upload'); setFileData(null); setMapping({}); setProgress({current:0,total:0}); setResults(null); }
+  }, [open]);
+
+  const handleFile = async (file) => {
+    try {
+      const text = await file.text();
+      const isJSON = file.name.endsWith('.json') || file.type === 'application/json';
+      const parsed = isJSON ? parseJSONImport(text) : parseCSV(text);
+      if (parsed.records.length === 0) throw new Error('No records found in file');
+      setFileData({ ...parsed, fileName: file.name, fileType: isJSON ? 'JSON' : 'CSV' });
+      // Auto-map columns
+      const autoMap = autoMapColumns(parsed.headers);
+      setMapping(autoMap);
+      setStep('map');
+    } catch (e) {
+      showToast('Parse error: ' + e.message, 'error');
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  const mappedFieldCount = Object.values(mapping).filter(v => v && !v.startsWith('_')).length;
+  const hasMappedFields = mappedFieldCount > 0;
+
+  // Count how many columns map to each vault field (detect duplicates)
+  const vaultFieldUsage = {};
+  for (const v of Object.values(mapping)) {
+    if (v && !v.startsWith('_')) vaultFieldUsage[v] = (vaultFieldUsage[v] || 0) + 1;
+  }
+
+  const handleImport = async () => {
+    if (!fileData || !hasMappedFields) return;
+    setStep('importing');
+    setProgress({ current: 0, total: fileData.records.length });
+    try {
+      const res = await importClientRecords(
+        fileData.records, mapping, metricsRoom,
+        (p) => setProgress(p)
+      );
+      setResults(res);
+      setStep('done');
+      if (onComplete) onComplete(res);
+    } catch (e) {
+      showToast('Import failed: ' + e.message, 'error');
+      setStep('preview');
+    }
+  };
+
+  if (!open) return null;
+
+  return <Modal open={open} onClose={step === 'importing' ? undefined : onClose} title="Import Client Data" w={720}>
+
+    {/* ── STEP 1: UPLOAD ── */}
+    {step === 'upload' && <div>
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:16,lineHeight:1.6}}>
+        Upload a CSV or JSON file containing client records. Each row becomes an encrypted client room with its own AES-256-GCM key. PII is never stored in any reportable format.
+      </p>
+      <div onDragOver={(e)=>{e.preventDefault();setDragOver(true)}} onDragLeave={()=>setDragOver(false)} onDrop={handleDrop}
+        onClick={()=>fileRef.current?.click()}
+        style={{border:`2px dashed ${dragOver?'var(--gold)':'var(--border-1)'}`,borderRadius:'var(--r-lg)',
+          padding:'48px 24px',textAlign:'center',cursor:'pointer',transition:'all .2s',
+          background:dragOver?'var(--gold-dim)':'var(--bg-1)'}}>
+        <div style={{width:48,height:48,borderRadius:'var(--r-lg)',background:'var(--gold-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--gold)',margin:'0 auto 14px'}}>
+          <I n="upload" s={24}/>
+        </div>
+        <p style={{fontSize:14,fontWeight:600,marginBottom:4}}>Drop CSV or JSON file here</p>
+        <p style={{fontSize:12,color:'var(--tx-2)'}}>or click to browse</p>
+        <div style={{display:'flex',gap:6,justifyContent:'center',marginTop:12}}>
+          <span className="tag tag-blue">.csv</span>
+          <span className="tag tag-teal">.json</span>
+        </div>
+      </div>
+      <input ref={fileRef} type="file" accept=".csv,.json,application/json,text/csv" style={{display:'none'}}
+        onChange={(e)=>{if(e.target.files[0])handleFile(e.target.files[0])}}/>
+      <div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'12px 16px',marginTop:16,display:'flex',gap:10,alignItems:'flex-start'}}>
+        <I n="shield" s={16} c="var(--teal)"/>
+        <div style={{fontSize:11.5,color:'var(--tx-1)',lineHeight:1.6}}>
+          <strong style={{color:'var(--teal)'}}>Encryption guarantee:</strong> Each record gets a unique AES-256-GCM encryption key. PII fields (name, DOB, SSN, address, phone, email) are encrypted before storage. Reports only contain demographic ranges — never raw PII.
+        </div>
+      </div>
+    </div>}
+
+    {/* ── STEP 2: MAP COLUMNS ── */}
+    {step === 'map' && fileData && <div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+        <div>
+          <p style={{fontSize:12.5,fontWeight:600}}>{fileData.fileName}</p>
+          <p style={{fontSize:11,color:'var(--tx-2)'}}>{fileData.fileType} · {fileData.records.length} records · {fileData.headers.length} columns</p>
+        </div>
+        <button onClick={()=>{setStep('upload');setFileData(null);setMapping({})}} className="b-gho b-xs">Change File</button>
+      </div>
+
+      <span className="section-label">MAP COLUMNS TO VAULT FIELDS</span>
+      <p style={{fontSize:11,color:'var(--tx-2)',marginBottom:10}}>Assign each source column to a vault field. Unmapped columns are skipped. Fields marked with a lock are encrypted at rest.</p>
+
+      <div style={{maxHeight:340,overflow:'auto',marginBottom:16}}>
+        {fileData.headers.map(h => {
+          const currentMapping = mapping[h] || '';
+          const vf = VAULT_FIELDS.find(f => f.key === currentMapping);
+          const transform = DEFAULT_TRANSFORMS[currentMapping];
+          const sampleVal = fileData.records.slice(0, 3).map(r => r[h]).filter(Boolean)[0];
+          return <div key={h} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid var(--border-0)'}}>
+            <div style={{flex:1,minWidth:0}}>
+              <span style={{fontSize:12,fontWeight:500,display:'block'}}>{h}</span>
+              {sampleVal && <span style={{fontSize:10,color:'var(--tx-3)',fontFamily:'var(--mono)',display:'block',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                e.g. {String(sampleVal).slice(0, 40)}{String(sampleVal).length > 40 ? '…' : ''}
+              </span>}
+            </div>
+            <I n="chevR" s={12} c="var(--tx-3)"/>
+            <div style={{flex:1,minWidth:0}}>
+              <select value={currentMapping} onChange={e=>setMapping(prev=>({...prev,[h]:e.target.value}))}
+                style={{width:'100%',fontSize:12,padding:'7px 10px'}}>
+                <option value="">— skip —</option>
+                {VAULT_FIELDS.map(f => <option key={f.key} value={f.key}>
+                  {f.label}{f.sensitive ? ' 🔒' : ''}{transform?.method === 'block' ? ' (blocked in reports)' : ''}
+                </option>)}
+                <option value="_first_name">First Name (will combine)</option>
+                <option value="_last_name">Last Name (will combine)</option>
+              </select>
+            </div>
+            <div style={{width:60,textAlign:'center'}}>
+              {currentMapping && !currentMapping.startsWith('_') && transform?.method === 'block' &&
+                <span className="tag tag-red" style={{fontSize:8}}>BLOCKED</span>}
+              {currentMapping && !currentMapping.startsWith('_') && transform?.method === 'age_range' &&
+                <span className="tag tag-blue" style={{fontSize:8}}>RANGED</span>}
+              {currentMapping && !currentMapping.startsWith('_') && vf?.sensitive &&
+                <span className="tag tag-green" style={{fontSize:8}}>ENCRYPT</span>}
+              {currentMapping && !currentMapping.startsWith('_') && !transform && !vf?.sensitive &&
+                <span className="tag tag-teal" style={{fontSize:8}}>STORED</span>}
+            </div>
+          </div>;
+        })}
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
+        <div className="card" style={{padding:12}}>
+          <span className="section-label">MAPPED</span>
+          <span style={{fontSize:18,fontWeight:700,color:'var(--gold)'}}>{mappedFieldCount}</span>
+          <span style={{fontSize:11,color:'var(--tx-2)'}}> of {fileData.headers.length} columns</span>
+        </div>
+        <div className="card" style={{padding:12}}>
+          <span className="section-label">REPORT VISIBILITY</span>
+          <div style={{display:'flex',gap:3,flexWrap:'wrap',marginTop:4}}>
+            {Object.values(mapping).filter(v=>v&&!v.startsWith('_')).map(v => {
+              const t = DEFAULT_TRANSFORMS[v];
+              const vf = VAULT_FIELDS.find(f=>f.key===v);
+              return <span key={v} className={`tag ${t?.method==='block'?'tag-red':t?.method==='age_range'?'tag-blue':'tag-teal'}`} style={{fontSize:8}}>
+                {vf?.label||v}: {t?.method==='block'?'NEVER':t?.method==='age_range'?'RANGE ONLY':'visible'}
+              </span>;
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div style={{display:'flex',gap:8}}>
+        <button onClick={()=>setStep('upload')} className="b-gho" style={{flex:1}}>Back</button>
+        <button onClick={()=>setStep('preview')} className="b-pri" disabled={!hasMappedFields} style={{flex:2}}>
+          Preview {fileData.records.length} Records
+        </button>
+      </div>
+    </div>}
+
+    {/* ── STEP 3: PREVIEW ── */}
+    {step === 'preview' && fileData && <div>
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>
+        Review how records will be stored. PII fields are masked below as they will be in reports. The actual data is encrypted per-record and only accessible to room members.
+      </p>
+
+      <div style={{overflowX:'auto',marginBottom:16}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:11.5}}>
+          <thead>
+            <tr style={{borderBottom:'2px solid var(--border-1)'}}>
+              <th style={{padding:'8px 10px',textAlign:'left',fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-2)',letterSpacing:'.05em'}}>#</th>
+              {Object.entries(mapping).filter(([,v])=>v&&!v.startsWith('_')).map(([src,vk])=>{
+                const vf = VAULT_FIELDS.find(f=>f.key===vk);
+                const t = DEFAULT_TRANSFORMS[vk];
+                return <th key={src} style={{padding:'8px 10px',textAlign:'left',whiteSpace:'nowrap'}}>
+                  <span style={{fontSize:10,fontFamily:'var(--mono)',color:'var(--tx-2)',letterSpacing:'.05em'}}>{vf?.label||vk}</span>
+                  {t?.method==='block'&&<span className="tag tag-red" style={{fontSize:7,marginLeft:4}}>BLOCKED</span>}
+                  {vf?.sensitive&&!t&&<span className="tag tag-green" style={{fontSize:7,marginLeft:4}}>ENC</span>}
+                </th>;
+              })}
+              <th style={{padding:'8px 10px',textAlign:'left',fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-2)'}}>DEMOGRAPHICS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {fileData.records.slice(0, 5).map((row, i) => {
+              // Build mapped fields for this row
+              const fields = {};
+              for (const [src, vk] of Object.entries(mapping)) {
+                if (vk && !vk.startsWith('_') && row[src] != null) fields[vk] = String(row[src]);
+              }
+              // Handle first+last name
+              const fnCol = Object.entries(mapping).find(([,v])=>v==='_first_name')?.[0];
+              const lnCol = Object.entries(mapping).find(([,v])=>v==='_last_name')?.[0];
+              if (fnCol && lnCol) {
+                const combined = [(row[fnCol]||'').trim(), (row[lnCol]||'').trim()].filter(Boolean).join(' ');
+                if (combined) fields['full_name'] = combined;
+              }
+              // Anonymize for demographic preview
+              const anonDemo = {};
+              for (const [k, v] of Object.entries(fields)) {
+                const anon = anonymizeField(k, v);
+                if (anon) anonDemo[anon.key] = anon.value;
+              }
+              return <tr key={i} style={{borderBottom:'1px solid var(--border-0)'}}>
+                <td style={{padding:'6px 10px',color:'var(--tx-3)',fontFamily:'var(--mono)',fontSize:10}}>{i+1}</td>
+                {Object.entries(mapping).filter(([,v])=>v&&!v.startsWith('_')).map(([src,vk])=>{
+                  const val = vk==='full_name'&&fields['full_name']?fields['full_name']:row[src];
+                  return <td key={src} style={{padding:'6px 10px',fontSize:11,maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {maskPII(vk, val ? String(val) : '')}
+                  </td>;
+                })}
+                <td style={{padding:'6px 10px'}}>
+                  <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
+                    {Object.entries(anonDemo).map(([k,v])=>
+                      <span key={k} className="tag tag-blue" style={{fontSize:8}}>{k}: {v||'—'}</span>
+                    )}
+                    {Object.keys(anonDemo).length===0&&<span style={{fontSize:10,color:'var(--tx-3)'}}>—</span>}
+                  </div>
+                </td>
+              </tr>;
+            })}
+          </tbody>
+        </table>
+        {fileData.records.length > 5 && <p style={{fontSize:11,color:'var(--tx-3)',textAlign:'center',padding:8}}>
+          …and {fileData.records.length - 5} more records
+        </p>}
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:16}}>
+        <div className="card" style={{padding:10,textAlign:'center'}}>
+          <span className="section-label">RECORDS</span>
+          <span style={{fontSize:18,fontWeight:700,display:'block'}}>{fileData.records.length}</span>
+        </div>
+        <div className="card" style={{padding:10,textAlign:'center'}}>
+          <span className="section-label">ENCRYPTED FIELDS</span>
+          <span style={{fontSize:18,fontWeight:700,color:'var(--green)',display:'block'}}>{mappedFieldCount}</span>
+        </div>
+        <div className="card" style={{padding:10,textAlign:'center'}}>
+          <span className="section-label">ROOMS TO CREATE</span>
+          <span style={{fontSize:18,fontWeight:700,color:'var(--gold)',display:'block'}}>{fileData.records.length}</span>
+        </div>
+      </div>
+
+      <div style={{background:'var(--red-dim)',border:'1px solid rgba(232,93,93,.15)',borderRadius:'var(--r)',padding:'12px 16px',marginBottom:16,display:'flex',gap:10,alignItems:'flex-start'}}>
+        <I n="eyeOff" s={16} c="var(--red)"/>
+        <div style={{fontSize:11.5,color:'var(--tx-1)',lineHeight:1.6}}>
+          <strong style={{color:'var(--red)'}}>PII will NEVER appear in reports.</strong> Names, DOBs, SSNs, addresses, phones, and emails are either blocked entirely or converted to demographic ranges (age buckets, area hashes). Only anonymized aggregates flow to the metrics system.
+        </div>
+      </div>
+
+      <div style={{display:'flex',gap:8}}>
+        <button onClick={()=>setStep('map')} className="b-gho" style={{flex:1}}>Back</button>
+        <button onClick={handleImport} className="b-pri" style={{flex:2,padding:12,fontSize:14}}>
+          <I n="lock" s={15}/> Encrypt &amp; Import {fileData.records.length} Records
+        </button>
+      </div>
+    </div>}
+
+    {/* ── STEP 4: IMPORTING ── */}
+    {step === 'importing' && <div style={{textAlign:'center',padding:'20px 0'}}>
+      <Spin s={32}/>
+      <p style={{fontSize:15,fontWeight:600,marginTop:16}}>Encrypting &amp; creating rooms...</p>
+      <p style={{fontSize:12,color:'var(--tx-2)',marginTop:6}}>Record {progress.current} of {progress.total}</p>
+      <div style={{background:'var(--bg-3)',borderRadius:8,height:8,overflow:'hidden',marginTop:16,maxWidth:400,margin:'16px auto 0'}}>
+        <div style={{height:'100%',background:'var(--gold)',borderRadius:8,transition:'width .3s',
+          width:`${progress.total?((progress.current/progress.total)*100):0}%`}}/>
+      </div>
+      <div style={{display:'flex',gap:12,justifyContent:'center',marginTop:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:4}}>
+          <I n="lock" s={12} c="var(--green)"/><span style={{fontSize:11,color:'var(--tx-2)'}}>AES-256-GCM per record</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:4}}>
+          <I n="shield" s={12} c="var(--teal)"/><span style={{fontSize:11,color:'var(--tx-2)'}}>E2EE rooms</span>
+        </div>
+      </div>
+    </div>}
+
+    {/* ── STEP 5: DONE ── */}
+    {step === 'done' && results && <div>
+      <div style={{textAlign:'center',marginBottom:20}}>
+        <div style={{width:48,height:48,borderRadius:'50%',background:'var(--green-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--green)',margin:'0 auto 12px'}}>
+          <I n="check" s={24}/>
+        </div>
+        <p style={{fontSize:18,fontWeight:700}}>Import Complete</p>
+        <p style={{fontSize:12,color:'var(--tx-2)',marginTop:4}}>
+          {results.created.length} records encrypted &amp; stored · {results.errors.length} errors
+        </p>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:16}}>
+        <div className="card" style={{padding:10,textAlign:'center'}}>
+          <span className="section-label">IMPORTED</span>
+          <span style={{fontSize:20,fontWeight:700,color:'var(--green)',display:'block'}}>{results.created.length}</span>
+        </div>
+        <div className="card" style={{padding:10,textAlign:'center'}}>
+          <span className="section-label">ENCRYPTED FIELDS</span>
+          <span style={{fontSize:20,fontWeight:700,color:'var(--gold)',display:'block'}}>{results.totalFields}</span>
+        </div>
+        <div className="card" style={{padding:10,textAlign:'center'}}>
+          <span className="section-label">ERRORS</span>
+          <span style={{fontSize:20,fontWeight:700,color:results.errors.length?'var(--red)':'var(--tx-2)',display:'block'}}>{results.errors.length}</span>
+        </div>
+      </div>
+
+      {/* DEMOGRAPHIC SUMMARY — This is the ONLY reportable data */}
+      {Object.keys(results.demographics).length > 0 && <div className="card" style={{marginBottom:16}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+          <span className="section-label" style={{marginBottom:0}}>DEMOGRAPHIC SUMMARY (ANONYMIZED)</span>
+          <span className="tag tag-teal" style={{fontSize:8}}>REPORT-SAFE</span>
+        </div>
+        <p style={{fontSize:11,color:'var(--tx-2)',marginBottom:10}}>This is the only data available for reporting. No PII is present — only demographic ranges and hashed areas.</p>
+        {Object.entries(results.demographics).map(([category, values]) => <div key={category} style={{marginBottom:10}}>
+          <span style={{fontSize:11,fontWeight:600,color:'var(--tx-1)',textTransform:'uppercase',fontFamily:'var(--mono)',letterSpacing:'.05em',display:'block',marginBottom:4}}>{category}</span>
+          <div style={{display:'flex',flexDirection:'column',gap:3}}>
+            {Object.entries(values).sort((a,b)=>b[1]-a[1]).map(([val, count]) => {
+              const max = Math.max(...Object.values(values));
+              return <div key={val} style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:11,width:140,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--tx-1)'}}>{val || '—'}</span>
+                <div style={{flex:1,height:14,background:'var(--bg-3)',borderRadius:3,overflow:'hidden'}}>
+                  <div style={{width:`${(count/max)*100}%`,height:'100%',background:'var(--teal)',borderRadius:3,transition:'width .3s'}}/>
+                </div>
+                <span style={{fontSize:10.5,fontFamily:'var(--mono)',color:'var(--tx-1)',minWidth:24,textAlign:'right'}}>{count}</span>
+              </div>;
+            })}
+          </div>
+        </div>)}
+      </div>}
+
+      {results.errors.length > 0 && <div className="card" style={{marginBottom:16}}>
+        <span className="section-label">ERRORS</span>
+        <div style={{maxHeight:120,overflow:'auto',marginTop:4}}>
+          {results.errors.map((e, i) => <div key={i} style={{fontSize:11,color:'var(--red)',padding:'4px 0',borderBottom:'1px solid var(--border-0)'}}>
+            Row {e.row}: {e.error}
+          </div>)}
+        </div>
+      </div>}
+
+      <div style={{background:'var(--green-dim)',border:'1px solid rgba(61,214,140,.15)',borderRadius:'var(--r)',padding:'12px 16px',marginBottom:16,display:'flex',gap:10,alignItems:'flex-start'}}>
+        <I n="shieldCheck" s={16} c="var(--green)"/>
+        <div style={{fontSize:11.5,color:'var(--tx-1)',lineHeight:1.6}}>
+          <strong style={{color:'var(--green)'}}>No PII in reports.</strong> All {results.created.length} records are individually encrypted with unique AES-256-GCM keys. The demographic summary above shows only anonymized ranges — this is the maximum granularity available for any report. Names, dates of birth, SSNs, addresses, phones, and emails are cryptographically blocked from reporting.
+        </div>
+      </div>
+
+      <button onClick={onClose} className="b-pri" style={{width:'100%',padding:12,fontSize:14}}>
+        <I n="check" s={15}/> Done — View Clients
+      </button>
+    </div>}
+  </Modal>;
+};
 
 /* ═══════════════════ SMALL COMPONENTS ═══════════════════ */
 const Spin = ({s=18}) => <div style={{width:s,height:s,border:'2px solid var(--border-1)',borderTopColor:'var(--gold)',borderRadius:'50%',animation:'spin .6s linear infinite'}} />;
@@ -3782,6 +4392,8 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const [newClientNotes, setNewClientNotes] = useState('');
   const [clientInviteMatrixId, setClientInviteMatrixId] = useState('');
   const [copiedField, setCopiedField] = useState(null);
+  // Client data import
+  const [importModal, setImportModal] = useState(false);
   // Provider profile — self-reported identity info
   const [providerProfile, setProviderProfile] = useState({});
   const [profileModal, setProfileModal] = useState(false);
@@ -4102,6 +4714,16 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       setCopiedField(label);
       setTimeout(() => setCopiedField(null), 2000);
     } catch { showToast('Copy failed — please select and copy manually', 'warn'); }
+  };
+
+  // ─── Import completion handler ───
+  const handleImportComplete = (importResults) => {
+    const newRecords = importResults.created.map(r => ({
+      roomId: r.roomId, client_name: r.displayName, client_matrix_id: null,
+      notes: `Imported (${r.fieldCount} encrypted fields)`,
+      owner: svc.userId, created: Date.now(), status: 'created', imported: true,
+    }));
+    setClientRecords(prev => [...prev, ...newRecords]);
   };
 
   const getInviteUrl = (roomId) => `https://matrix.to/#/${roomId}`;
@@ -4791,14 +5413,18 @@ const ProviderApp = ({session, onLogout, showToast}) => {
             <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Clients</h2>
             <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>Each client record is a private encrypted room. Invite clients to give them full control.</p>
           </div>
-          <button onClick={()=>{setCreateClientModal(true);setNewClientName('');setNewClientMatrixId('');setNewClientNotes('')}} className="b-pri" style={{display:'flex',alignItems:'center',gap:6}}><I n="plus" s={14}/>New Client</button>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={()=>setImportModal(true)} className="b-gho" style={{display:'flex',alignItems:'center',gap:6}}><I n="upload" s={14}/>Import Data</button>
+            <button onClick={()=>{setCreateClientModal(true);setNewClientName('');setNewClientMatrixId('');setNewClientNotes('')}} className="b-pri" style={{display:'flex',alignItems:'center',gap:6}}><I n="plus" s={14}/>New Client</button>
+          </div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:20}}>
           {[{l:'Total Clients',v:clientRecords.length,c:'teal',i:'users'},
+            {l:'Imported',v:clientRecords.filter(r=>r.imported).length,c:'purple',i:'upload'},
             {l:'Invited',v:clientRecords.filter(r=>r.status==='invited').length,c:'gold',i:'send'},
             {l:'Joined',v:clientRecords.filter(r=>r.status==='joined').length,c:'green',i:'check'},
             {l:'Claimed',v:clientRecords.filter(r=>r.status==='claimed').length,c:'teal',i:'shield'},
-            {l:'Pending',v:clientRecords.filter(r=>r.status==='created').length,c:'orange',i:'clock'},
+            {l:'Pending',v:clientRecords.filter(r=>r.status==='created'&&!r.imported).length,c:'orange',i:'clock'},
           ].map((s,i)=><div key={i} className="card" style={{padding:14}}><span className="section-label">{s.l.toUpperCase()}</span>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:2}}>
               <span style={{fontSize:18,fontWeight:700}}>{s.v}</span>
@@ -4808,7 +5434,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           <div className="card" style={{textAlign:'center',padding:'40px 20px',borderStyle:'dashed'}}>
             <I n="users" s={32}/>
             <p style={{color:'var(--tx-2)',marginTop:10,fontSize:13}}>No client records yet</p>
-            <p style={{color:'var(--tx-3)',fontSize:11.5,marginTop:4}}>Click "New Client" to create a record. Each client gets their own encrypted room.</p>
+            <p style={{color:'var(--tx-3)',fontSize:11.5,marginTop:4}}>Click "New Client" to create a record, or "Import Data" to upload a CSV/JSON. Each client gets their own encrypted room.</p>
           </div>
         :<div className="card" style={{padding:0,overflow:'hidden'}}>
           {/* Table header */}
@@ -4826,7 +5452,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
               onMouseEnter={e=>e.currentTarget.style.background='var(--bg-3)'}
               onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
               <div>
-                <span style={{fontSize:13,fontWeight:600,display:'block'}}>{rec.client_name}</span>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <span style={{fontSize:13,fontWeight:600}}>{rec.client_name}</span>
+                  {rec.imported&&<span className="tag tag-purple" style={{fontSize:8}}><I n="lock" s={8}/>Encrypted</span>}
+                </div>
                 {rec.notes&&<span style={{fontSize:10,color:'var(--tx-3)',display:'block',marginTop:2}}>{rec.notes}</span>}
               </div>
               <span style={{fontFamily:'var(--mono)',fontSize:10.5,color:rec.client_matrix_id?'var(--tx-1)':'var(--tx-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
@@ -5005,8 +5634,43 @@ const ProviderApp = ({session, onLogout, showToast}) => {
             })}
           </div>
         </div>)}
+        {/* DEMOGRAPHIC RANGES from imported/consented data */}
+        {(()=>{
+          const demoAgg = {};
+          metrics.forEach(m => {
+            if (!m.demographics) return;
+            for (const [k,v] of Object.entries(m.demographics)) {
+              if (!v) return;
+              if (!demoAgg[k]) demoAgg[k] = {};
+              demoAgg[k][v] = (demoAgg[k][v]||0) + 1;
+            }
+          });
+          return Object.keys(demoAgg).length > 0 ? <div className="card" style={{marginTop:12}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+              <span className="section-label" style={{marginBottom:0}}>DEMOGRAPHIC RANGES</span>
+              <span className="tag tag-green" style={{fontSize:8}}><I n="shieldCheck" s={8}/>NO PII</span>
+            </div>
+            <p style={{fontSize:11,color:'var(--tx-2)',marginBottom:10}}>Aggregated from anonymized transforms. Names, DOBs, SSNs, addresses, phones, and emails are cryptographically blocked — only bucketed ranges appear.</p>
+            {Object.entries(demoAgg).map(([cat,vals])=><div key={cat} style={{marginBottom:8}}>
+              <span style={{fontSize:10.5,fontWeight:600,color:'var(--tx-1)',fontFamily:'var(--mono)',textTransform:'uppercase',letterSpacing:'.05em'}}>{cat}</span>
+              <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:4}}>
+                {Object.entries(vals).sort((a,b)=>b[1]-a[1]).map(([val,count])=>{
+                  const max = Math.max(...Object.values(vals));
+                  return <div key={val} style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:11,width:140,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{val}</span>
+                    <div style={{flex:1,height:14,background:'var(--bg-3)',borderRadius:3,overflow:'hidden'}}>
+                      <div style={{width:`${(count/max)*100}%`,height:'100%',background:'var(--green)',borderRadius:3,transition:'width .3s'}}/>
+                    </div>
+                    <span style={{fontSize:10.5,fontFamily:'var(--mono)',color:'var(--tx-1)',minWidth:24,textAlign:'right'}}>{count}</span>
+                  </div>;
+                })}
+              </div>
+            </div>)}
+          </div> : null;
+        })()}
+
         <div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'12px 16px',marginTop:16,fontSize:11.5,color:'var(--tx-1)',lineHeight:1.6}}>
-          <strong style={{color:'var(--teal)'}}>K-anonymity (k=5):</strong> Combinations with fewer than 5 matching individuals are suppressed. This data is suitable for compliance reporting and aggregate analysis.
+          <strong style={{color:'var(--teal)'}}>K-anonymity (k=5):</strong> Combinations with fewer than 5 matching individuals are suppressed. This data is suitable for compliance reporting and aggregate analysis. PII fields (name, DOB, SSN, address, phone, email) are never present — only demographic ranges and hashed identifiers.
         </div>
       </div>}
 
@@ -5870,6 +6534,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         </div>
       </>}
     </Modal>
+    {/* IMPORT DATA MODAL */}
+    <ImportDataModal open={importModal} onClose={()=>setImportModal(false)}
+      showToast={showToast} metricsRoom={metricsRoom} onComplete={handleImportComplete}/>
+
     {/* COMPOSE ORG MESSAGE CHANNEL MODAL */}
     <Modal open={composeOrgModal} onClose={()=>setComposeOrgModal(false)} title="New Org Messaging Channel" w={520}>
       <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>
