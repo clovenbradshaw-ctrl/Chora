@@ -57,16 +57,16 @@ html,body,#root{height:100%;background:var(--bg-0);color:var(--tx-0);font-family
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .anim-up{animation:fadeUp .3s ease both}.anim-in{animation:fadeIn .25s ease both}.anim-sl{animation:slideR .28s ease both}
-input,textarea,select{font-family:var(--sans);background:var(--bg-1);border:1px solid var(--border-1);color:var(--tx-0);padding:10px 14px;border-radius:var(--r);font-size:13.5px;outline:none;transition:border .2s,box-shadow .2s;width:100%;}
+input,textarea,select{font-family:var(--sans);background:var(--bg-1);border:1px solid var(--border-1);color:var(--tx-0);padding:11px 15px;border-radius:var(--r);font-size:14.5px;outline:none;transition:border .2s,box-shadow .2s;width:100%;}
 input:focus,textarea:focus,select:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-dim)}
 input::placeholder,textarea::placeholder{color:var(--tx-3)}textarea{resize:vertical;min-height:72px;line-height:1.55}
-button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r);font-size:12.5px;font-weight:600;padding:8px 16px;transition:all .18s;letter-spacing:.01em;}
+button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r);font-size:13.5px;font-weight:600;padding:9px 18px;transition:all .18s;letter-spacing:.01em;}
 .b-pri{background:var(--gold);color:var(--bg-0)}.b-pri:hover{filter:brightness(1.12);transform:translateY(-1px);box-shadow:0 4px 16px var(--gold-dim)}.b-pri:disabled{opacity:.5;transform:none;cursor:default;filter:none}
 .b-gho{background:transparent;color:var(--tx-1);border:1px solid var(--border-1)}.b-gho:hover{background:var(--bg-3);color:var(--tx-0);border-color:var(--border-2)}
 .b-red{background:var(--red-dim);color:var(--red);border:1px solid rgba(232,93,93,.18)}.b-red:hover{background:rgba(232,93,93,.18)}
 .b-grn{background:var(--green-dim);color:var(--green);border:1px solid rgba(61,214,140,.18)}
-.b-sm{padding:6px 12px;font-size:11.5px}.b-xs{padding:4px 9px;font-size:11px}
-.tag{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:14px;font-size:10.5px;font-weight:600;font-family:var(--mono);letter-spacing:.03em}
+.b-sm{padding:7px 14px;font-size:12.5px}.b-xs{padding:5px 10px;font-size:12px}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:14px;font-size:12px;font-weight:600;font-family:var(--mono);letter-spacing:.03em}
 .tag-gold{background:var(--gold-dim);color:var(--gold)}.tag-green{background:var(--green-dim);color:var(--green)}
 .tag-red{background:var(--red-dim);color:var(--red)}.tag-blue{background:var(--blue-dim);color:var(--blue)}
 .tag-teal{background:var(--teal-dim);color:var(--teal)}.tag-orange{background:var(--orange-dim);color:var(--orange)}
@@ -74,14 +74,14 @@ button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r)
 .card{background:var(--bg-2);border:1px solid var(--border-0);border-radius:var(--r-lg);padding:20px}
 .card-h{background:var(--bg-2);border:1px solid var(--border-0);border-radius:var(--r-lg);padding:20px;transition:border-color .2s,transform .2s;cursor:pointer}
 .card-h:hover{border-color:var(--gold);transform:translateY(-2px)}
-.section-label{font-size:10.5px;font-family:var(--mono);color:var(--tx-2);letter-spacing:.07em;font-weight:500;margin-bottom:10px;display:block}
+.section-label{font-size:12px;font-family:var(--mono);color:var(--tx-1);letter-spacing:.07em;font-weight:500;margin-bottom:12px;display:block}
 .toggle-track{width:38px;height:20px;border-radius:10px;position:relative;cursor:pointer;transition:background .2s}
 .toggle-track.on{background:var(--green)}.toggle-track.off{background:var(--border-1)}
 .toggle-knob{width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .toggle-track.on .toggle-knob{left:20px}.toggle-track.off .toggle-knob{left:2px}
 .grid-bg{background-image:radial-gradient(circle at 20% 20%,rgba(201,163,82,.03) 0%,transparent 50%),radial-gradient(circle at 80% 80%,rgba(91,156,245,.02) 0%,transparent 50%),linear-gradient(var(--border-0) 1px,transparent 1px),linear-gradient(90deg,var(--border-0) 1px,transparent 1px);background-size:100% 100%,100% 100%,48px 48px,48px 48px;}
 .tabs{display:flex;gap:2px;background:var(--bg-1);border-radius:var(--r);padding:3px;margin-bottom:20px}
-.tab{padding:8px 16px;border-radius:var(--r);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--tx-2);background:transparent}
+.tab{padding:9px 18px;border-radius:var(--r);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;color:var(--tx-1);background:transparent}
 .tab.active{background:var(--bg-3);color:var(--tx-0);font-weight:600}
 .tab:hover:not(.active){background:var(--bg-2);color:var(--tx-1)}
 
@@ -98,10 +98,10 @@ button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r)
   background:repeating-linear-gradient(180deg,transparent,transparent 8px,rgba(201,163,82,.04) 8px,rgba(201,163,82,.04) 16px);pointer-events:none}
 .gm-crossing-arrow{width:24px;height:24px;display:flex;align-items:center;justify-content:center;
   background:linear-gradient(135deg,var(--teal),var(--gold));border-radius:50%;color:var(--bg-0);font-size:11px;font-weight:800;flex-shrink:0}
-.gm-crossing-label{writing-mode:vertical-rl;text-orientation:mixed;font-family:var(--mono);font-size:8.5px;
+.gm-crossing-label{writing-mode:vertical-rl;text-orientation:mixed;font-family:var(--mono);font-size:10px;
   font-weight:600;letter-spacing:.1em;background:linear-gradient(180deg,var(--teal),var(--gold));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.gm-crossing-op{padding:2px 5px;border-radius:8px;font-size:8px;font-family:var(--mono);font-weight:700;
+.gm-crossing-op{padding:3px 6px;border-radius:8px;font-size:10px;font-family:var(--mono);font-weight:700;
   background:var(--bg-3);color:var(--tx-1);border:1px solid var(--border-1);flex-shrink:0}
 .gm-meant{flex:1;min-width:0;background:var(--bg-1);padding:20px;display:flex;flex-direction:column;gap:10px;position:relative}
 .gm-meant::before{content:'';position:absolute;top:0;left:0;bottom:0;width:2px;background:var(--gold);opacity:.3}
@@ -114,16 +114,16 @@ button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r)
 .gm-fw-card[data-accent="orange"]::before{background:var(--orange)}
 .gm-fw-card[data-accent="green"]::before{background:var(--green)}
 .gm-fw-card[data-accent="purple"]::before{background:var(--purple)}
-.gm-divergence{background:rgba(201,163,82,.06);border:1px dashed var(--gold);border-radius:var(--r);padding:8px 12px;
-  display:flex;align-items:flex-start;gap:8px;font-size:11px;color:var(--tx-1)}
-.gm-obs-field{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--teal);padding:8px 12px;
+.gm-divergence{background:rgba(201,163,82,.06);border:1px dashed var(--gold);border-radius:var(--r);padding:10px 14px;
+  display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--tx-1)}
+.gm-obs-field{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--teal);padding:10px 14px;
   background:var(--teal-dim);border:1px solid rgba(62,201,176,.15);border-radius:var(--r)}
-.gm-obs-value{font-size:15px;font-weight:600;color:var(--tx-0);margin:8px 0}
-.gm-meta-row{display:flex;gap:12px;font-size:10.5px;color:var(--tx-2);font-family:var(--mono)}
-.gm-eo-trace{font-family:var(--mono);font-size:9.5px;color:var(--purple);padding:4px 8px;background:var(--purple-dim);
-  border-radius:var(--r);display:inline-block;margin-top:6px}
+.gm-obs-value{font-size:16px;font-weight:600;color:var(--tx-0);margin:10px 0}
+.gm-meta-row{display:flex;gap:14px;font-size:12px;color:var(--tx-1);font-family:var(--mono)}
+.gm-eo-trace{font-family:var(--mono);font-size:11px;color:var(--purple);padding:5px 10px;background:var(--purple-dim);
+  border-radius:var(--r);display:inline-block;margin-top:8px}
 .gm-chain{display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:6px}
-.gm-chain-step{padding:1px 6px;border-radius:6px;font-size:8.5px;font-family:var(--mono);font-weight:600}
+.gm-chain-step{padding:2px 7px;border-radius:6px;font-size:10px;font-family:var(--mono);font-weight:600}
 .gm-wb-left{flex:0 0 340px;min-width:280px;overflow:auto;border-right:1px solid var(--border-0);padding:16px}
 .gm-wb-right{flex:1;min-width:0;overflow:auto;padding:16px}
 .gm-wb-field{padding:10px 12px;border-radius:var(--r);cursor:pointer;border:1px solid var(--border-0);
@@ -132,8 +132,8 @@ button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r)
 .gm-wb-field.active{border-color:var(--teal);background:var(--teal-dim);border-left:3px solid var(--teal)}
 .gm-wb-empty{padding:40px 20px;text-align:center;border:1px dashed var(--border-1);border-radius:var(--r);color:var(--tx-3)}
 .gm-sankey-line{position:absolute;pointer-events:none}
-.gm-sup-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;
-  font-size:9px;font-family:var(--mono);font-weight:600;background:var(--gold-dim);color:var(--gold);border:1px solid rgba(201,163,82,.2)}
+.gm-sup-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:10px;
+  font-size:11px;font-family:var(--mono);font-weight:600;background:var(--gold-dim);color:var(--gold);border:1px solid rgba(201,163,82,.2)}
 </style>
 </head>
 <body>
@@ -2683,8 +2683,8 @@ const RecordGivenMeant = ({promptKey, value, reporter, timestamp}) => {
 /* ═══════════════════ SCHEMA WORKBENCH ═══════════════════ */
 const SWC_DARK = {
   bg: "#07090d", surface: "#0e1218", raised: "#151b23", hover: "#1b2330",
-  border: "#1d2735", borderLit: "#2c3d52", text: "#adb8c4", muted: "#586a7c",
-  dim: "#2d3c4d", white: "#e3e9ef",
+  border: "#1d2735", borderLit: "#2c3d52", text: "#c0c9d4", muted: "#7a8da0",
+  dim: "#4a5d72", white: "#edf0f5",
   given: "#2dd4a0", givenBorder: "#18694e",
   meant: "#a78bfa", meantBorder: "#4a2d8a",
   fw: ["#60a5fa","#f0abfc","#fbbf24","#34d399","#fb7185"],
@@ -2694,8 +2694,8 @@ const SWC_DARK = {
 };
 const SWC_LIGHT = {
   bg: "#f5f5f7", surface: "#ebedf0", raised: "#e0e2e7", hover: "#d4d7dd",
-  border: "#b8bcc6", borderLit: "#a0a5b2", text: "#3d4250", muted: "#5a6073",
-  dim: "#c8ccd4", white: "#1a1c20",
+  border: "#b8bcc6", borderLit: "#a0a5b2", text: "#2e3340", muted: "#4a5168",
+  dim: "#8890a0", white: "#111318",
   given: "#137a6a", givenBorder: "#0a5c4d",
   meant: "#6938c0", meantBorder: "#4a2d8a",
   fw: ["#2563b0","#9333b0","#8a6d1e","#177a4a","#c03050"],
@@ -2711,20 +2711,20 @@ let _swId = 100;
 const swUid = () => `id_${_swId++}`;
 
 const SwTag = ({color=SWC.muted,children,sm,mono,onClick,style:sx}) => (
-  <span onClick={onClick} style={{display:"inline-flex",alignItems:"center",padding:sm?"0 5px":"1px 7px",fontSize:sm?9:10,fontWeight:600,fontFamily:mono?"var(--mono)":"inherit",background:`${color}10`,border:`1px solid ${color}28`,borderRadius:3,color,cursor:onClick?"pointer":"default",letterSpacing:"0.01em",lineHeight:"18px",whiteSpace:"nowrap",...sx}}>{children}</span>
+  <span onClick={onClick} style={{display:"inline-flex",alignItems:"center",padding:sm?"1px 7px":"2px 9px",fontSize:sm?11:12,fontWeight:600,fontFamily:mono?"var(--mono)":"inherit",background:`${color}10`,border:`1px solid ${color}28`,borderRadius:3,color,cursor:onClick?"pointer":"default",letterSpacing:"0.01em",lineHeight:"20px",whiteSpace:"nowrap",...sx}}>{children}</span>
 );
 const SwDot = ({color,size=6}) => <span style={{width:size,height:size,borderRadius:"50%",background:color,display:"inline-block",flexShrink:0}}/>;
 const SwBtn = ({children,accent=SWC.given,ghost,disabled,onClick,style:sx}) => (
-  <button disabled={disabled} onClick={onClick} style={{padding:"7px 16px",borderRadius:6,fontSize:12,fontWeight:600,fontFamily:"inherit",cursor:disabled?"default":"pointer",transition:"all 0.15s",opacity:disabled?0.4:1,border:ghost?`1px solid ${accent}40`:`1px solid ${accent}`,background:ghost?"transparent":accent,color:ghost?accent:SWC.bg,...sx}}>{children}</button>
+  <button disabled={disabled} onClick={onClick} style={{padding:"8px 18px",borderRadius:6,fontSize:13,fontWeight:600,fontFamily:"inherit",cursor:disabled?"default":"pointer",transition:"all 0.15s",opacity:disabled?0.4:1,border:ghost?`1px solid ${accent}40`:`1px solid ${accent}`,background:ghost?"transparent":accent,color:ghost?accent:SWC.bg,...sx}}>{children}</button>
 );
 const SwInput = ({value,onChange,placeholder,autoFocus,onKeyDown,style:sx}) => (
-  <input autoFocus={autoFocus} value={value} onChange={e=>onChange(e.target.value)} onKeyDown={onKeyDown} placeholder={placeholder} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${SWC.border}`,background:SWC.surface,color:SWC.white,fontSize:13,fontFamily:"inherit",outline:"none",boxSizing:"border-box",...sx}} onFocus={e=>e.target.style.borderColor=SWC.borderLit} onBlur={e=>e.target.style.borderColor=SWC.border}/>
+  <input autoFocus={autoFocus} value={value} onChange={e=>onChange(e.target.value)} onKeyDown={onKeyDown} placeholder={placeholder} style={{width:"100%",padding:"10px 14px",borderRadius:6,border:`1px solid ${SWC.border}`,background:SWC.surface,color:SWC.white,fontSize:14,fontFamily:"inherit",outline:"none",boxSizing:"border-box",...sx}} onFocus={e=>e.target.style.borderColor=SWC.borderLit} onBlur={e=>e.target.style.borderColor=SWC.border}/>
 );
 const SwHdr = ({title,tag,tagColor,right,children:ch}) => (
-  <div style={{marginBottom:20}}>
-    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-      <div style={{display:"flex",alignItems:"center",gap:6}}>
-        <span style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:SWC.muted}}>{title}</span>
+  <div style={{marginBottom:22}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <span style={{fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:SWC.muted}}>{title}</span>
         {tag && <SwTag color={tagColor} sm>{tag}</SwTag>}
       </div>
       {right}
@@ -2734,7 +2734,7 @@ const SwHdr = ({title,tag,tagColor,right,children:ch}) => (
 );
 
 const SwEpNote = ({type}) => (
-  <div style={{padding:"8px 12px",borderRadius:6,border:`1px solid ${type==="given"?SWC.givenBorder:SWC.meantBorder}`,background:type==="given"?"rgba(45,212,160,0.04)":"rgba(167,139,250,0.04)",fontSize:11,color:SWC.muted,lineHeight:1.6,marginBottom:14}}>
+  <div style={{padding:"10px 14px",borderRadius:6,border:`1px solid ${type==="given"?SWC.givenBorder:SWC.meantBorder}`,background:type==="given"?"rgba(45,212,160,0.04)":"rgba(167,139,250,0.04)",fontSize:13,color:SWC.muted,lineHeight:1.6,marginBottom:16}}>
     {type==="given" ? (<>
       <SwTag color={SWC.given} sm style={{marginRight:4}}>GIVEN</SwTag> = what happened. Could someone disagree? <b style={{color:SWC.text}}>No</b> → it's a fact of observation. Questions and their answer options live here — phenomenological, no interpretation baked in.
     </>) : (<>
@@ -2748,8 +2748,8 @@ function SwMRow({opt,frameworks,getBindingCode,setBind,clearBind,hasConflict,isL
   return (
     <div style={{borderBottom:!isLast?`1px solid ${SWC.border}`:"none"}}>
       <div style={{display:"grid",gridTemplateColumns:`minmax(140px,180px) repeat(${frameworks.length}, 1fr)`}}>
-        <div style={{padding:"9px 12px",fontSize:13,color:SWC.white,fontWeight:500,display:"flex",alignItems:"center",gap:4}}>
-          {opt.label}{hasConflict(opt)&&<span style={{fontSize:10}}>⚡</span>}
+        <div style={{padding:"10px 14px",fontSize:14,color:SWC.white,fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
+          {opt.label}{hasConflict(opt)&&<span style={{fontSize:11}}>⚡</span>}
         </div>
         {frameworks.map((fw,fi) => {
           const code = getBindingCode(opt.id,fw.id);
@@ -2764,7 +2764,7 @@ function SwMRow({opt,frameworks,getBindingCode,setBind,clearBind,hasConflict,isL
             onMouseEnter={e=>{if(hasCodes&&!isOpen)e.currentTarget.style.background=SWC.hover;}}
             onMouseLeave={e=>{if(!isOpen)e.currentTarget.style.background=isOpen?SWC.fwBg(fi):"transparent";}}
             >
-              {code?<SwTag color={SWC.fw[fi%5]} mono style={{fontSize:12}}>{code.code}</SwTag>:hasCodes?<span style={{fontSize:11,color:SWC.dim}}>—</span>:<span style={{fontSize:10,color:SWC.dim}}>no codes</span>}
+              {code?<SwTag color={SWC.fw[fi%5]} mono style={{fontSize:13}}>{code.code}</SwTag>:hasCodes?<span style={{fontSize:12.5,color:SWC.dim}}>—</span>:<span style={{fontSize:11.5,color:SWC.dim}}>no codes</span>}
             </div>
           );
         })}
@@ -2776,7 +2776,7 @@ function SwMRow({opt,frameworks,getBindingCode,setBind,clearBind,hasConflict,isL
         const cur=getBindingCode(opt.id,fw.id);
         return (
           <div style={{padding:"8px 12px 10px",background:SWC.fwBg(fi),borderTop:`1px solid ${SWC.fwBorder(fi)}`}}>
-            <div style={{fontSize:10,color:SWC.muted,marginBottom:6,fontWeight:600}}>
+            <div style={{fontSize:12,color:SWC.muted,marginBottom:8,fontWeight:600}}>
               <span style={{color:SWC.fw[fi%5]}}>{fw.name}</span> reading for "{opt.label}":
             </div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -2791,13 +2791,13 @@ function SwMRow({opt,frameworks,getBindingCode,setBind,clearBind,hasConflict,isL
                   onMouseLeave={e=>{e.currentTarget.style.borderColor=a?SWC.fw[fi%5]:SWC.border;e.currentTarget.style.background=a?`${SWC.fw[fi%5]}18`:"transparent";}}
                   >
                     <SwTag color={SWC.fw[fi%5]} mono sm>{c.code}</SwTag>
-                    <span style={{fontSize:12,color:a?SWC.white:SWC.text}}>{c.label}</span>
-                    {a && <span style={{fontSize:10,color:SWC.fw[fi%5]}}>✓</span>}
+                    <span style={{fontSize:13,color:a?SWC.white:SWC.text}}>{c.label}</span>
+                    {a && <span style={{fontSize:11.5,color:SWC.fw[fi%5]}}>✓</span>}
                   </div>
                 );
               })}
             </div>
-            {cur && <div onClick={e=>{e.stopPropagation();clearBind(opt.id,fw.id);setOpenCell(null);}} style={{fontSize:11,color:SWC.dim,cursor:"pointer",marginTop:6}}>Clear</div>}
+            {cur && <div onClick={e=>{e.stopPropagation();clearBind(opt.id,fw.id);setOpenCell(null);}} style={{fontSize:12.5,color:SWC.dim,cursor:"pointer",marginTop:8}}>Clear</div>}
           </div>
         );
       })()}
@@ -2872,15 +2872,15 @@ const SchemaWorkbench = ({isOrg = false}) => {
       <div style={{marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <I n="grid" s={20} c={SWC.given}/>
-          <span onClick={()=>setScreen(hasData?"questions":"start")} style={{fontSize:17,fontWeight:700,color:SWC.white,letterSpacing:"-0.03em",cursor:"pointer",fontFamily:"var(--serif)"}}>Schema Workbench</span>
+          <span onClick={()=>setScreen(hasData?"questions":"start")} style={{fontSize:19,fontWeight:700,color:SWC.white,letterSpacing:"-0.03em",cursor:"pointer",fontFamily:"var(--serif)"}}>Schema Workbench</span>
         </div>
         {hasData && (
           <div style={{display:"flex",gap:2}}>
             {tabs.map(t => (
               <button key={t.id} onClick={()=>{setScreen(t.id);setSelectedValue(null);setExpandedFw(null);setMatrixPrompt(null);}} style={{
-                padding:"5px 10px",borderRadius:5,border:"none",fontSize:11,fontWeight:500,
+                padding:"6px 12px",borderRadius:5,border:"none",fontSize:12.5,fontWeight:500,
                 cursor:"pointer",fontFamily:"inherit",transition:"all 0.12s",
-                display:"flex",alignItems:"center",gap:4,
+                display:"flex",alignItems:"center",gap:5,
                 background:screen===t.id?SWC.raised:"transparent",
                 color:screen===t.id?SWC.white:SWC.muted,
               }}>{t.label}<SwTag color={screen===t.id?t.color:SWC.dim} sm>{t.ep}</SwTag></button>
@@ -2891,7 +2891,7 @@ const SchemaWorkbench = ({isOrg = false}) => {
 
       {/* Stats bar */}
       {hasData && (
-        <div style={{padding:"6px 0",borderTop:`1px solid ${SWC.border}`,borderBottom:`1px solid ${SWC.border}`,fontSize:11,color:SWC.dim,display:"flex",gap:16,marginBottom:16}}>
+        <div style={{padding:"8px 0",borderTop:`1px solid ${SWC.border}`,borderBottom:`1px solid ${SWC.border}`,fontSize:12.5,color:SWC.dim,display:"flex",gap:18,marginBottom:18}}>
           <span>{prompts.length} question{prompts.length!==1?"s":""} · {allOptions.length} options</span>
           <span>{frameworks.length} framework{frameworks.length!==1?"s":""} · {allCodes.length} codes</span>
           {totalPossible > 0 && <span style={{marginLeft:"auto"}}>{totalBindings}/{totalPossible} bindings · {crosswalks.length} crosswalks</span>}
@@ -2902,8 +2902,8 @@ const SchemaWorkbench = ({isOrg = false}) => {
       {screen === "start" && !hasData && (
         <div style={{paddingTop:40}}>
           <div style={{textAlign:"center",marginBottom:40}}>
-            <div style={{fontSize:20,fontWeight:600,color:SWC.white,marginBottom:6}}>Build a schema from any angle</div>
-            <div style={{fontSize:13,color:SWC.muted,maxWidth:460,margin:"0 auto",lineHeight:1.6}}>
+            <div style={{fontSize:22,fontWeight:600,color:SWC.white,marginBottom:8}}>Build a schema from any angle</div>
+            <div style={{fontSize:15,color:SWC.muted,maxWidth:480,margin:"0 auto",lineHeight:1.6}}>
               Start with what you observe, or start with what you need to report. They'll connect in the middle.
             </div>
           </div>
@@ -2916,8 +2916,8 @@ const SchemaWorkbench = ({isOrg = false}) => {
             onMouseLeave={e=>e.currentTarget.style.borderColor=SWC.givenBorder}
             >
               <SwTag color={SWC.given}>GIVEN</SwTag>
-              <div style={{fontSize:15,fontWeight:600,color:SWC.white,marginTop:8}}>Start with a question</div>
-              <div style={{fontSize:12,color:SWC.muted,marginTop:4,lineHeight:1.5}}>What do you need to observe? Something answerable by looking, listening, or asking.</div>
+              <div style={{fontSize:16,fontWeight:600,color:SWC.white,marginTop:10}}>Start with a question</div>
+              <div style={{fontSize:13.5,color:SWC.muted,marginTop:6,lineHeight:1.55}}>What do you need to observe? Something answerable by looking, listening, or asking.</div>
             </div>
             <div onClick={()=>{setAddingFw(true);setDraft("");setDraft2("");}} style={{
               padding:20,borderRadius:10,border:`1px solid ${SWC.meantBorder}`,background:"rgba(167,139,250,0.03)",
@@ -2927,8 +2927,8 @@ const SchemaWorkbench = ({isOrg = false}) => {
             onMouseLeave={e=>e.currentTarget.style.borderColor=SWC.meantBorder}
             >
               <SwTag color={SWC.meant}>MEANT</SwTag>
-              <div style={{fontSize:15,fontWeight:600,color:SWC.white,marginTop:8}}>Start with a framework</div>
-              <div style={{fontSize:12,color:SWC.muted,marginTop:4,lineHeight:1.5}}>Who do you report to? A regulation, a funder's categories, an internal policy.</div>
+              <div style={{fontSize:16,fontWeight:600,color:SWC.white,marginTop:10}}>Start with a framework</div>
+              <div style={{fontSize:13.5,color:SWC.muted,marginTop:6,lineHeight:1.55}}>Who do you report to? A regulation, a funder's categories, an internal policy.</div>
             </div>
           </div>
         </div>
@@ -2937,9 +2937,9 @@ const SchemaWorkbench = ({isOrg = false}) => {
       {/* ═══ ADD PROMPT (overlay) ═══ */}
       {addingPrompt && (
         <div style={{border:`1px solid ${SWC.givenBorder}`,borderRadius:10,background:SWC.surface,padding:20,marginBottom:16}}>
-          <div style={{fontSize:13,fontWeight:600,color:SWC.given,marginBottom:10}}>New Observation Question</div>
+          <div style={{fontSize:15,fontWeight:600,color:SWC.given,marginBottom:12}}>New Observation Question</div>
           <SwInput autoFocus value={draft} onChange={setDraft} placeholder="Type your question..." onKeyDown={e=>{if(e.key==="Enter")doAddPrompt();if(e.key==="Escape"){setAddingPrompt(false);setDraft("");}}}/>
-          <div style={{fontSize:11,color:SWC.dim,marginTop:6,lineHeight:1.5}}>Can it be answered by observing — without consulting a policy? Then it's GIVEN.</div>
+          <div style={{fontSize:13,color:SWC.dim,marginTop:8,lineHeight:1.55}}>Can it be answered by observing — without consulting a policy? Then it's GIVEN.</div>
           <div style={{display:"flex",gap:8,marginTop:12}}>
             <SwBtn onClick={doAddPrompt} disabled={!draft.trim()}>Create</SwBtn>
             <SwBtn ghost accent={SWC.muted} onClick={()=>{setAddingPrompt(false);setDraft("");}}>Cancel</SwBtn>
@@ -2947,7 +2947,7 @@ const SchemaWorkbench = ({isOrg = false}) => {
           {screen==="start" && (
             <div style={{marginTop:12,display:"flex",flexDirection:"column",gap:6}}>
               {["Where did you sleep last night?","What temperature was recorded?","What condition is this part in?","What did the patient report?"].map(ex => (
-                <div key={ex} onClick={()=>setDraft(ex)} style={{padding:"6px 10px",borderRadius:5,border:`1px solid ${SWC.border}`,fontSize:12,color:SWC.dim,cursor:"pointer",transition:"all 0.12s"}}
+                <div key={ex} onClick={()=>setDraft(ex)} style={{padding:"8px 12px",borderRadius:5,border:`1px solid ${SWC.border}`,fontSize:13,color:SWC.dim,cursor:"pointer",transition:"all 0.12s"}}
                   onMouseEnter={e=>{e.currentTarget.style.color=SWC.given;e.currentTarget.style.borderColor=SWC.given;}}
                   onMouseLeave={e=>{e.currentTarget.style.color=SWC.dim;e.currentTarget.style.borderColor=SWC.border;}}
                 >{ex}</div>
@@ -2960,10 +2960,10 @@ const SchemaWorkbench = ({isOrg = false}) => {
       {/* ═══ ADD FRAMEWORK (overlay) ═══ */}
       {addingFw && (
         <div style={{border:`1px solid ${SWC.meantBorder}`,borderRadius:10,background:SWC.surface,padding:20,marginBottom:16}}>
-          <div style={{fontSize:13,fontWeight:600,color:SWC.meant,marginBottom:10}}>New Reporting Framework</div>
+          <div style={{fontSize:15,fontWeight:600,color:SWC.meant,marginBottom:12}}>New Reporting Framework</div>
           <SwInput autoFocus value={draft} onChange={setDraft} placeholder="Short name (e.g. HUD §578.3)" onKeyDown={e=>{if(e.key==="Enter"&&draft.trim())doAddFw();if(e.key==="Escape"){setAddingFw(false);setDraft("");setDraft2("");}}}/>
           <div style={{marginTop:8}}><SwInput value={draft2} onChange={setDraft2} placeholder="Full name (optional)" onKeyDown={e=>{if(e.key==="Enter"&&draft.trim())doAddFw();}}/></div>
-          <div style={{fontSize:11,color:SWC.dim,marginTop:6,lineHeight:1.5}}>Could someone disagree about what a code means? Then it's MEANT.</div>
+          <div style={{fontSize:13,color:SWC.dim,marginTop:8,lineHeight:1.55}}>Could someone disagree about what a code means? Then it's MEANT.</div>
           <div style={{display:"flex",gap:8,marginTop:12}}>
             <SwBtn accent={SWC.meant} onClick={doAddFw} disabled={!draft.trim()}>Create</SwBtn>
             <SwBtn ghost accent={SWC.muted} onClick={()=>{setAddingFw(false);setDraft("");setDraft2("");}}>Cancel</SwBtn>
@@ -2981,19 +2981,19 @@ const SchemaWorkbench = ({isOrg = false}) => {
           <SwHdr title="Observation Questions" tag="GIVEN" tagColor={SWC.given}
             right={<SwBtn ghost accent={SWC.given} onClick={()=>{setAddingPrompt(true);setDraft("");}}>+ Add question</SwBtn>}>
             {prompts.length === 0 ? (
-              <div style={{padding:16,border:`1px dashed ${SWC.border}`,borderRadius:8,textAlign:"center",color:SWC.dim,fontSize:12}}>
+              <div style={{padding:20,border:`1px dashed ${SWC.border}`,borderRadius:8,textAlign:"center",color:SWC.dim,fontSize:13.5}}>
                 No questions yet. <span style={{color:SWC.given,cursor:"pointer"}} onClick={()=>{setAddingPrompt(true);setDraft("");}}>Create one →</span>
               </div>
             ) : prompts.map(p => (
               <div key={p.id} style={{border:`1px solid ${SWC.border}`,borderRadius:8,background:SWC.surface,marginBottom:8,overflow:"hidden"}}>
                 <div style={{padding:"10px 14px",borderBottom:`1px solid ${SWC.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                   <div>
-                    <span style={{fontSize:14,fontWeight:600,color:SWC.white}}>{p.prompt}</span>
+                    <span style={{fontSize:15,fontWeight:600,color:SWC.white}}>{p.prompt}</span>
                     {p.options.some(o=>hasConflict(o)) && <span style={{marginLeft:6}}>⚡</span>}
-                    <div style={{fontSize:11,color:SWC.dim,marginTop:2}}>{p.options.length} option{p.options.length!==1?"s":""}</div>
+                    <div style={{fontSize:12.5,color:SWC.dim,marginTop:3}}>{p.options.length} option{p.options.length!==1?"s":""}</div>
                   </div>
                   {frameworks.length > 0 && p.options.length > 0 && (
-                    <button onClick={()=>{setMatrixPrompt(p);setScreen("matrix");}} style={{padding:"4px 10px",borderRadius:5,border:`1px solid ${SWC.border}`,background:"transparent",color:SWC.muted,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>Bindings →</button>
+                    <button onClick={()=>{setMatrixPrompt(p);setScreen("matrix");}} style={{padding:"5px 12px",borderRadius:5,border:`1px solid ${SWC.border}`,background:"transparent",color:SWC.muted,fontSize:12.5,cursor:"pointer",fontFamily:"inherit"}}>Bindings →</button>
                   )}
                 </div>
                 <div style={{padding:"4px 6px"}}>
@@ -3007,11 +3007,11 @@ const SchemaWorkbench = ({isOrg = false}) => {
                       onMouseEnter={e=>{if(frameworks.length>0)e.currentTarget.style.background=SWC.hover;}}
                       onMouseLeave={e=>e.currentTarget.style.background="transparent"}
                       >
-                        <span style={{fontSize:13,color:SWC.white}}>{o.label}</span>
-                        <div style={{display:"flex",alignItems:"center",gap:3}}>
-                          {hasConflict(o) && <span style={{fontSize:10}}>⚡</span>}
+                        <span style={{fontSize:14,color:SWC.white}}>{o.label}</span>
+                        <div style={{display:"flex",alignItems:"center",gap:4}}>
+                          {hasConflict(o) && <span style={{fontSize:11}}>⚡</span>}
                           {bound.map((c,i)=><SwDot key={i} color={SWC.fw[c.fwIdx%5]}/>)}
-                          {bound.length===0 && frameworks.length>0 && <span style={{fontSize:10,color:SWC.dim}}>unbound</span>}
+                          {bound.length===0 && frameworks.length>0 && <span style={{fontSize:11.5,color:SWC.dim}}>unbound</span>}
                         </div>
                       </div>
                     );
@@ -3025,7 +3025,7 @@ const SchemaWorkbench = ({isOrg = false}) => {
                       <SwBtn ghost accent={SWC.muted} onClick={()=>{setAddingOption(null);setDraft("");}} style={{padding:"5px 8px",fontSize:11}}>×</SwBtn>
                     </div>
                   ) : (
-                    <div onClick={()=>{setAddingOption(p.id);setDraft("");}} style={{padding:"6px 10px",fontSize:12,color:SWC.dim,cursor:"pointer"}}>+ Add option</div>
+                    <div onClick={()=>{setAddingOption(p.id);setDraft("");}} style={{padding:"8px 12px",fontSize:13,color:SWC.dim,cursor:"pointer"}}>+ Add option</div>
                   )}
                 </div>
               </div>
@@ -3044,22 +3044,22 @@ const SchemaWorkbench = ({isOrg = false}) => {
           <SwHdr title="Reporting Frameworks" tag="MEANT" tagColor={SWC.meant}
             right={<SwBtn ghost accent={SWC.meant} onClick={()=>{setAddingFw(true);setDraft("");setDraft2("");}}>+ Add framework</SwBtn>}>
             {frameworks.length === 0 ? (
-              <div style={{padding:16,border:`1px dashed ${SWC.border}`,borderRadius:8,textAlign:"center",color:SWC.dim,fontSize:12}}>
+              <div style={{padding:20,border:`1px dashed ${SWC.border}`,borderRadius:8,textAlign:"center",color:SWC.dim,fontSize:13.5}}>
                 No frameworks yet. <span style={{color:SWC.meant,cursor:"pointer"}} onClick={()=>{setAddingFw(true);setDraft("");setDraft2("");}}>Create one →</span>
               </div>
             ) : frameworks.map((f,fi) => (
               <div key={f.id} style={{border:`1px solid ${SWC.border}`,borderRadius:8,background:SWC.surface,marginBottom:8,overflow:"hidden"}}>
                 <div style={{padding:"10px 14px",borderBottom:`1px solid ${SWC.border}`,display:"flex",alignItems:"center",gap:6}}>
                   <SwDot color={SWC.fw[fi%5]} size={8}/>
-                  <span style={{fontSize:14,fontWeight:600,color:SWC.fw[fi%5]}}>{f.name}</span>
-                  {f.fullName && <span style={{fontSize:11,color:SWC.muted}}>— {f.fullName}</span>}
-                  <span style={{marginLeft:"auto",fontSize:11,color:SWC.dim}}>{f.codes.length} code{f.codes.length!==1?"s":""}</span>
+                  <span style={{fontSize:15,fontWeight:600,color:SWC.fw[fi%5]}}>{f.name}</span>
+                  {f.fullName && <span style={{fontSize:13,color:SWC.muted}}>— {f.fullName}</span>}
+                  <span style={{marginLeft:"auto",fontSize:12.5,color:SWC.dim}}>{f.codes.length} code{f.codes.length!==1?"s":""}</span>
                 </div>
                 <div style={{padding:"4px 6px"}}>
                   {f.codes.map(c => (
                     <div key={c.id} style={{padding:"5px 10px",display:"flex",alignItems:"center",gap:8}}>
                       <SwTag color={SWC.fw[fi%5]} sm mono>{c.code}</SwTag>
-                      <span style={{fontSize:12,color:SWC.text}}>{c.label}</span>
+                      <span style={{fontSize:13,color:SWC.text}}>{c.label}</span>
                     </div>
                   ))}
                   {addingCode === f.id ? (
@@ -3078,7 +3078,7 @@ const SchemaWorkbench = ({isOrg = false}) => {
                       </div>
                     </div>
                   ) : (
-                    <div onClick={()=>{setAddingCode(f.id);setDraft("");setDraft2("");}} style={{padding:"6px 10px",fontSize:12,color:SWC.dim,cursor:"pointer"}}>+ Add code</div>
+                    <div onClick={()=>{setAddingCode(f.id);setDraft("");setDraft2("");}} style={{padding:"8px 12px",fontSize:13,color:SWC.dim,cursor:"pointer"}}>+ Add code</div>
                   )}
                 </div>
               </div>
@@ -3099,14 +3099,14 @@ const SchemaWorkbench = ({isOrg = false}) => {
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
               <div>
                 <SwTag color={SWC.given}>GIVEN</SwTag>
-                <div style={{fontSize:11,color:SWC.muted,marginTop:6}}>{selectedValue.prompt.prompt}</div>
-                <div style={{fontSize:18,fontWeight:700,color:SWC.white,marginTop:2}}>{selectedValue.option.label}</div>
+                <div style={{fontSize:13,color:SWC.muted,marginTop:6}}>{selectedValue.prompt.prompt}</div>
+                <div style={{fontSize:20,fontWeight:700,color:SWC.white,marginTop:3}}>{selectedValue.option.label}</div>
               </div>
               <button onClick={()=>{setSelectedValue(null);setExpandedFw(null);setModalAddingCode(null);}} style={{background:"none",border:"none",color:SWC.muted,cursor:"pointer",fontSize:20,padding:4,lineHeight:1}}>×</button>
             </div>
 
-            <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:SWC.muted,marginBottom:6}}>Framework Readings</div>
-            <div style={{fontSize:11,color:SWC.dim,marginBottom:12}}>Click a framework to assign its reading of this observation.</div>
+            <div style={{fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:SWC.muted,marginBottom:8}}>Framework Readings</div>
+            <div style={{fontSize:13,color:SWC.dim,marginBottom:14}}>Click a framework to assign its reading of this observation.</div>
 
             {frameworks.map((fw,fi) => {
               const code = getBindingCode(selectedValue.option.id, fw.id);
@@ -3125,19 +3125,19 @@ const SchemaWorkbench = ({isOrg = false}) => {
                     padding:"10px 14px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",
                   }}>
                     <SwDot color={SWC.fw[fi%5]} size={8}/>
-                    <span style={{fontSize:13,fontWeight:600,color:SWC.fw[fi%5],minWidth:80}}>{fw.name}</span>
-                    <span style={{color:SWC.dim,fontSize:13}}>→</span>
+                    <span style={{fontSize:14,fontWeight:600,color:SWC.fw[fi%5],minWidth:80}}>{fw.name}</span>
+                    <span style={{color:SWC.dim,fontSize:14}}>→</span>
                     {code ? (
                       <div style={{display:"flex",alignItems:"center",gap:6,flex:1}}>
                         <SwTag color={SWC.fw[fi%5]} mono>{code.code}</SwTag>
-                        <span style={{fontSize:13,fontWeight:500,color:SWC.white}}>{code.label}</span>
+                        <span style={{fontSize:14,fontWeight:500,color:SWC.white}}>{code.label}</span>
                       </div>
                     ) : (
-                      <span style={{fontSize:12,color:SWC.muted,fontStyle:"italic",flex:1}}>
+                      <span style={{fontSize:13,color:SWC.muted,fontStyle:"italic",flex:1}}>
                         {hasCodes ? "click to assign" : "no codes yet — click to add"}
                       </span>
                     )}
-                    <span style={{fontSize:10,color:SWC.dim,transform:isExpanded?"rotate(180deg)":"rotate(0)",transition:"transform 0.15s"}}>▼</span>
+                    <span style={{fontSize:11,color:SWC.dim,transform:isExpanded?"rotate(180deg)":"rotate(0)",transition:"transform 0.15s"}}>▼</span>
                   </div>
 
                   {/* Expanded panel */}
@@ -3145,7 +3145,7 @@ const SchemaWorkbench = ({isOrg = false}) => {
                     <div style={{padding:"6px 14px 12px",borderTop:`1px solid ${SWC.fwBorder(fi)}`}}>
                       {hasCodes && (
                         <>
-                          <div style={{fontSize:10,color:SWC.muted,marginBottom:6,fontWeight:600}}>Select a code:</div>
+                          <div style={{fontSize:12,color:SWC.muted,marginBottom:8,fontWeight:600}}>Select a code:</div>
                           <div style={{display:"flex",flexDirection:"column",gap:4}}>
                             {fw.codes.map(c => {
                               const isActive = code?.id === c.id;
@@ -3167,15 +3167,15 @@ const SchemaWorkbench = ({isOrg = false}) => {
                                     {isActive && <div style={{width:8,height:8,borderRadius:4,background:SWC.fw[fi%5]}}/>}
                                   </div>
                                   <SwTag color={SWC.fw[fi%5]} mono sm>{c.code}</SwTag>
-                                  <span style={{fontSize:12,color:isActive?SWC.white:SWC.text}}>{c.label}</span>
-                                  {isActive && <span style={{fontSize:10,color:SWC.fw[fi%5],marginLeft:"auto"}}>✓ bound</span>}
+                                  <span style={{fontSize:13,color:isActive?SWC.white:SWC.text}}>{c.label}</span>
+                                  {isActive && <span style={{fontSize:11.5,color:SWC.fw[fi%5],marginLeft:"auto"}}>✓ bound</span>}
                                 </div>
                               );
                             })}
                           </div>
                           {code && (
                             <div onClick={()=>{doClearBind(selectedValue.option.id,fw.id);setExpandedFw(null);}}
-                              style={{fontSize:11,color:SWC.dim,cursor:"pointer",marginTop:8}}
+                              style={{fontSize:12.5,color:SWC.dim,cursor:"pointer",marginTop:10}}
                               onMouseEnter={e=>e.currentTarget.style.color=SWC.red}
                               onMouseLeave={e=>e.currentTarget.style.color=SWC.dim}
                             >Clear binding</div>
@@ -3187,7 +3187,7 @@ const SchemaWorkbench = ({isOrg = false}) => {
                       {/* Inline add code */}
                       {isAddingCodeHere ? (
                         <div>
-                          <div style={{fontSize:10,color:SWC.muted,marginBottom:4,fontWeight:600}}>Add a code to {fw.name}:</div>
+                          <div style={{fontSize:12,color:SWC.muted,marginBottom:6,fontWeight:600}}>Add a code to {fw.name}:</div>
                           <div style={{display:"flex",gap:6,marginBottom:4}}>
                             <SwInput autoFocus value={draft} onChange={setDraft} placeholder="Code"
                               onKeyDown={e=>{if(e.key==="Escape"){setModalAddingCode(null);setDraft("");setDraft2("");}}}
@@ -3202,7 +3202,7 @@ const SchemaWorkbench = ({isOrg = false}) => {
                           </div>
                         </div>
                       ) : (
-                        <div onClick={()=>{setModalAddingCode(fw.id);setDraft("");setDraft2("");}} style={{fontSize:11,color:SWC.fw[fi%5],cursor:"pointer"}}
+                        <div onClick={()=>{setModalAddingCode(fw.id);setDraft("");setDraft2("");}} style={{fontSize:12.5,color:SWC.fw[fi%5],cursor:"pointer"}}
                           onMouseEnter={e=>e.currentTarget.style.textDecoration="underline"}
                           onMouseLeave={e=>e.currentTarget.style.textDecoration="none"}
                         >+ Add code to {fw.name}</div>
@@ -3214,7 +3214,7 @@ const SchemaWorkbench = ({isOrg = false}) => {
             })}
 
             {hasConflict(selectedValue.option) && (
-              <div style={{marginTop:12,padding:"10px 14px",borderRadius:8,border:`1px solid ${SWC.sup}25`,background:SWC.supBg,fontSize:12,color:SWC.text,lineHeight:1.5}}>
+              <div style={{marginTop:14,padding:"12px 16px",borderRadius:8,border:`1px solid ${SWC.sup}25`,background:SWC.supBg,fontSize:13.5,color:SWC.text,lineHeight:1.55}}>
                 <span style={{color:SWC.sup,fontWeight:600}}>⚡ Superposition — </span>
                 Frameworks disagree. Different lenses, same thermometer.{" "}
                 <span style={{color:SWC.meant,cursor:"pointer",textDecoration:"underline"}}
@@ -3233,15 +3233,15 @@ const SchemaWorkbench = ({isOrg = false}) => {
         <>
           {!matrixPrompt && (
             <SwHdr title="Binding Matrix" tag="GIVEN → MEANT" tagColor={SWC.meant}>
-              <div style={{fontSize:12,color:SWC.muted,marginBottom:12,lineHeight:1.5}}>
+              <div style={{fontSize:13.5,color:SWC.muted,marginBottom:14,lineHeight:1.55}}>
                 Each binding connects an observation (GIVEN) to a classification (MEANT). The same observation can mean different things to different frameworks.
               </div>
               {prompts.filter(p=>p.options.length>0).length === 0 ? (
-                <div style={{padding:16,border:`1px dashed ${SWC.border}`,borderRadius:8,textAlign:"center",color:SWC.dim,fontSize:12}}>
+                <div style={{padding:20,border:`1px dashed ${SWC.border}`,borderRadius:8,textAlign:"center",color:SWC.dim,fontSize:13.5}}>
                   Add questions with options first. <span style={{color:SWC.given,cursor:"pointer"}} onClick={()=>setScreen("questions")}>Go to Questions →</span>
                 </div>
               ) : frameworks.length === 0 ? (
-                <div style={{padding:16,border:`1px dashed ${SWC.border}`,borderRadius:8,textAlign:"center",color:SWC.dim,fontSize:12}}>
+                <div style={{padding:20,border:`1px dashed ${SWC.border}`,borderRadius:8,textAlign:"center",color:SWC.dim,fontSize:13.5}}>
                   Add a framework to bind against. <span style={{color:SWC.meant,cursor:"pointer"}} onClick={()=>setScreen("frameworks")}>Go to Frameworks →</span>
                 </div>
               ) : prompts.filter(p=>p.options.length>0).map(p => {
@@ -3255,10 +3255,10 @@ const SchemaWorkbench = ({isOrg = false}) => {
                   onMouseEnter={e=>e.currentTarget.style.borderColor=SWC.borderLit}
                   onMouseLeave={e=>e.currentTarget.style.borderColor=SWC.border}
                   >
-                    <span style={{fontSize:14,fontWeight:600,color:SWC.white}}>{p.prompt}</span>
+                    <span style={{fontSize:15,fontWeight:600,color:SWC.white}}>{p.prompt}</span>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      {ps>0 && <span style={{fontSize:11,color:bc===ps?SWC.given:SWC.dim}}>{bc}/{ps}</span>}
-                      <span style={{fontSize:11,color:SWC.dim}}>→</span>
+                      {ps>0 && <span style={{fontSize:12.5,color:bc===ps?SWC.given:SWC.dim}}>{bc}/{ps}</span>}
+                      <span style={{fontSize:12.5,color:SWC.dim}}>→</span>
                     </div>
                   </div>
                 );
@@ -3269,15 +3269,15 @@ const SchemaWorkbench = ({isOrg = false}) => {
           {matrixPrompt && (
             <>
               <div style={{marginBottom:14}}>
-                <button onClick={()=>setMatrixPrompt(null)} style={{background:"none",border:"none",color:SWC.muted,fontSize:11,cursor:"pointer",fontFamily:"inherit",padding:0,marginBottom:6}}>← All questions</button>
-                <div style={{fontSize:15,fontWeight:600,color:SWC.white}}>{matrixPrompt.prompt}</div>
-                <div style={{fontSize:12,color:SWC.muted,marginTop:2}}>Click any cell to assign a code.</div>
+                <button onClick={()=>setMatrixPrompt(null)} style={{background:"none",border:"none",color:SWC.muted,fontSize:12.5,cursor:"pointer",fontFamily:"inherit",padding:0,marginBottom:8}}>← All questions</button>
+                <div style={{fontSize:17,fontWeight:600,color:SWC.white}}>{matrixPrompt.prompt}</div>
+                <div style={{fontSize:13,color:SWC.muted,marginTop:3}}>Click any cell to assign a code.</div>
               </div>
               <div style={{border:`1px solid ${SWC.border}`,borderRadius:10,overflow:"hidden",background:SWC.surface}}>
                 <div style={{display:"grid",gridTemplateColumns:`minmax(140px,180px) repeat(${frameworks.length}, 1fr)`,borderBottom:`1px solid ${SWC.border}`,background:SWC.raised}}>
-                  <div style={{padding:"8px 12px",fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",color:SWC.dim}}>Value</div>
+                  <div style={{padding:"10px 14px",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em",color:SWC.dim}}>Value</div>
                   {frameworks.map((fw,fi) => (
-                    <div key={fw.id} style={{padding:"8px 10px",fontSize:11,fontWeight:600,color:SWC.fw[fi%5],textAlign:"center",borderLeft:`1px solid ${SWC.border}`,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                    <div key={fw.id} style={{padding:"10px 12px",fontSize:12.5,fontWeight:600,color:SWC.fw[fi%5],textAlign:"center",borderLeft:`1px solid ${SWC.border}`,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
                       <SwDot color={SWC.fw[fi%5]} size={5}/>{fw.name}
                     </div>
                   ))}
@@ -3287,7 +3287,7 @@ const SchemaWorkbench = ({isOrg = false}) => {
                 ))}
               </div>
               {matrixPrompt.options.some(o=>hasConflict(o)) && (
-                <div style={{marginTop:10,padding:"10px 14px",borderRadius:8,border:`1px solid ${SWC.sup}25`,background:SWC.supBg,fontSize:12,color:SWC.text,lineHeight:1.5}}>
+                <div style={{marginTop:12,padding:"12px 16px",borderRadius:8,border:`1px solid ${SWC.sup}25`,background:SWC.supBg,fontSize:13.5,color:SWC.text,lineHeight:1.55}}>
                   <span style={{color:SWC.sup,fontWeight:600}}>⚡ Disagreement.</span>{" "}
                   <span style={{color:SWC.meant,cursor:"pointer",textDecoration:"underline"}} onClick={()=>setScreen("crosswalks")}>Document in crosswalks →</span>
                 </div>
@@ -3304,12 +3304,12 @@ const SchemaWorkbench = ({isOrg = false}) => {
       {screen === "crosswalks" && !addingPrompt && !addingFw && (
         <SwHdr title="Crosswalks" tag="MEANT ↔ MEANT" tagColor={SWC.meant}
           right={allCodes.length>=2 && <SwBtn ghost accent={SWC.meant} onClick={()=>setAddingXW(true)}>+ Add crosswalk</SwBtn>}>
-          <div style={{fontSize:12,color:SWC.muted,marginBottom:14,lineHeight:1.5}}>
+          <div style={{fontSize:13.5,color:SWC.muted,marginBottom:16,lineHeight:1.55}}>
             Crosswalks translate between frameworks — how one institution's categories map to another's. Both sides are MEANT.
           </div>
           {addingXW && (
             <div style={{border:`1px solid ${SWC.meantBorder}`,borderRadius:10,background:SWC.surface,padding:16,marginBottom:12}}>
-              <div style={{fontSize:13,fontWeight:600,color:SWC.meant,marginBottom:10}}>New Crosswalk</div>
+              <div style={{fontSize:15,fontWeight:600,color:SWC.meant,marginBottom:12}}>New Crosswalk</div>
               <div style={{display:"flex",gap:8,marginBottom:8}}>
                 <select value={xwFrom} onChange={e=>setXwFrom(e.target.value)} style={{flex:1,padding:"7px 10px",borderRadius:6,border:`1px solid ${SWC.border}`,background:SWC.surface,color:SWC.white,fontSize:12,fontFamily:"inherit"}}>
                   <option value="">From code...</option>
@@ -3334,7 +3334,7 @@ const SchemaWorkbench = ({isOrg = false}) => {
             </div>
           )}
           {crosswalks.length===0 && !addingXW ? (
-            <div style={{padding:20,border:`1px dashed ${SWC.border}`,borderRadius:8,textAlign:"center",color:SWC.dim,fontSize:12}}>
+            <div style={{padding:24,border:`1px dashed ${SWC.border}`,borderRadius:8,textAlign:"center",color:SWC.dim,fontSize:13.5}}>
               {allCodes.length<2?"Need codes in at least two frameworks first.":"No crosswalks yet."}
             </div>
           ) : crosswalks.map(xw=>{
@@ -3349,7 +3349,7 @@ const SchemaWorkbench = ({isOrg = false}) => {
                   <SwDot color={SWC.fw[to.fwIdx%5]} size={6}/><SwTag color={SWC.fw[to.fwIdx%5]} sm>{to.frameworkName}: {to.code}</SwTag>
                   <SwTag color={xw.type==="conflicts"?SWC.sup:xw.type==="equivalent"?SWC.given:SWC.meant} sm>{xw.type}</SwTag>
                 </div>
-                {xw.notes && <div style={{fontSize:12,color:SWC.text,lineHeight:1.5}}>{xw.notes}</div>}
+                {xw.notes && <div style={{fontSize:13,color:SWC.text,lineHeight:1.55}}>{xw.notes}</div>}
               </div>
             );
           })}
