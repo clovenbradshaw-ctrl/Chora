@@ -2100,12 +2100,12 @@ const ImportDataModal = ({open, onClose, showToast, metricsRoom, onComplete}) =>
 
   if (!open) return null;
 
-  return <Modal open={open} onClose={step === 'importing' ? undefined : onClose} title="Import Client Data" w={720}>
+  return <Modal open={open} onClose={step === 'importing' ? undefined : onClose} title={`Import ${ROLES.client.label} Data`} w={720}>
 
     {/* ── STEP 1: UPLOAD ── */}
     {step === 'upload' && <div>
       <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:16,lineHeight:1.6}}>
-        Upload a CSV or JSON file containing client records. Each row becomes an encrypted client room with its own AES-256-GCM key. PII is never stored in any reportable format.
+        Upload a CSV or JSON file containing {ROLES.client.label.toLowerCase()} records. Each row becomes an encrypted {ROLES.client.label.toLowerCase()} room with its own AES-256-GCM key. PII is never stored in any reportable format.
       </p>
       <div onDragOver={(e)=>{e.preventDefault();setDragOver(true)}} onDragLeave={()=>setDragOver(false)} onDrop={handleDrop}
         onClick={()=>fileRef.current?.click()}
@@ -2397,7 +2397,7 @@ const ImportDataModal = ({open, onClose, showToast, metricsRoom, onComplete}) =>
       </div>
 
       <button onClick={onClose} className="b-pri" style={{width:'100%',padding:12,fontSize:14}}>
-        <I n="check" s={15}/> Done — View Clients
+        <I n="check" s={15}/> Done — View {ROLES.client.label}s
       </button>
     </div>}
   </Modal>;
@@ -3414,9 +3414,9 @@ const classifyRoom = async (roomId, scannedState) => {
   const state = scannedState || {};
   const id = state[EVT.IDENTITY] || await svc.getState(roomId, EVT.IDENTITY);
   if (id) {
-    if (id.account_type==='client') return {type:'vault',label:'Client Vault',color:'teal'};
-    if (id.account_type==='client_record') return {type:'client_record',label:'Client Record',color:'teal'};
-    if (id.account_type==='provider') return {type:'roster',label:'Provider Roster',color:'gold'};
+    if (id.account_type==='client') return {type:'vault',label:`${ROLES.client.label} Vault`,color:'teal'};
+    if (id.account_type==='client_record') return {type:'client_record',label:`${ROLES.client.label} Record`,color:'teal'};
+    if (id.account_type==='provider') return {type:'roster',label:`${ROLES.provider.label} Roster`,color:'gold'};
     if (id.account_type==='organization') return {type:'org',label:'Organization',color:'blue'};
     if (id.account_type==='schema') return {type:'schema',label:'Schema Room',color:'purple'};
     if (id.account_type==='metrics') return {type:'metrics',label:'Metrics Room',color:'orange'};
@@ -3437,7 +3437,7 @@ const classifyEvent = (ev, roomInfo) => {
     switch (type) {
       case EVT.IDENTITY: return {op:'INS',epistemic:'GIVEN',label:'Identity Declaration',desc:`Type: ${content.account_type}`};
       case EVT.VAULT_SNAPSHOT: return {op:'ALT',epistemic:'GIVEN',label:'Vault Snapshot',desc:`${Object.keys(content.fields||{}).length} fields`};
-      case EVT.VAULT_PROVIDERS: return {op:'SEG',epistemic:'GIVEN',label:'Provider Index',desc:`${(content.providers||[]).length} providers`};
+      case EVT.VAULT_PROVIDERS: return {op:'SEG',epistemic:'GIVEN',label:`${ROLES.provider.label} Index`,desc:`${(content.providers||[]).length} ${ROLES.provider.label.toLowerCase()}s`};
       case EVT.BRIDGE_META: return {op:'CON',epistemic:'MEANT',label:'Bridge Connection',desc:`${content.status} — ${content.client?.slice(0,16)} ↔ ${content.provider?.slice(0,16)}`};
       case EVT.BRIDGE_REFS: return {op:'SEG',epistemic:'MEANT',label:'Field Refs Update',desc:`${Object.keys(content.fields||{}).length} encrypted refs${content.revoked?' (REVOKED)':''}`};
       case EVT.ROSTER_INDEX: return {op:'ALT',epistemic:'MEANT',label:'Roster Update',desc:`${(content.cases||[]).length} cases`};
@@ -3447,7 +3447,7 @@ const classifyEvent = (ev, roomInfo) => {
       case EVT.ORG_INVITE: return {op:'CON',epistemic:'MEANT',label:'Org Invite',desc:content.userId};
       case EVT.SCHEMA_AUTHORITY: return {op:'CON',epistemic:'MEANT',label:'Authority Binding',desc:content.name?.slice(0,40)};
       case EVT.SCHEMA_PROP: return {op:'REC',epistemic:'MEANT',label:'Schema Propagation',desc:`${content.level}: ${content.prompt_key}`};
-      case EVT.OBSERVATION: return {op:'INS',epistemic:'MEANT',label:'Provider Observation',desc:`${content.prompt_id}: ${content.value}`};
+      case EVT.OBSERVATION: return {op:'INS',epistemic:'MEANT',label:`${ROLES.provider.label} Observation`,desc:`${content.prompt_id}: ${content.value}`};
       case EVT.INVITE_TOKEN: return {op:'CON',epistemic:'MEANT',label:'Invite Token',desc:'QR/link token'};
       case EVT.ENCOUNTER_PROV: return {op:'INS',epistemic:'MEANT',label:'Provisional Encounter',desc:content.description?.slice(0,40)};
       case EVT.MATCH_TOKEN: return {op:'CON',epistemic:'MEANT',label:'Match Token',desc:'Blind matching token'};
@@ -3665,7 +3665,7 @@ const WelcomeScreen = ({onContinue}) => (
             <div>
               <div style={{fontSize:13.5,fontWeight:600,color:'var(--tx-0)',marginBottom:4}}>Roles are detected automatically</div>
               <div style={{fontSize:12.5,color:'var(--tx-1)',lineHeight:1.6}}>
-                Khora infers your <strong style={{color:'var(--teal)'}}>Client</strong>, <strong style={{color:'var(--gold)'}}>Provider</strong>, Org Admin, and Network roles from room membership. If you hold multiple roles, you can switch contexts without signing out.
+                Khora infers your <strong style={{color:'var(--teal)'}}>{ROLES.client.label}</strong>, <strong style={{color:'var(--gold)'}}>{ROLES.provider.label}</strong>, Org Admin, and Network roles from room membership. If you hold multiple roles, you can switch contexts without signing out.
               </div>
             </div>
           </div>
@@ -3673,7 +3673,7 @@ const WelcomeScreen = ({onContinue}) => (
 
         <div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'12px 16px',marginTop:20,fontSize:12,color:'var(--tx-1)',lineHeight:1.6,display:'flex',gap:10,alignItems:'flex-start'}}>
           <div style={{flexShrink:0,marginTop:1}}><I n="lock" s={15}/></div>
-          <span>Your data is encrypted per-field on your device before it ever leaves. Providers see only the specific fields you share. You can revoke access at any time.</span>
+          <span>Your data is encrypted per-field on your device before it ever leaves. {ROLES.provider.label}s see only the specific fields you share. You can revoke access at any time.</span>
         </div>
 
         <button onClick={onContinue} className="b-pri" style={{width:'100%',padding:14,fontSize:15,marginTop:28,display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
@@ -3727,7 +3727,7 @@ const LoginScreen = ({onLogin}) => {
             <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-2)',letterSpacing:'.08em'}}>SOVEREIGN CASE MANAGEMENT</span></div>
         </div>
         <p style={{color:'var(--tx-1)',fontSize:13,marginTop:18,marginBottom:24,lineHeight:1.65}}>
-          Client-owned data vaults on Matrix. Per-field encryption. Providers see only what clients share. Each tile is yours to place.
+          {ROLES.client.label}-owned data vaults on Matrix. Per-field encryption. {ROLES.provider.label}s see only what {ROLES.client.label.toLowerCase()}s share. Each tile is yours to place.
         </p>
 
         <div className="tabs" style={{marginBottom:20}}>
@@ -4782,10 +4782,10 @@ const ClientApp = ({session, onLogout, showToast}) => {
     </Modal>
 
     {/* ADD PROVIDER MODAL */}
-    <Modal open={addProviderModal} onClose={()=>setAddProviderModal(false)} title="Add Provider">
-      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>Creates a new encrypted bridge room and invites the provider. No data shared until you toggle fields on.</p>
-      <div style={{marginBottom:14}}><span className="section-label">PROVIDER MATRIX ID</span>
-        <input value={newProviderId} onChange={e=>setNewProviderId(e.target.value)} placeholder="@provider:matrix.org"/></div>
+    <Modal open={addProviderModal} onClose={()=>setAddProviderModal(false)} title={`Add ${ROLES.provider.label}`}>
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>Creates a new encrypted bridge room and invites the {ROLES.provider.label.toLowerCase()}. No data shared until you toggle fields on.</p>
+      <div style={{marginBottom:14}}><span className="section-label">{ROLES.provider.label.toUpperCase()} MATRIX ID</span>
+        <input value={newProviderId} onChange={e=>setNewProviderId(e.target.value)} placeholder={`@${ROLES.provider.label.toLowerCase().replace(/\s+/g,'')}:matrix.org`}/></div>
       <div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'10px 14px',marginBottom:14}}>
         <span style={{fontSize:11.5,color:'var(--tx-1)',lineHeight:1.5}}>Bridge uses Megolm + per-field AES-256-GCM. Keys destroyed on revocation.</span>
       </div>
@@ -4880,6 +4880,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const [provObservations, setProvObservations] = useState([]);
   const [initError, setInitError] = useState(null);
   // Organization context — orgs are a feature within the provider experience
+  // Multi-org: providers can belong to multiple orgs; providedOrgs stores all detected orgs
+  const [providedOrgs, setProvidedOrgs] = useState([]); // [{roomId, role, meta, staff, terminology, opacity, msgAccess, channels, emailConfig, emailConfigDraft, myVerification}]
+  const [currentOrgIdx, setCurrentOrgIdx] = useState(0); // index into providedOrgs
+  // Active org (derived from providedOrgs[currentOrgIdx] via switchOrg)
   const [orgRoom, setOrgRoom] = useState(null);
   const [orgMeta, setOrgMeta] = useState({});
   const [staff, setStaff] = useState([]);
@@ -4955,6 +4959,34 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const networkFrame = (room) => ({type:'network',room:room||networkRoom,role:'provider',epistemic:'MEANT'});
   const orgFrame = (room) => ({type:'org',room:room||orgRoom,role:orgRole||'admin',epistemic:'MEANT'});
 
+  // Apply a specific org's context to all active-org state variables
+  const applyOrgContext = (org) => {
+    if (!org) { setOrgRoom(null); setOrgMeta({}); setStaff([]); setOrgRole(null); setOrgOpacity('translucent'); setOrgMsgAccess({read:['admin','case_manager'],respond:['admin']}); setOrgChannels([]); setOrgTerminology({...TERMINOLOGY_DEFAULTS}); setTerminologyDraft({...TERMINOLOGY_DEFAULTS}); setEmailVerifyConfig(EmailVerification.defaultConfig()); setEmailConfigDraft(EmailVerification.defaultConfig()); setMyVerification(null); return; }
+    setOrgRoom(org.roomId);
+    setOrgRole(org.role);
+    setOrgMeta(org.meta);
+    setStaff(org.staff);
+    setOrgOpacity(org.opacity);
+    setOrgMsgAccess(org.msgAccess);
+    setOrgChannels(org.channels);
+    setOrgTerminology(org.terminology);
+    setTerminologyDraft({...org.terminology});
+    if (org.emailConfig) { setEmailVerifyConfig(org.emailConfig); setEmailConfigDraft(org.emailConfig); }
+    else { setEmailVerifyConfig(EmailVerification.defaultConfig()); setEmailConfigDraft(EmailVerification.defaultConfig()); }
+    setMyVerification(org.myVerification);
+  };
+
+  // Switch active org context (called from org switcher UI)
+  const switchOrg = (idx) => {
+    if (idx < 0 || idx >= providedOrgs.length) return;
+    setCurrentOrgIdx(idx);
+    applyOrgContext(providedOrgs[idx]);
+    // Reset view state that's org-specific
+    setActiveCase(null);
+    setView('dashboard');
+    showToast(`Switched to ${providedOrgs[idx].meta?.name || 'organization'}`, 'success');
+  };
+
   const initProvider = async () => {
     setLoading(true);
     setInitError(null);
@@ -4962,7 +4994,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       // Single-pass scan: fetch all Khora state across rooms in one request
       const scanned = await svc.scanRooms([EVT.ORG_METADATA, EVT.ORG_ROSTER, EVT.PROVIDER_PROFILE, EVT.ORG_OPACITY, EVT.ORG_MSG_ACCESS, EVT.ORG_MSG_CHANNEL, EVT.ORG_TERMINOLOGY, EVT.TEAM_META, EVT.TEAM_MEMBERS]);
       let roster=null, metricsR=null, schema=null, network=null;
-      let detectedOrg=null, detectedOrgRole=null;
+      const detectedOrgs = []; // [{roomId, role, meta, staff, terminology, opacity, msgAccess, channels:[], emailConfig:null, myVerification:null}]
       const bridgeData = [];
       const detectedClientRecords = [];
       const detectedOrgChannels = [];
@@ -4977,14 +5009,30 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         if (id?.account_type==='client_record'&&(id.owner===svc.userId||id.previous_owner===svc.userId)) {
           detectedClientRecords.push({roomId:rid, ...id});
         }
-        // Detect org rooms — owned or joined as staff
+        // Detect org rooms — owned or joined as staff (multi-org: collect ALL)
         if (id?.account_type==='organization') {
+          let detectedRole = null;
           if (id.owner===svc.userId) {
-            detectedOrg=rid; detectedOrgRole='admin';
+            detectedRole = 'admin';
           } else {
             const orgRoster = state[EVT.ORG_ROSTER];
             const entry = orgRoster?.staff?.find(s=>s.userId===svc.userId);
-            if (entry) { detectedOrg=rid; detectedOrgRole=entry.role; }
+            if (entry) detectedRole = entry.role;
+          }
+          if (detectedRole) {
+            const orgState = state;
+            const orgTerms = orgState[EVT.ORG_TERMINOLOGY] ? {...TERMINOLOGY_DEFAULTS, ...orgState[EVT.ORG_TERMINOLOGY]} : {...TERMINOLOGY_DEFAULTS};
+            detectedOrgs.push({
+              roomId: rid, role: detectedRole,
+              meta: orgState[EVT.ORG_METADATA] || {},
+              staff: orgState[EVT.ORG_ROSTER]?.staff || [],
+              terminology: orgTerms,
+              opacity: orgState[EVT.ORG_OPACITY]?.level || 'translucent',
+              msgAccess: orgState[EVT.ORG_MSG_ACCESS] || {read:['admin','case_manager'],respond:['admin']},
+              channels: [],
+              emailConfig: null,
+              myVerification: orgState[EVT.ORG_ROSTER]?.staff?.find(s=>s.userId===svc.userId)?.email_verification || null,
+            });
           }
         }
         // Detect inter-org messaging channels
@@ -5035,31 +5083,21 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       const rosterState = scanned[roster];
       if (rosterState?.[EVT.PROVIDER_PROFILE]) setProviderProfile(rosterState[EVT.PROVIDER_PROFILE]);
       if (network) { setNetworkRoom(network); await loadNetworkMembers(network); }
-      // Load org context if detected during scan
-      if (detectedOrg) {
-        setOrgRoom(detectedOrg); setOrgRole(detectedOrgRole);
-        const orgState = scanned[detectedOrg];
-        if (orgState?.[EVT.ORG_METADATA]) setOrgMeta(orgState[EVT.ORG_METADATA]);
-        if (orgState?.[EVT.ORG_ROSTER]?.staff) setStaff(orgState[EVT.ORG_ROSTER].staff);
-        // Load email verification config
+      // Multi-org: load email configs for all detected orgs, assign channels
+      for (const dOrg of detectedOrgs) {
         try {
-          const evConfig = await svc.getState(detectedOrg, EVT.ORG_EMAIL_CONFIG).catch(()=>null);
-          if (evConfig) { setEmailVerifyConfig(evConfig); setEmailConfigDraft(evConfig); }
-          // Load my verification status from roster
-          const myStaff = orgState?.[EVT.ORG_ROSTER]?.staff?.find(s=>s.userId===svc.userId);
-          if (myStaff?.email_verification) setMyVerification(myStaff.email_verification);
+          const evConfig = await svc.getState(dOrg.roomId, EVT.ORG_EMAIL_CONFIG).catch(()=>null);
+          if (evConfig) dOrg.emailConfig = evConfig;
         } catch(e) { console.warn('Email verify config load:', e.message); }
-        // Load opacity & message access settings
-        if (orgState?.[EVT.ORG_OPACITY]) setOrgOpacity(orgState[EVT.ORG_OPACITY].level || 'translucent');
-        if (orgState?.[EVT.ORG_MSG_ACCESS]) setOrgMsgAccess(orgState[EVT.ORG_MSG_ACCESS]);
-        // Load org terminology customization
-        if (orgState?.[EVT.ORG_TERMINOLOGY]) {
-          const t = {...TERMINOLOGY_DEFAULTS, ...orgState[EVT.ORG_TERMINOLOGY]};
-          setOrgTerminology(t);
-          setTerminologyDraft(t);
-        }
-        // Load detected org messaging channels
-        if (detectedOrgChannels.length > 0) setOrgChannels(detectedOrgChannels);
+        // Associate channels with their org
+        dOrg.channels = detectedOrgChannels.filter(ch => ch.org_room_id === dOrg.roomId || ch.initiator_org === dOrg.roomId || ch.target_org === dOrg.roomId);
+      }
+      setProvidedOrgs(detectedOrgs);
+      // Activate first org (or the one we were previously on)
+      if (detectedOrgs.length > 0) {
+        const idx = 0; // default to first org
+        setCurrentOrgIdx(idx);
+        applyOrgContext(detectedOrgs[idx]);
       }
       // Load teams detected during scan
       if (detectedTeams.length > 0) setTeams(detectedTeams);
@@ -5396,9 +5434,19 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         {type:setupData.type,service_area:setupData.service_area}, orgFrame(org));
       await emitOp(org, 'INS', {entity:'staff',field:svc.userId},
         {role:'admin',initiated_by:'org_creation'}, orgFrame(org));
+      const newOrgEntry = {
+        roomId: org, role: 'admin',
+        meta: {name:setupData.name,type:setupData.type,service_area:setupData.service_area},
+        staff: [{userId:svc.userId,role:'admin',joined:Date.now()}],
+        terminology: {...TERMINOLOGY_DEFAULTS}, opacity: 'translucent',
+        msgAccess: {read:['admin','case_manager'],respond:['admin']},
+        channels: [], emailConfig: null, myVerification: null,
+      };
+      setProvidedOrgs(prev => { const next = [...prev, newOrgEntry]; setCurrentOrgIdx(next.length-1); return next; });
       setOrgRoom(org); setOrgRole('admin');
       setOrgMeta({name:setupData.name,type:setupData.type,service_area:setupData.service_area});
       setStaff([{userId:svc.userId,role:'admin',joined:Date.now()}]);
+      setOrgTerminology({...TERMINOLOGY_DEFAULTS}); setTerminologyDraft({...TERMINOLOGY_DEFAULTS});
       setCreateOrgModal(false);
       setSetupData({name:'',type:'direct_service',service_area:'',languages:'en'});
       showToast(`Organization "${setupData.name}" created`,'success');
@@ -5426,9 +5474,22 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       const meta = await svc.getState(joinOrgId, EVT.ORG_METADATA);
       const roster = await svc.getState(joinOrgId, EVT.ORG_ROSTER);
       const entry = roster?.staff?.find(s=>s.userId===svc.userId);
-      setOrgRoom(joinOrgId); setOrgRole(entry?.role||'read_only');
+      const joinRole = entry?.role||'read_only';
+      // Load terminology for this org
+      let joinTerms = {...TERMINOLOGY_DEFAULTS};
+      try { const t = await svc.getState(joinOrgId, EVT.ORG_TERMINOLOGY); if (t) joinTerms = {...TERMINOLOGY_DEFAULTS, ...t}; } catch(e){}
+      const joinOrgEntry = {
+        roomId: joinOrgId, role: joinRole,
+        meta: meta || {}, staff: roster?.staff || [],
+        terminology: joinTerms, opacity: 'translucent',
+        msgAccess: {read:['admin','case_manager'],respond:['admin']},
+        channels: [], emailConfig: null, myVerification: entry?.email_verification || null,
+      };
+      setProvidedOrgs(prev => { const next = [...prev, joinOrgEntry]; setCurrentOrgIdx(next.length-1); return next; });
+      setOrgRoom(joinOrgId); setOrgRole(joinRole);
       if (meta) setOrgMeta(meta);
       if (roster?.staff) setStaff(roster.staff);
+      setOrgTerminology(joinTerms); setTerminologyDraft({...joinTerms});
       setJoinOrgModal(false); setJoinOrgId('');
       showToast(`Joined organization${meta?.name?' "'+meta.name+'"':''}`,'success');
     } catch(e) { showToast('Failed to join org: '+e.message,'error'); }
@@ -5646,6 +5707,8 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     try {
       await svc.setState(orgRoom, EVT.ORG_OPACITY, {level, updated: Date.now(), updated_by: svc.userId});
       setOrgOpacity(level);
+      // Sync back to providedOrgs
+      setProvidedOrgs(prev => prev.map((o,i) => i===currentOrgIdx ? {...o, opacity: level} : o));
       await emitOp(orgRoom, 'ALT', {entity:'org_opacity',field:'level'}, {from:orgOpacity,to:level,changed_by:svc.userId}, orgFrame());
       showToast(`Opacity set to ${OPACITY_LABELS[level]}`,'success');
     } catch(e) { showToast('Failed to update opacity: '+e.message,'error'); }
@@ -5657,6 +5720,8 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     try {
       await svc.setState(orgRoom, EVT.ORG_MSG_ACCESS, {...msgAccessDraft, updated: Date.now()});
       setOrgMsgAccess(msgAccessDraft);
+      // Sync back to providedOrgs
+      setProvidedOrgs(prev => prev.map((o,i) => i===currentOrgIdx ? {...o, msgAccess: msgAccessDraft} : o));
       await emitOp(orgRoom, 'ALT', {entity:'org_msg_access',field:'roles'}, {read:msgAccessDraft.read,respond:msgAccessDraft.respond}, orgFrame());
       setMsgAccessModal(false);
       showToast('Message access roles updated','success');
@@ -5669,7 +5734,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     try {
       const payload = {...terminologyDraft, updated: Date.now(), updated_by: svc.userId};
       await svc.setState(orgRoom, EVT.ORG_TERMINOLOGY, payload);
-      setOrgTerminology({...TERMINOLOGY_DEFAULTS, ...terminologyDraft});
+      const newTerms = {...TERMINOLOGY_DEFAULTS, ...terminologyDraft};
+      setOrgTerminology(newTerms);
+      // Sync back to providedOrgs
+      setProvidedOrgs(prev => prev.map((o,i) => i===currentOrgIdx ? {...o, terminology: newTerms} : o));
       setTerminologyModal(false);
       await emitOp(orgRoom, 'ALT', {entity:'org_terminology',field:'terms'}, {
         client_term: terminologyDraft.client_term,
@@ -5855,7 +5923,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   if(initError) return <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
     <div style={{textAlign:'center',maxWidth:400,padding:20}}>
       <div style={{width:48,height:48,borderRadius:'var(--r-lg)',background:'var(--red-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--red)',margin:'0 auto 16px'}}><I n="alert-triangle" s={24}/></div>
-      <h3 style={{fontSize:16,fontWeight:700,marginBottom:8}}>Provider Setup Failed</h3>
+      <h3 style={{fontSize:16,fontWeight:700,marginBottom:8}}>{T.provider_term} Setup Failed</h3>
       <p style={{fontSize:12.5,color:'var(--tx-1)',lineHeight:1.6,marginBottom:16}}>{initError}</p>
       <div style={{display:'flex',gap:8,justifyContent:'center'}}>
         <button onClick={initProvider} className="b-pri"><I n="refresh-cw" s={13}/>Retry</button>
@@ -5931,8 +5999,18 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         </div>)}
 
         {/* Organization section */}
-        <div style={{padding:'14px 10px 4px'}}><span className="section-label">ORGANIZATION</span></div>
+        <div style={{padding:'14px 10px 4px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <span className="section-label" style={{marginBottom:0}}>ORGANIZATION{providedOrgs.length>1?`S (${providedOrgs.length})`:''}</span>
+          {providedOrgs.length>1&&<span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{currentOrgIdx+1}/{providedOrgs.length}</span>}
+        </div>
         {orgRoom ? <>
+          {/* Org switcher (when multiple orgs) */}
+          {providedOrgs.length>1&&<div style={{padding:'4px 10px 8px'}}>
+            <select value={currentOrgIdx} onChange={e=>switchOrg(Number(e.target.value))}
+              style={{width:'100%',fontSize:11,padding:'6px 8px',borderRadius:'var(--r)',background:'var(--bg-3)',border:'1px solid var(--border-1)',color:'var(--tx-0)',cursor:'pointer'}}>
+              {providedOrgs.map((org,i)=><option key={org.roomId} value={i}>{org.meta?.name||`Organization ${i+1}`} ({ORG_ROLE_LABELS[org.role]||org.role})</option>)}
+            </select>
+          </div>}
           <div style={{padding:'6px 10px',marginBottom:4}}>
             <div style={{display:'flex',alignItems:'center',gap:6}}>
               <div style={{width:20,height:20,borderRadius:'var(--r)',background:'var(--blue-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--blue)'}}><I n="users" s={11}/></div>
@@ -5964,7 +6042,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
 
         {/* Cases section */}
         <div style={{padding:'14px 10px 4px'}}><span className="section-label">CASES ({cases.length})</span></div>
-        {cases.length===0&&<p style={{color:'var(--tx-3)',fontSize:11.5,padding:'12px 10px',textAlign:'center'}}>No clients shared with you yet</p>}
+        {cases.length===0&&<p style={{color:'var(--tx-3)',fontSize:11.5,padding:'12px 10px',textAlign:'center'}}>No {T.client_term_plural.toLowerCase()} shared with you yet</p>}
         {cases.map((c,i)=><div key={c.bridgeRoomId} onClick={()=>openCase(c.bridgeRoomId)}
           style={{padding:'8px 10px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:1,
             background:activeCase===c.bridgeRoomId?'var(--bg-4)':'transparent',
@@ -5976,7 +6054,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         </div>)}
         <div style={{padding:'12px 10px',display:'flex',flexDirection:'column',gap:4}}>
           <button onClick={()=>setDiscoverModal(true)} className="b-gho b-sm" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:4}}>
-            <I n="search" s={12}/>Find Client</button>
+            <I n="search" s={12}/>Find {T.client_term}</button>
           <button onClick={()=>loadCases()} className="b-gho b-xs" style={{width:'100%'}}><I n="search" s={10}/>Refresh</button>
         </div>
       </div>
@@ -6057,7 +6135,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           </div></>}
         <div style={{background:'var(--gold-dim)',border:'1px solid var(--gold-mid)',borderRadius:'var(--r)',padding:'14px 18px',marginTop:20,display:'flex',gap:10,alignItems:'flex-start'}}>
           <I n="eye" s={16} c="var(--gold)"/>
-          <span style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.6}}>As a provider, you cannot modify client vault data. Clients can revoke your access at any time.{!orgRoom&&' Create or join an organization to manage staff, cases across your team, and participate in networks.'}</span>
+          <span style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.6}}>As a {T.provider_term.toLowerCase()}, you cannot modify {T.client_term.toLowerCase()} vault data. {T.client_term_plural} can revoke your access at any time.{!orgRoom&&' Create or join an organization to manage staff, cases across your team, and participate in networks.'}</span>
         </div>
       </div>}
 
@@ -6066,10 +6144,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         <div className="inbox-header">
           <div>
             <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Inbox</h2>
-            <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>All your encrypted conversations with clients{orgRoom?' and organizations':''} in one place.</p>
+            <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>All your encrypted conversations with {T.client_term_plural.toLowerCase()}{orgRoom?' and organizations':''} in one place.</p>
           </div>
           <div style={{display:'flex',gap:6,flexShrink:0}}>
-            <button onClick={()=>setDiscoverModal(true)} className="b-gho" style={{display:'flex',alignItems:'center',gap:6}}><I n="search" s={14}/>Find Client</button>
+            <button onClick={()=>setDiscoverModal(true)} className="b-gho" style={{display:'flex',alignItems:'center',gap:6}}><I n="search" s={14}/>Find {T.client_term}</button>
             {orgRoom&&hasOrgMsgPermission('read')&&<button onClick={()=>setComposeOrgModal(true)} className="b-pri" style={{display:'flex',alignItems:'center',gap:6}}><I n="plus" s={14}/>New Channel</button>}
           </div>
         </div>
@@ -6090,7 +6168,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
                   <div style={{padding:'40px 16px',textAlign:'center'}}>
                     <I n="briefcase" s={28} c="var(--tx-3)"/>
                     <p style={{color:'var(--tx-3)',fontSize:11.5,marginTop:10}}>No cases yet</p>
-                    <p style={{color:'var(--tx-3)',fontSize:10.5,marginTop:4}}>Clients must share a bridge with you first</p>
+                    <p style={{color:'var(--tx-3)',fontSize:10.5,marginTop:4}}>{T.client_term_plural} must share a bridge with you first</p>
                   </div>
                 :cases.map(c=><div key={c.bridgeRoomId} onClick={()=>openInboxConvo(c.bridgeRoomId)}
                   style={{padding:'12px 14px',cursor:'pointer',borderBottom:'1px solid var(--border-0)',
@@ -6384,10 +6462,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           <h2 style={{fontFamily:'var(--serif)',fontSize:20,fontWeight:700}}>{activeCaseData.sharedData.full_name||activeCaseData.clientUserId}</h2>
           <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
             <span className="tag tag-green"><I n="lock" s={9}/>Megolm + AES-GCM</span>
-            <span style={{fontFamily:'var(--mono)',fontSize:9.5,color:'var(--tx-3)'}}>Client-owned bridge</span></div>
+            <span style={{fontFamily:'var(--mono)',fontSize:9.5,color:'var(--tx-3)'}}>{T.client_term}-owned bridge</span></div>
         </div>
         <div className="card" style={{marginBottom:16}}>
-          <span className="section-label">SHARED DATA — CLIENT CONTROLLED</span>
+          <span className="section-label">SHARED DATA — {T.client_term.toUpperCase()} CONTROLLED</span>
           {(()=>{
             const knownKeys = new Set(VAULT_FIELDS.map(f=>f.key));
             const customShared = Object.keys(activeCaseData.sharedData).filter(k=>!knownKeys.has(k));
@@ -6503,7 +6581,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       {/* METRICS DASHBOARD (§B.5) */}
       {view==='metrics'&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
         <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700,marginBottom:4}}>Metrics Dashboard</h2>
-        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:20}}>Anonymized, aggregate data from consenting clients. No PII — names, DOBs, SSNs, and addresses are never present.</p>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:20}}>Anonymized, aggregate data from consenting {T.client_term_plural.toLowerCase()}. No PII — names, DOBs, SSNs, and addresses are never present.</p>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:10,marginBottom:20}}>
           {[{l:'Metric Events',v:metrics.length,c:'orange'},{l:'Unique Cohorts',v:new Set(metrics.map(m=>m.cohort_hash)).size,c:'blue'},
             {l:'Categories',v:Object.keys(metricsByCategory).length,c:'teal'}
@@ -6511,7 +6589,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
             <span style={{fontSize:18,fontWeight:700,color:`var(--${s.c})`}}>{s.v}</span></div>)}
         </div>
         {Object.keys(metricsByCategory).length===0?
-          <div className="card" style={{textAlign:'center',padding:'30px',borderStyle:'dashed'}}><I n="bar" s={28}/><p style={{color:'var(--tx-3)',marginTop:8}}>No metric events yet. Clients must consent to anonymized reporting.</p></div>
+          <div className="card" style={{textAlign:'center',padding:'30px',borderStyle:'dashed'}}><I n="bar" s={28}/><p style={{color:'var(--tx-3)',marginTop:8}}>No metric events yet. {T.client_term_plural} must consent to anonymized reporting.</p></div>
         :Object.entries(metricsByCategory).map(([cat,vals])=><div key={cat} className="card" style={{marginBottom:12}}>
           <span className="section-label">{cat.toUpperCase()}</span>
           <div style={{display:'flex',flexDirection:'column',gap:4,marginTop:6}}>
@@ -6591,7 +6669,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
             <div style={{display:'flex',alignItems:'center',gap:8}}>
               <I n="settings" s={16} c="var(--gold)"/>
               <span className="section-label" style={{marginBottom:0}}>TERMINOLOGY</span>
-              {(T.client_term!=='Client'||T.provider_term!=='Provider')&&<span className="tag tag-gold" style={{fontSize:8}}>CUSTOMIZED</span>}
+              {(T.client_term!==TERMINOLOGY_DEFAULTS.client_term||T.provider_term!==TERMINOLOGY_DEFAULTS.provider_term)&&<span className="tag tag-gold" style={{fontSize:8}}>CUSTOMIZED</span>}
             </div>
             <button onClick={()=>{setTerminologyDraft({...orgTerminology});setTerminologyModal(true)}} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:4}}><I n="settings" s={11}/>Customize</button>
           </div>
@@ -6610,7 +6688,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
               <span style={{fontSize:11,color:'var(--tx-2)'}}>Plural: {T.provider_term_plural}</span>
             </div>
           </div>
-          {(T.client_term!=='Client'||T.provider_term!=='Provider')&&<div style={{marginTop:10,padding:'8px 12px',background:'var(--gold-dim)',borderRadius:'var(--r)',fontSize:11,color:'var(--gold)',display:'flex',alignItems:'center',gap:6}}>
+          {(T.client_term!==TERMINOLOGY_DEFAULTS.client_term||T.provider_term!==TERMINOLOGY_DEFAULTS.provider_term)&&<div style={{marginTop:10,padding:'8px 12px',background:'var(--gold-dim)',borderRadius:'var(--r)',fontSize:11,color:'var(--gold)',display:'flex',alignItems:'center',gap:6}}>
             <I n="alert" s={12} c="var(--gold)"/>
             Custom terminology active — staff will see "{T.client_term}" and "{T.provider_term}" instead of the defaults.
           </div>}
@@ -7140,10 +7218,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     </div>
 
     {/* DISCOVER CLIENT MODAL */}
-    <Modal open={discoverModal} onClose={()=>setDiscoverModal(false)} title="Find Client">
-      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>Look up a client by their Matrix ID. If they've created a bridge room and invited you, it will appear in your cases.</p>
-      <div style={{marginBottom:14}}><span className="section-label">CLIENT MATRIX ID</span>
-        <input value={discoverUserId} onChange={e=>setDiscoverUserId(e.target.value)} placeholder="@client:matrix.org"/></div>
+    <Modal open={discoverModal} onClose={()=>setDiscoverModal(false)} title={`Find ${T.client_term}`}>
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>Look up a {T.client_term.toLowerCase()} by their Matrix ID. If they've created a bridge room and invited you, it will appear in your cases.</p>
+      <div style={{marginBottom:14}}><span className="section-label">{T.client_term.toUpperCase()} MATRIX ID</span>
+        <input value={discoverUserId} onChange={e=>setDiscoverUserId(e.target.value)} placeholder={`@${T.client_term.toLowerCase()}:matrix.org`}/></div>
       <button onClick={handleDiscoverClient} className="b-pri" style={{width:'100%'}}>Search for Bridge</button>
     </Modal>
 
@@ -7299,20 +7377,20 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         </div>
         {emailVerifyConfig.enabled && myVerification?.status!=='verified' ?
           <div style={{marginTop:8}}>
-            <p style={{fontSize:10,color:'var(--gold)',marginBottom:6}}>Your organization requires email verification. Verify your email to display a verified badge to clients.</p>
+            <p style={{fontSize:10,color:'var(--gold)',marginBottom:6}}>Your organization requires email verification. Verify your email to display a verified badge to {T.client_term_plural.toLowerCase()}.</p>
             <button onClick={openEmailVerifyModal} className="b-pri b-sm" style={{fontSize:11}}>
               <I n="shieldCheck" s={12}/> Verify Email Now
             </button>
           </div>
         : <p style={{fontSize:10,color:'var(--tx-2)',marginTop:6}}>
-            {myVerification?.status==='verified' ? 'Your identity is email-verified and visible to clients on all bridges.' : 'Your organization membership is verified through the Matrix room roster and will be visible to clients on all bridges.'}
+            {myVerification?.status==='verified' ? `Your identity is email-verified and visible to ${T.client_term_plural.toLowerCase()} on all bridges.` : `Your organization membership is verified through the Matrix room roster and will be visible to ${T.client_term_plural.toLowerCase()} on all bridges.`}
           </p>}
       </div> : <div style={{background:'var(--gold-dim)',border:'1px solid var(--gold-mid)',borderRadius:'var(--r)',padding:'12px 14px',marginBottom:16}}>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <I n="alert" s={14} c="var(--gold)"/>
           <span style={{fontSize:11.5,color:'var(--gold)',fontWeight:600}}>No organization affiliation</span>
         </div>
-        <p style={{fontSize:10.5,color:'var(--tx-2)',marginTop:4}}>Clients will see you as an independent provider. Create or join an organization to display a verified affiliation badge on your profile.</p>
+        <p style={{fontSize:10.5,color:'var(--tx-2)',marginTop:4}}>{T.client_term_plural} will see you as an independent {T.provider_term.toLowerCase()}. Create or join an organization to display a verified affiliation badge on your profile.</p>
       </div>}
       <button onClick={handleSaveProfile} className="b-pri" style={{width:'100%',padding:12,fontSize:14}}>
         <I n="check" s={16}/> Save Profile & Broadcast
