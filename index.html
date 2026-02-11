@@ -584,6 +584,11 @@ const EVT = {
   ORG_ROSTER:     `${NS}.org.roster`,
   ORG_METADATA:   `${NS}.org.metadata`,
   ORG_INVITE:     `${NS}.org.invite`,
+  ORG_OPACITY:    `${NS}.org.opacity`,
+  ORG_MSG_ACCESS: `${NS}.org.msg_access`,
+  // Inter-org messaging
+  ORG_MSG_CHANNEL:`${NS}.org.msg.channel`,
+  ORG_MSG_ENVELOPE:`${NS}.org.msg.envelope`,
   // Schema
   SCHEMA_PROMPT:  `${NS}.schema.prompt`,
   SCHEMA_DEF:     `${NS}.schema.definition`,
@@ -659,6 +664,8 @@ class KhoraService {
         });
       });
       this._userId = res.user_id; this._token = res.access_token;
+      // Persist session to sessionStorage so it survives page refresh
+      try { sessionStorage.setItem('khora_session', JSON.stringify({ homeserver: baseUrl, accessToken: res.access_token, userId: res.user_id, deviceId: res.device_id })); } catch {}
       // Cache encrypted session metadata in the encrypted vault
       try { await KhoraEncryptedCache.put('session', 'current', { userId: res.user_id, homeserver: baseUrl, deviceId: res.device_id, ts: Date.now() }); } catch {}
       return { userId: res.user_id };
@@ -666,6 +673,39 @@ class KhoraService {
       const resp = await this._api('POST', '/login', { type: 'm.login.password', user, password: pass }, true);
       this._token = resp.access_token; this._userId = resp.user_id;
       return { userId: resp.user_id };
+    }
+  }
+
+  async restoreSession() {
+    try {
+      const raw = sessionStorage.getItem('khora_session');
+      if (!raw) return null;
+      const { homeserver, accessToken, userId, deviceId } = JSON.parse(raw);
+      if (!homeserver || !accessToken || !userId || !deviceId) return null;
+      this._baseUrl = homeserver;
+      await LocalVaultCrypto.deriveKey(userId, accessToken, deviceId);
+      if (typeof matrixcs !== 'undefined') {
+        this.client = matrixcs.createClient({ baseUrl: homeserver, accessToken, userId, deviceId });
+        try { await this.client.initCrypto(); } catch (e) { console.warn('Crypto:', e.message); }
+        await this.client.startClient({ initialSyncLimit: 30 });
+        await new Promise((resolve, reject) => {
+          if (this.client.isInitialSyncComplete()) return resolve();
+          const timeout = setTimeout(() => reject(new Error('Sync timed out')), 60000);
+          this.client.on('sync', (state, prev, data) => {
+            if (state === 'PREPARED') { clearTimeout(timeout); resolve(); }
+            else if (state === 'ERROR') { clearTimeout(timeout); reject(new Error(data?.error?.message || 'Sync failed')); }
+          });
+        });
+      }
+      this._userId = userId; this._token = accessToken;
+      return { userId };
+    } catch (e) {
+      console.warn('Session restore failed:', e.message);
+      sessionStorage.removeItem('khora_session');
+      sessionStorage.removeItem('khora_account_type');
+      this.client = null; this._token = null; this._userId = null;
+      LocalVaultCrypto.clear();
+      return null;
     }
   }
 
@@ -1292,6 +1332,27 @@ const DOMAIN_CONFIG = {
   orgTypes: ['direct_service','administrative','clinical','legal','coordinating_body','advocacy','other'],
   orgTypeLabels: {direct_service:'Direct Service',administrative:'Administrative',clinical:'Clinical',
     legal:'Legal',coordinating_body:'Coordinating Body',advocacy:'Advocacy',other:'Other'},
+
+  /* ── Org Opacity Levels ── */
+  // Controls how much of the org's internal structure is visible to external orgs during messaging
+  opacityLevels: ['transparent','translucent','opaque'],
+  opacityLabels: {
+    transparent: 'Transparent',     // sender name & org visible
+    translucent: 'Translucent',     // org name visible, individual sender hidden
+    opaque:      'Opaque',          // only "an organization" — no name, no members
+  },
+  opacityDescriptions: {
+    transparent: 'External orgs see which staff member sent each message and your org name.',
+    translucent: 'External orgs see your org name but individual sender identities are hidden.',
+    opaque:      'External orgs see only that a response came from an organization. Org name and all member identities are hidden.',
+  },
+
+  /* ── Org Message Access Roles ── */
+  // Which org roles can access inter-org messages by default
+  msgAccessDefaults: {
+    read: ['admin','case_manager'],
+    respond: ['admin'],
+  },
 };
 
 /* ── Derived constants (backward-compatible references) ── */
@@ -1315,6 +1376,10 @@ const ORG_ROLES = DOMAIN_CONFIG.orgRoles;
 const ORG_ROLE_LABELS = DOMAIN_CONFIG.orgRoleLabels;
 const ORG_TYPES = DOMAIN_CONFIG.orgTypes;
 const ORG_TYPE_LABELS = DOMAIN_CONFIG.orgTypeLabels;
+const OPACITY_LEVELS = DOMAIN_CONFIG.opacityLevels;
+const OPACITY_LABELS = DOMAIN_CONFIG.opacityLabels;
+const OPACITY_DESCRIPTIONS = DOMAIN_CONFIG.opacityDescriptions;
+const MSG_ACCESS_DEFAULTS = DOMAIN_CONFIG.msgAccessDefaults;
 
 /* ═══════════════════ FRAMEWORK BINDINGS (§C.2) ═══════════════════ */
 // Multi-framework value mappings: same observation value → different classifications
@@ -2837,8 +2902,43 @@ const ClientApp = ({session, onLogout, showToast}) => {
   const [initError, setInitError] = useState(null);
   const [claimedRooms, setClaimedRooms] = useState([]);
   const [pendingClaims, setPendingClaims] = useState([]);
+  const [customFieldDefs, setCustomFieldDefs] = useState([]); // [{key,label,category,sensitive}]
+  const [addFieldModal, setAddFieldModal] = useState(false);
+  const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [newFieldCategory, setNewFieldCategory] = useState('details');
+  const [newFieldSensitive, setNewFieldSensitive] = useState(false);
 
   useEffect(() => { initVault(); }, []);
+
+  // Merge built-in fields with client-defined custom fields
+  const allFields = useMemo(() => [...VAULT_FIELDS, ...customFieldDefs], [customFieldDefs]);
+  const allCategories = useMemo(() => {
+    const cats = [...FIELD_CATEGORIES];
+    for (const f of customFieldDefs) { if (!cats.includes(f.category)) cats.push(f.category); }
+    return cats;
+  }, [customFieldDefs]);
+
+  const handleAddCustomField = async () => {
+    const label = newFieldLabel.trim();
+    if (!label) return;
+    const key = 'custom_' + label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+    if (allFields.some(f => f.key === key)) { showToast('A field with that name already exists','error'); return; }
+    const def = {key, label, category: newFieldCategory, sensitive: newFieldSensitive, custom: true};
+    const updated = [...customFieldDefs, def];
+    await emitOp(vaultRoom, 'INS', {field:key,entity:'custom_field_def'}, {label,category:newFieldCategory,sensitive:newFieldSensitive}, vaultFrame());
+    await saveSnapshot(undefined, undefined, undefined, updated);
+    setAddFieldModal(false); setNewFieldLabel(''); setNewFieldCategory('details'); setNewFieldSensitive(false);
+    showToast(`Custom field "${label}" created`, 'success');
+  };
+
+  const handleDeleteCustomField = async (fieldKey) => {
+    const updated = customFieldDefs.filter(f => f.key !== fieldKey);
+    const updatedData = {...vaultData};
+    delete updatedData[fieldKey];
+    await emitOp(vaultRoom, 'NUL', {field:fieldKey,entity:'custom_field_def'}, {reason:'client_deleted'}, vaultFrame());
+    await saveSnapshot(updatedData, undefined, undefined, updated);
+    showToast('Custom field removed', 'warn');
+  };
 
   const vaultFrame = (room) => ({type:'vault',room:room||vaultRoom,role:'client',epistemic:'GIVEN'});
   const bridgeFrame = (room) => ({type:'bridge',room,role:'client',epistemic:'MEANT'});
@@ -2887,7 +2987,8 @@ const ClientApp = ({session, onLogout, showToast}) => {
           {type:EVT.IDENTITY,state_key:'',content:{account_type:'client',owner:svc.userId,created:Date.now()}},
           {type:EVT.VAULT_SNAPSHOT,state_key:'',content:{fields:{},observations:[],
             metrics_consent:{enabled:false,categories:[]},
-            matching_consent:{enabled:false,layers:[],network_id:null,last_token_ts:null}}},
+            matching_consent:{enabled:false,layers:[],network_id:null,last_token_ts:null},
+            custom_field_defs:[]}},
           {type:EVT.VAULT_PROVIDERS,state_key:'',content:{providers:[]}},
         ]);
         showToast('Vault created — encrypted room ready','success');
@@ -2923,6 +3024,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     setVaultData(snap?.fields || {});
     setObservations(snap?.observations || []);
     setMetricsConsent(snap?.metrics_consent || {enabled:false,categories:[]});
+    setCustomFieldDefs(snap?.custom_field_defs || []);
     const idx = await svc.getState(rid, EVT.VAULT_PROVIDERS);
     // Enrich providers with profile data from bridge rooms
     const enrichedProviders = (idx?.providers || []).map(p => {
@@ -2932,10 +3034,10 @@ const ClientApp = ({session, onLogout, showToast}) => {
     setProviders(enrichedProviders);
   };
 
-  const saveSnapshot = async (fields, obs, mc) => {
-    const snapshot = {fields:fields??vaultData, observations:obs??observations, metrics_consent:mc??metricsConsent};
+  const saveSnapshot = async (fields, obs, mc, cfd) => {
+    const snapshot = {fields:fields??vaultData, observations:obs??observations, metrics_consent:mc??metricsConsent, custom_field_defs:cfd??customFieldDefs};
     await svc.setState(vaultRoom, EVT.VAULT_SNAPSHOT, snapshot);
-    setVaultData(snapshot.fields); setObservations(snapshot.observations); setMetricsConsent(snapshot.metrics_consent);
+    setVaultData(snapshot.fields); setObservations(snapshot.observations); setMetricsConsent(snapshot.metrics_consent); setCustomFieldDefs(snapshot.custom_field_defs);
   };
 
   const saveProviderIndex = async (provs) => {
@@ -3023,7 +3125,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     await emitOp(prov.bridgeRoomId, 'SEG', {field:fk,visibility:newShared[fk]?'shared':'revoked'},
       {provider:prov.providerUserId}, bridgeFrame(prov.bridgeRoomId), newShared[fk]?[]:[`prev_seg_${fk}`]);
     await syncFieldsToBridge(prov.bridgeRoomId, newShared, vaultData);
-    const label = VAULT_FIELDS.find(f=>f.key===fk)?.label||fk;
+    const label = allFields.find(f=>f.key===fk)?.label||fk;
     showToast(newShared[fk]?`Shared ${label} — new key issued`:`Revoked ${label} — key destroyed`, newShared[fk]?'success':'warn');
   };
 
@@ -3144,7 +3246,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
 
   const activeProviderIdx = providers.findIndex(p=>p.bridgeRoomId===activeBridge);
   const activeProvider = activeProviderIdx>=0?providers[activeProviderIdx]:null;
-  const filledFields = VAULT_FIELDS.filter(f=>vaultData[f.key]);
+  const filledFields = allFields.filter(f=>vaultData[f.key]);
   const sharedCount = providers.reduce((s,p)=>s+Object.values(p.sharedFields||{}).filter(Boolean).length,0);
 
   if(loading)return<div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}><Spin s={28}/></div>;
@@ -3177,7 +3279,6 @@ const ClientApp = ({session, onLogout, showToast}) => {
       <div style={{flex:1,overflow:'auto',padding:'6px 6px'}}>
         {[{id:'vault',icon:'folder',label:'My Vault'},{id:'observations',icon:'clipboard',label:'Observations'},
           {id:'providers',icon:'users',label:'My Providers'},{id:'records',icon:'shield',label:'My Records'},
-          {id:'schema',icon:'grid',label:'Schema'},
           {id:'metrics',icon:'bar',label:'Metrics'},{id:'activity',icon:'zap',label:'Activity Stream'}
         ].map(item=><div key={item.id} onClick={()=>{setView(item.id);setActiveBridge(null)}}
           style={{padding:'9px 10px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:1,
@@ -3218,10 +3319,13 @@ const ClientApp = ({session, onLogout, showToast}) => {
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:24}}>
           <div><h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Your Vault</h2>
             <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>All data encrypted in your private Matrix room. Only you can read this.</p></div>
-          <button onClick={()=>{setEditData({...vaultData});setEditModal(true)}} className="b-pri" style={{display:'flex',alignItems:'center',gap:6}}><I n="key" s={14}/>Edit Vault</button>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={()=>setAddFieldModal(true)} className="b-gho" style={{display:'flex',alignItems:'center',gap:6}}><I n="plus" s={14}/>Add Field</button>
+            <button onClick={()=>{setEditData({...vaultData});setEditModal(true)}} className="b-pri" style={{display:'flex',alignItems:'center',gap:6}}><I n="key" s={14}/>Edit Vault</button>
+          </div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:10,marginBottom:24}}>
-          {[{l:'Fields',v:`${filledFields.length}/${VAULT_FIELDS.length}`,c:'teal',i:'folder'},
+          {[{l:'Fields',v:`${filledFields.length}/${allFields.length}`,c:'teal',i:'folder'},
             {l:'Providers',v:providers.length,c:'gold',i:'users'},
             {l:'Observations',v:observations.length,c:'blue',i:'clipboard'},
             {l:'Shared Fields',v:sharedCount,c:'orange',i:'share'},
@@ -3230,18 +3334,24 @@ const ClientApp = ({session, onLogout, showToast}) => {
               <span style={{fontSize:18,fontWeight:700}}>{s.v}</span>
               <span style={{color:`var(--${s.c})`,opacity:.5}}><I n={s.i} s={15}/></span></div></div>)}
         </div>
-        {FIELD_CATEGORIES.map(cat=>{const fields=VAULT_FIELDS.filter(f=>f.category===cat);const color=CAT_COLORS[cat];
+        {allCategories.map(cat=>{const fields=allFields.filter(f=>f.category===cat);const color=CAT_COLORS[cat]||'gold';
+          if(!fields.length) return null;
           return <div key={cat} style={{marginBottom:16}}>
             <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
-              <span style={{color:`var(--${color})`}}><I n={CAT_ICONS[cat]} s={13}/></span>
-              <span className="section-label" style={{marginBottom:0}}>{CAT_LABELS[cat].toUpperCase()}</span></div>
+              <span style={{color:`var(--${color})`}}><I n={CAT_ICONS[cat]||'file'} s={13}/></span>
+              <span className="section-label" style={{marginBottom:0}}>{(CAT_LABELS[cat]||cat.charAt(0).toUpperCase()+cat.slice(1)).toUpperCase()}</span></div>
             <div className="card" style={{padding:0,overflow:'hidden'}}>
               {fields.map((f,fi)=><div key={f.key} style={{padding:'10px 16px',borderBottom:fi<fields.length-1?'1px solid var(--border-0)':'none',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                 <div style={{display:'flex',alignItems:'center',gap:8}}>
                   <span style={{fontSize:12.5,fontWeight:500}}>{f.label}</span>
-                  {f.sensitive&&<span className="tag tag-red" style={{fontSize:8.5}}>SENSITIVE</span>}</div>
-                <span style={{fontFamily:'var(--mono)',fontSize:11.5,color:vaultData[f.key]?'var(--tx-1)':'var(--tx-3)',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                  {vaultData[f.key]?(f.sensitive?'••••••••':vaultData[f.key]):'—'}</span>
+                  {f.sensitive&&<span className="tag tag-red" style={{fontSize:8.5}}>SENSITIVE</span>}
+                  {f.custom&&<span className="tag tag-purple" style={{fontSize:8.5}}>CUSTOM</span>}</div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontFamily:'var(--mono)',fontSize:11.5,color:vaultData[f.key]?'var(--tx-1)':'var(--tx-3)',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {vaultData[f.key]?(f.sensitive?'••••••••':vaultData[f.key]):'—'}</span>
+                  {f.custom&&<span onClick={()=>handleDeleteCustomField(f.key)} style={{cursor:'pointer',color:'var(--tx-3)',transition:'color .15s'}}
+                    onMouseEnter={e=>e.currentTarget.style.color='var(--red)'} onMouseLeave={e=>e.currentTarget.style.color='var(--tx-3)'}><I n="trash" s={12}/></span>}
+                </div>
               </div>)}
             </div>
           </div>;
@@ -3343,15 +3453,15 @@ const ClientApp = ({session, onLogout, showToast}) => {
               <div style={{padding:'12px 18px'}}>
                 <span className="section-label">FIELD-LEVEL SHARING</span>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0'}}>
-                  {VAULT_FIELDS.map(f=>{const isShared=prov.sharedFields?.[f.key]||false;const hasData=!!vaultData[f.key];
+                  {allFields.map(f=>{const isShared=prov.sharedFields?.[f.key]||false;const hasData=!!vaultData[f.key];
                     return <div key={f.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border-0)',marginRight:16}}>
-                      <span style={{fontSize:12,color:hasData?'var(--tx-0)':'var(--tx-3)'}}>{f.label}</span>
+                      <span style={{fontSize:12,color:hasData?'var(--tx-0)':'var(--tx-3)'}}>{f.label}{f.custom?' ✦':''}</span>
                       <Toggle on={isShared} onChange={()=>handleToggleField(pi,f.key)} disabled={!hasData}/>
                     </div>;})}
                 </div>
                 <div style={{marginTop:10,display:'flex',alignItems:'center',gap:6}}>
                   <I n="key" s={12} c="var(--tx-3)"/>
-                  <span style={{fontSize:10.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{shCount}/{VAULT_FIELDS.length} fields — unique AES-256-GCM keys</span>
+                  <span style={{fontSize:10.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{shCount}/{allFields.length} fields — unique AES-256-GCM keys</span>
                 </div>
               </div>
             </div>;})}
@@ -3440,9 +3550,6 @@ const ClientApp = ({session, onLogout, showToast}) => {
         </div>
       </div>}
 
-      {/* SCHEMA WORKBENCH */}
-      {view==='schema'&&!activeBridge&&<SchemaWorkbench isOrg={false}/>}
-
       {/* METRICS VIEW (§B) */}
       {view==='metrics'&&!activeBridge&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
         <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700,marginBottom:6}}>Metrics Consent</h2>
@@ -3510,7 +3617,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
         <div className="card" style={{marginBottom:16}}>
           <span className="section-label">CURRENTLY SHARED</span>
           <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:4}}>
-            {VAULT_FIELDS.filter(f=>activeProvider.sharedFields?.[f.key]).map(f=><span key={f.key} className="tag tag-blue">{f.label}</span>)}
+            {allFields.filter(f=>activeProvider.sharedFields?.[f.key]).map(f=><span key={f.key} className="tag tag-blue">{f.label}</span>)}
             {Object.values(activeProvider.sharedFields||{}).filter(Boolean).length===0&&<span style={{fontSize:12,color:'var(--tx-3)'}}>No fields shared</span>}
           </div>
         </div>
@@ -3539,17 +3646,20 @@ const ClientApp = ({session, onLogout, showToast}) => {
     {/* EDIT VAULT MODAL */}
     <Modal open={editModal} onClose={()=>setEditModal(false)} title="Edit Vault Data" w={540}>
       <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:16,lineHeight:1.6}}>Changes to shared fields are re-encrypted with new keys per provider. Each edit emits EO operations (INS/ALT/NUL) to the vault timeline.</p>
-      {FIELD_CATEGORIES.map(cat=><div key={cat} style={{marginBottom:14}}>
-        <span className="section-label">{CAT_LABELS[cat].toUpperCase()}</span>
-        {VAULT_FIELDS.filter(f=>f.category===cat).map(f=><div key={f.key} style={{marginBottom:8}}>
+      {allCategories.map(cat=>{const fields=allFields.filter(f=>f.category===cat);
+        if(!fields.length) return null;
+        return <div key={cat} style={{marginBottom:14}}>
+        <span className="section-label">{(CAT_LABELS[cat]||cat.charAt(0).toUpperCase()+cat.slice(1)).toUpperCase()}</span>
+        {fields.map(f=><div key={f.key} style={{marginBottom:8}}>
           <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:3}}>
             <label style={{fontSize:11.5,color:'var(--tx-1)'}}>{f.label}</label>
-            {f.sensitive&&<span className="tag tag-red" style={{fontSize:8}}>SENSITIVE</span>}</div>
-          {['case_notes','history','medical','documents'].includes(f.key)?
+            {f.sensitive&&<span className="tag tag-red" style={{fontSize:8}}>SENSITIVE</span>}
+            {f.custom&&<span className="tag tag-purple" style={{fontSize:8}}>CUSTOM</span>}</div>
+          {['case_notes','history','medical','documents'].includes(f.key)||(f.custom&&f.category==='case')?
             <textarea value={editData[f.key]||''} onChange={e=>setEditData({...editData,[f.key]:e.target.value})} placeholder={`Enter ${f.label.toLowerCase()}...`} style={{minHeight:50}}/>:
             <input value={editData[f.key]||''} onChange={e=>setEditData({...editData,[f.key]:e.target.value})} placeholder={`Enter ${f.label.toLowerCase()}...`}/>}
         </div>)}
-      </div>)}
+      </div>;})}
       <button onClick={handleEditSave} className="b-pri" style={{width:'100%'}}>Save & Re-encrypt Shared Fields</button>
     </Modal>
 
@@ -3601,6 +3711,27 @@ const ClientApp = ({session, onLogout, showToast}) => {
         <button onClick={()=>handleHardRevoke(hardRevokeTarget)} className="b-red" style={{flex:1}}><I n="zap" s={13}/>Execute</button>
       </div>
     </Modal>
+
+    {/* ADD CUSTOM FIELD MODAL */}
+    <Modal open={addFieldModal} onClose={()=>{setAddFieldModal(false);setNewFieldLabel('');setNewFieldCategory('details');setNewFieldSensitive(false)}} title="Add Custom Field" w={440}>
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:16,lineHeight:1.6}}>Create a new field to store any data you want in your vault. Custom fields work just like built-in fields — encrypted, shareable, and fully under your control.</p>
+      <div style={{marginBottom:14}}><span className="section-label">FIELD NAME</span>
+        <input value={newFieldLabel} onChange={e=>setNewFieldLabel(e.target.value)} placeholder="e.g. Emergency Contact, Preferred Language..." autoFocus
+          onKeyDown={e=>{if(e.key==='Enter'&&newFieldLabel.trim())handleAddCustomField()}}/></div>
+      <div style={{marginBottom:14}}><span className="section-label">CATEGORY</span>
+        <select value={newFieldCategory} onChange={e=>setNewFieldCategory(e.target.value)} style={{width:'100%'}}>
+          {FIELD_CATEGORIES.map(c=><option key={c} value={c}>{CAT_LABELS[c]}</option>)}
+        </select></div>
+      <div style={{marginBottom:14,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div><span style={{fontSize:12,fontWeight:500}}>Sensitive field</span>
+          <p style={{fontSize:10.5,color:'var(--tx-2)',marginTop:2}}>Sensitive fields are masked in the vault view</p></div>
+        <Toggle on={newFieldSensitive} onChange={()=>setNewFieldSensitive(!newFieldSensitive)}/>
+      </div>
+      <div style={{background:'var(--purple-dim)',border:'1px solid rgba(167,139,250,.15)',borderRadius:'var(--r)',padding:'10px 14px',marginBottom:14}}>
+        <span style={{fontSize:11.5,color:'var(--tx-1)',lineHeight:1.5}}>Custom fields are encrypted with AES-256-GCM, stored in your vault, and can be selectively shared with providers — identical to built-in fields.</span>
+      </div>
+      <button onClick={handleAddCustomField} className="b-pri" disabled={!newFieldLabel.trim()} style={{width:'100%'}}>Create Field</button>
+    </Modal>
   </div>;
 };
 
@@ -3614,7 +3745,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const [metrics, setMetrics] = useState([]);
   const [networkMembers, setNetworkMembers] = useState([]);
   const [activeCase, setActiveCase] = useState(null);
-  const [view, setView] = useState('dashboard'); // dashboard|case|metrics|schema|network|activity|staff|org-settings
+  const [view, setView] = useState('dashboard'); // dashboard|case|metrics|schema|network|activity|staff|org-settings|org-inbox
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState([]);
   const [msgText, setMsgText] = useState('');
@@ -3666,6 +3797,18 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const [myVerification, setMyVerification] = useState(null); // current user's verification status
   const [emailConfigDraft, setEmailConfigDraft] = useState(EmailVerification.defaultConfig());
   const [emailConfigModal, setEmailConfigModal] = useState(false);
+  // ─── Inter-org messaging & opacity ───
+  const [orgOpacity, setOrgOpacity] = useState('translucent'); // transparent|translucent|opaque
+  const [orgMsgAccess, setOrgMsgAccess] = useState({read:['admin','case_manager'],respond:['admin']});
+  const [orgChannels, setOrgChannels] = useState([]); // [{roomId, peerOrg:{name,roomId}, lastMessage, unread}]
+  const [activeChannel, setActiveChannel] = useState(null);
+  const [channelMessages, setChannelMessages] = useState([]);
+  const [orgMsgText, setOrgMsgText] = useState('');
+  const [composeOrgModal, setComposeOrgModal] = useState(false);
+  const [composePeerOrgId, setComposePeerOrgId] = useState('');
+  const [composePeerOrgName, setComposePeerOrgName] = useState('');
+  const [msgAccessModal, setMsgAccessModal] = useState(false);
+  const [msgAccessDraft, setMsgAccessDraft] = useState({read:[],respond:[]});
 
   useEffect(() => { initProvider(); }, []);
 
@@ -3679,11 +3822,12 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     setInitError(null);
     try {
       // Single-pass scan: fetch all Khora state across rooms in one request
-      const scanned = await svc.scanRooms([EVT.ORG_METADATA, EVT.ORG_ROSTER, EVT.PROVIDER_PROFILE]);
+      const scanned = await svc.scanRooms([EVT.ORG_METADATA, EVT.ORG_ROSTER, EVT.PROVIDER_PROFILE, EVT.ORG_OPACITY, EVT.ORG_MSG_ACCESS, EVT.ORG_MSG_CHANNEL]);
       let roster=null, metricsR=null, schema=null, network=null;
       let detectedOrg=null, detectedOrgRole=null;
       const bridgeData = [];
       const detectedClientRecords = [];
+      const detectedOrgChannels = [];
       for (const [rid, state] of Object.entries(scanned)) {
         const id = state[EVT.IDENTITY];
         if (id?.account_type==='provider'&&id.owner===svc.userId) roster=rid;
@@ -3703,6 +3847,11 @@ const ProviderApp = ({session, onLogout, showToast}) => {
             const entry = orgRoster?.staff?.find(s=>s.userId===svc.userId);
             if (entry) { detectedOrg=rid; detectedOrgRole=entry.role; }
           }
+        }
+        // Detect inter-org messaging channels
+        const chanMeta = state[EVT.ORG_MSG_CHANNEL];
+        if (chanMeta && chanMeta.type === 'org_msg_channel') {
+          detectedOrgChannels.push({roomId: rid, ...chanMeta});
         }
         const meta = state[EVT.BRIDGE_META];
         if (meta && meta.provider===svc.userId && meta.status!=='tombstoned') {
@@ -3755,6 +3904,11 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           const myStaff = orgState?.[EVT.ORG_ROSTER]?.staff?.find(s=>s.userId===svc.userId);
           if (myStaff?.email_verification) setMyVerification(myStaff.email_verification);
         } catch(e) { console.warn('Email verify config load:', e.message); }
+        // Load opacity & message access settings
+        if (orgState?.[EVT.ORG_OPACITY]) setOrgOpacity(orgState[EVT.ORG_OPACITY].level || 'translucent');
+        if (orgState?.[EVT.ORG_MSG_ACCESS]) setOrgMsgAccess(orgState[EVT.ORG_MSG_ACCESS]);
+        // Load detected org messaging channels
+        if (detectedOrgChannels.length > 0) setOrgChannels(detectedOrgChannels);
       }
       // Load client records detected during scan
       if (detectedClientRecords.length > 0) {
@@ -4029,6 +4183,8 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           {userId:svc.userId,role:'admin',joined:Date.now()}
         ]}},
         {type:EVT.ROSTER_ASSIGN,state_key:'',content:{}},
+        {type:EVT.ORG_OPACITY,state_key:'',content:{level:'translucent',updated:Date.now(),updated_by:svc.userId}},
+        {type:EVT.ORG_MSG_ACCESS,state_key:'',content:{read:['admin','case_manager'],respond:['admin'],updated:Date.now()}},
       ]);
       await emitOp(org, 'DES', {entity:'organization',designation:setupData.name},
         {type:setupData.type,service_area:setupData.service_area}, orgFrame(org));
@@ -4268,6 +4424,136 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     setProfileModal(true);
   };
 
+  // ─── Inter-org messaging ───
+
+  // Check if current user has permission for an org messaging action
+  const hasOrgMsgPermission = useCallback((action) => {
+    // action: 'read' or 'respond'
+    if (!orgRole) return false;
+    const allowed = orgMsgAccess[action] || [];
+    return allowed.includes(orgRole);
+  }, [orgRole, orgMsgAccess]);
+
+  // Save opacity setting (admin only)
+  const handleSaveOpacity = async (level) => {
+    if (!orgRoom || orgRole !== 'admin') return;
+    try {
+      await svc.setState(orgRoom, EVT.ORG_OPACITY, {level, updated: Date.now(), updated_by: svc.userId});
+      setOrgOpacity(level);
+      await emitOp(orgRoom, 'ALT', {entity:'org_opacity',field:'level'}, {from:orgOpacity,to:level,changed_by:svc.userId}, orgFrame());
+      showToast(`Opacity set to ${OPACITY_LABELS[level]}`,'success');
+    } catch(e) { showToast('Failed to update opacity: '+e.message,'error'); }
+  };
+
+  // Save message access settings (admin only)
+  const handleSaveMsgAccess = async () => {
+    if (!orgRoom || orgRole !== 'admin') return;
+    try {
+      await svc.setState(orgRoom, EVT.ORG_MSG_ACCESS, {...msgAccessDraft, updated: Date.now()});
+      setOrgMsgAccess(msgAccessDraft);
+      await emitOp(orgRoom, 'ALT', {entity:'org_msg_access',field:'roles'}, {read:msgAccessDraft.read,respond:msgAccessDraft.respond}, orgFrame());
+      setMsgAccessModal(false);
+      showToast('Message access roles updated','success');
+    } catch(e) { showToast('Failed to update access: '+e.message,'error'); }
+  };
+
+  // Create org-to-org messaging channel
+  const handleCreateOrgChannel = async () => {
+    if (!orgRoom || !composePeerOrgId.trim()) return;
+    // Check for existing channel
+    const existing = orgChannels.find(c => c.orgs?.includes(composePeerOrgId.trim()));
+    if (existing) {
+      setActiveChannel(existing.roomId);
+      setView('org-inbox');
+      setComposeOrgModal(false);
+      showToast('Channel already exists — opened','info');
+      return;
+    }
+    try {
+      const peerOrgId = composePeerOrgId.trim();
+      const channelRoom = await svc.createRoom(
+        `[Khora Org Msg] ${orgMeta.name||'Org'} ↔ ${composePeerOrgName||peerOrgId.slice(0,12)}`,
+        'Inter-org messaging channel',
+        [
+          {type:EVT.IDENTITY,state_key:'',content:{account_type:'org_msg_channel',created:Date.now()}},
+          {type:EVT.ORG_MSG_CHANNEL,state_key:'',content:{
+            type:'org_msg_channel',
+            orgs:[orgRoom, peerOrgId],
+            org_names:{[orgRoom]:orgMeta.name||'',[peerOrgId]:composePeerOrgName||''},
+            created:Date.now(), created_by:svc.userId,
+          }},
+        ]
+      );
+      // Invite the peer org room members (the channel inherits access from org rooms)
+      try { await svc.invite(channelRoom, peerOrgId); } catch(e) { console.warn('Peer invite:', e.message); }
+      await emitOp(channelRoom, 'INS', {entity:'org_msg_channel',field:'channel'},
+        {from_org:orgRoom,to_org:peerOrgId}, orgFrame());
+      const newChannel = {roomId:channelRoom,orgs:[orgRoom,peerOrgId],
+        org_names:{[orgRoom]:orgMeta.name||'',[peerOrgId]:composePeerOrgName||''},type:'org_msg_channel',created:Date.now()};
+      setOrgChannels(prev=>[...prev,newChannel]);
+      setActiveChannel(channelRoom);
+      setView('org-inbox');
+      setComposeOrgModal(false); setComposePeerOrgId(''); setComposePeerOrgName('');
+      showToast('Messaging channel created','success');
+    } catch(e) { showToast('Failed to create channel: '+e.message,'error'); }
+  };
+
+  // Load messages for an org channel
+  const loadChannelMessages = async (channelRoomId) => {
+    if (!channelRoomId) return;
+    const msgs = await svc.getMessages(channelRoomId);
+    setChannelMessages(msgs);
+  };
+
+  // Send a message in an org channel — applies opacity envelope
+  const handleSendOrgMsg = async () => {
+    if (!orgMsgText.trim() || !activeChannel) return;
+    if (!hasOrgMsgPermission('respond')) { showToast('You do not have permission to send org messages','warn'); return; }
+    try {
+      // Build opacity envelope: what the receiving org sees depends on our opacity setting
+      const envelope = {
+        [`${NS}.type`]: 'org_message',
+        [`${NS}.envelope`]: {
+          opacity: orgOpacity,
+          org_room_id: orgOpacity === 'opaque' ? undefined : orgRoom,
+          org_name: orgOpacity === 'opaque' ? undefined : (orgMeta.name || undefined),
+          sender_id: orgOpacity === 'transparent' ? svc.userId : undefined,
+          sender_name: orgOpacity === 'transparent' ? (providerProfile.display_name || undefined) : undefined,
+          ts: Date.now(),
+        },
+      };
+      await svc.sendMessage(activeChannel, orgMsgText, envelope);
+      await emitOp(activeChannel, 'INS', {type:'org_message',field:'message'},
+        {opacity:orgOpacity,body_length:orgMsgText.length}, orgFrame());
+      setOrgMsgText('');
+      setTimeout(()=>loadChannelMessages(activeChannel),500);
+    } catch(e) { showToast('Send failed: '+e.message,'error'); }
+  };
+
+  // Open a channel
+  const openChannel = (channelRoomId) => {
+    setActiveChannel(channelRoomId);
+    setView('org-inbox');
+    loadChannelMessages(channelRoomId);
+  };
+
+  // Resolve display info for a message based on opacity
+  const resolveMessageSender = useCallback((msg) => {
+    const env = msg.content?.[`${NS}.envelope`];
+    if (!env) return {label: msg.sender === svc.userId ? 'You' : msg.sender, isOwn: msg.sender === svc.userId};
+    const isOwn = msg.sender === svc.userId || env.org_room_id === orgRoom;
+    switch (env.opacity) {
+      case 'transparent':
+        return {label: env.sender_name || env.sender_id || 'Unknown', org: env.org_name, isOwn};
+      case 'translucent':
+        return {label: env.org_name || 'Organization', org: env.org_name, isOwn};
+      case 'opaque':
+        return {label: 'An organization', org: null, isOwn};
+      default:
+        return {label: msg.sender, isOwn};
+    }
+  }, [orgRoom]);
+
   // Determine network role based on org membership
   const networkRole = useMemo(() => {
     if (!networkRoom || !orgRoom) return null;
@@ -4379,9 +4665,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           </div>
           {[
             {id:'org-settings',icon:'settings',label:'Org Settings',reqRole:'admin'},
+            {id:'org-inbox',icon:'msg',label:`Inbox${orgChannels.length?` (${orgChannels.length})`:''}`},
             {id:'staff',icon:'users',label:'Staff'},
             {id:'network',icon:'globe',label:'Network'},
-          ].filter(item=>!item.reqRole||orgRole===item.reqRole).map(item=><div key={item.id} onClick={()=>{setView(item.id);setActiveCase(null)}}
+          ].filter(item=>!item.reqRole||orgRole===item.reqRole).filter(item=>item.id!=='org-inbox'||hasOrgMsgPermission('read')).map(item=><div key={item.id} onClick={()=>{setView(item.id);setActiveCase(null)}}
             style={{padding:'9px 10px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:1,
               background:view===item.id&&!activeCase?'var(--bg-4)':'transparent',
               borderLeft:view===item.id&&!activeCase?'2px solid var(--blue)':'2px solid transparent',
@@ -4582,22 +4869,33 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         </div>
         <div className="card" style={{marginBottom:16}}>
           <span className="section-label">SHARED DATA — CLIENT CONTROLLED</span>
-          {FIELD_CATEGORIES.map(cat=>{const fields=VAULT_FIELDS.filter(f=>f.category===cat&&activeCaseData.sharedData[f.key]);
-            if(!fields.length) return null;
-            return <div key={cat} style={{marginBottom:10}}>
-              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6}}>
-                <span style={{color:`var(--${CAT_COLORS[cat]})`}}><I n={CAT_ICONS[cat]} s={12}/></span>
-                <span style={{fontSize:10.5,fontFamily:'var(--mono)',color:'var(--tx-2)',letterSpacing:'.05em'}}>{CAT_LABELS[cat].toUpperCase()}</span></div>
-              {fields.map(f=><div key={f.key} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border-0)'}}>
-                <span style={{fontSize:12,color:'var(--tx-1)'}}>{f.label}</span>
-                <span style={{fontSize:12.5,fontWeight:500,maxWidth:260,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{activeCaseData.sharedData[f.key]}</span>
-              </div>)}
-            </div>;})}
+          {(()=>{
+            const knownKeys = new Set(VAULT_FIELDS.map(f=>f.key));
+            const customShared = Object.keys(activeCaseData.sharedData).filter(k=>!knownKeys.has(k));
+            return <>
+              {FIELD_CATEGORIES.map(cat=>{const fields=VAULT_FIELDS.filter(f=>f.category===cat&&activeCaseData.sharedData[f.key]);
+                if(!fields.length) return null;
+                return <div key={cat} style={{marginBottom:10}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6}}>
+                    <span style={{color:`var(--${CAT_COLORS[cat]})`}}><I n={CAT_ICONS[cat]} s={12}/></span>
+                    <span style={{fontSize:10.5,fontFamily:'var(--mono)',color:'var(--tx-2)',letterSpacing:'.05em'}}>{CAT_LABELS[cat].toUpperCase()}</span></div>
+                  {fields.map(f=><div key={f.key} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border-0)'}}>
+                    <span style={{fontSize:12,color:'var(--tx-1)'}}>{f.label}</span>
+                    <span style={{fontSize:12.5,fontWeight:500,maxWidth:260,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{activeCaseData.sharedData[f.key]}</span>
+                  </div>)}
+                </div>;})}
+              {customShared.length>0&&<div style={{marginBottom:10}}>
+                <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6}}>
+                  <span style={{color:'var(--purple)'}}><I n="file" s={12}/></span>
+                  <span style={{fontSize:10.5,fontFamily:'var(--mono)',color:'var(--tx-2)',letterSpacing:'.05em'}}>CLIENT CUSTOM FIELDS</span></div>
+                {customShared.map(k=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border-0)'}}>
+                  <span style={{fontSize:12,color:'var(--tx-1)'}}>{k.replace(/^custom_/,'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</span>
+                  <span style={{fontSize:12.5,fontWeight:500,maxWidth:260,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{activeCaseData.sharedData[k]}</span>
+                </div>)}
+              </div>}
+            </>;
+          })()}
           {Object.keys(activeCaseData.sharedData).length===0&&<p style={{color:'var(--tx-3)',fontSize:12,padding:'10px 0'}}>No fields shared yet</p>}
-          <div style={{marginTop:10,padding:'8px 12px',background:'var(--bg-3)',borderRadius:'var(--r)',display:'flex',alignItems:'center',gap:6}}>
-            <I n="eyeOff" s={13} c="var(--tx-3)"/>
-            <span style={{fontSize:10.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{VAULT_FIELDS.length-Object.keys(activeCaseData.sharedData).length} fields exist but not shared</span>
-          </div>
         </div>
         {/* GIVEN/MEANT DIVIDE — Record-level framework interpretations */}
         {provObservations.filter(obs => {
@@ -4718,7 +5016,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       {/* ORG SETTINGS VIEW (admin only) */}
       {view==='org-settings'&&orgRoom&&orgRole==='admin'&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
         <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700,marginBottom:4}}>Organization Settings</h2>
-        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:24}}>Manage your organization metadata and configuration.</p>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:24}}>Manage your organization metadata, privacy, and inter-org messaging configuration.</p>
         <div className="card" style={{marginBottom:16}}>
           <span className="section-label">ORGANIZATION DETAILS</span>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginTop:8}}>
@@ -4729,10 +5027,120 @@ const ProviderApp = ({session, onLogout, showToast}) => {
               <span style={{fontSize:13,fontWeight:500,display:'block'}}>{s.v}</span></div>)}
           </div>
         </div>
+
+        {/* OPACITY SETTINGS */}
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+            <I n="eyeOff" s={16} c="var(--purple)"/>
+            <span className="section-label" style={{marginBottom:0}}>ORGANIZATION OPACITY</span>
+            <span className={`tag ${orgOpacity==='opaque'?'tag-red':orgOpacity==='translucent'?'tag-gold':'tag-green'}`} style={{fontSize:9}}>{OPACITY_LABELS[orgOpacity]?.toUpperCase()}</span>
+          </div>
+          <p style={{fontSize:11.5,color:'var(--tx-2)',marginBottom:14,lineHeight:1.6}}>
+            Controls how much of your organization's identity is revealed when communicating with other organizations. This affects all outgoing inter-org messages.
+          </p>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {OPACITY_LEVELS.map(level => <div key={level} onClick={()=>handleSaveOpacity(level)}
+              style={{padding:'14px 16px',borderRadius:'var(--r-lg)',cursor:'pointer',
+                border:`2px solid ${orgOpacity===level?'var(--gold)':'var(--border-1)'}`,
+                background:orgOpacity===level?'var(--gold-dim)':'var(--bg-3)',transition:'all .18s'}}
+              onMouseEnter={e=>{if(orgOpacity!==level)e.currentTarget.style.borderColor='var(--border-2)'}}
+              onMouseLeave={e=>{if(orgOpacity!==level)e.currentTarget.style.borderColor='var(--border-1)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                <span style={{width:10,height:10,borderRadius:'50%',border:`2px solid ${orgOpacity===level?'var(--gold)':'var(--tx-3)'}`,
+                  background:orgOpacity===level?'var(--gold)':'transparent',flexShrink:0}}/>
+                <span style={{fontSize:14,fontWeight:700,color:orgOpacity===level?'var(--gold)':'var(--tx-0)'}}>{OPACITY_LABELS[level]}</span>
+                {level==='opaque'&&<span className="tag tag-red" style={{fontSize:8}}>MAX PRIVACY</span>}
+                {level==='translucent'&&<span className="tag tag-gold" style={{fontSize:8}}>RECOMMENDED</span>}
+                {level==='transparent'&&<span className="tag tag-green" style={{fontSize:8}}>OPEN</span>}
+              </div>
+              <p style={{fontSize:11.5,color:'var(--tx-2)',lineHeight:1.5,marginLeft:18}}>{OPACITY_DESCRIPTIONS[level]}</p>
+              {/* Preview of what external org sees */}
+              <div style={{marginTop:8,marginLeft:18,padding:'8px 12px',background:'var(--bg-1)',borderRadius:'var(--r)',border:'1px solid var(--border-0)'}}>
+                <span style={{fontSize:9,fontFamily:'var(--mono)',color:'var(--tx-3)',display:'block',marginBottom:4}}>EXTERNAL ORG SEES:</span>
+                <span style={{fontSize:11,color:'var(--tx-1)'}}>
+                  {level==='transparent'?`"${providerProfile.display_name||'Jamie R.'} from ${orgMeta.name||'Your Org'}"`
+                  :level==='translucent'?`"${orgMeta.name||'Your Org'}"`
+                  :'"An organization"'}
+                </span>
+              </div>
+            </div>)}
+          </div>
+        </div>
+
+        {/* MESSAGE ACCESS CONTROLS */}
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <I n="lock" s={16} c="var(--blue)"/>
+              <span className="section-label" style={{marginBottom:0}}>INTER-ORG MESSAGE ACCESS</span>
+            </div>
+            <button onClick={()=>{setMsgAccessDraft({...orgMsgAccess});setMsgAccessModal(true)}} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:4}}><I n="settings" s={11}/>Configure</button>
+          </div>
+          <p style={{fontSize:11.5,color:'var(--tx-2)',marginBottom:12,lineHeight:1.6}}>
+            Control which staff roles can read and respond to messages sent to your organization from other organizations.
+          </p>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+            <div style={{padding:'10px 14px',background:'var(--bg-3)',borderRadius:'var(--r)'}}>
+              <span style={{fontSize:10,fontFamily:'var(--mono)',color:'var(--tx-3)',display:'block',marginBottom:6}}>CAN READ</span>
+              <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                {orgMsgAccess.read?.map(r=><span key={r} className="tag tag-blue" style={{fontSize:9}}>{ORG_ROLE_LABELS[r]||r}</span>)}
+                {(!orgMsgAccess.read||orgMsgAccess.read.length===0)&&<span style={{fontSize:10,color:'var(--tx-3)',fontStyle:'italic'}}>No roles assigned</span>}
+              </div>
+            </div>
+            <div style={{padding:'10px 14px',background:'var(--bg-3)',borderRadius:'var(--r)'}}>
+              <span style={{fontSize:10,fontFamily:'var(--mono)',color:'var(--tx-3)',display:'block',marginBottom:6}}>CAN RESPOND</span>
+              <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                {orgMsgAccess.respond?.map(r=><span key={r} className="tag tag-gold" style={{fontSize:9}}>{ORG_ROLE_LABELS[r]||r}</span>)}
+                {(!orgMsgAccess.respond||orgMsgAccess.respond.length===0)&&<span style={{fontSize:10,color:'var(--tx-3)',fontStyle:'italic'}}>No roles assigned</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ORG MESSAGING CHANNELS */}
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <I n="msg" s={16} c="var(--teal)"/>
+              <span className="section-label" style={{marginBottom:0}}>MESSAGING CHANNELS ({orgChannels.length})</span>
+            </div>
+            <button onClick={()=>setComposeOrgModal(true)} className="b-pri b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="plus" s={12}/>New Channel</button>
+          </div>
+          <p style={{fontSize:11.5,color:'var(--tx-2)',marginBottom:10,lineHeight:1.6}}>
+            Secure encrypted channels for org-to-org communication. Messages are governed by your opacity setting.
+          </p>
+          {orgChannels.length===0?<div style={{textAlign:'center',padding:'20px 0'}}>
+            <I n="msg" s={24}/>
+            <p style={{color:'var(--tx-3)',fontSize:11,marginTop:6}}>No messaging channels yet. Create one to start communicating with another organization.</p>
+          </div>
+          :<div style={{display:'flex',flexDirection:'column',gap:4}}>
+            {orgChannels.map(ch=>{
+              const peerOrgId = ch.orgs?.find(o=>o!==orgRoom);
+              const peerName = ch.org_names?.[peerOrgId]||peerOrgId?.slice(0,20)||'Unknown Org';
+              return <div key={ch.roomId} onClick={()=>openChannel(ch.roomId)}
+                className="card-h" style={{padding:'10px 14px'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <div style={{width:28,height:28,borderRadius:'50%',background:'var(--teal-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--teal)'}}><I n="msg" s={14}/></div>
+                    <div>
+                      <span style={{fontSize:12.5,fontWeight:600,display:'block'}}>{peerName}</span>
+                      <span style={{fontSize:9.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{ch.roomId?.slice(0,20)}…</span>
+                    </div>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <span className={`tag ${orgOpacity==='opaque'?'tag-red':orgOpacity==='translucent'?'tag-gold':'tag-green'}`} style={{fontSize:8}}>{OPACITY_LABELS[orgOpacity]}</span>
+                    <I n="chevR" s={13} c="var(--tx-3)"/>
+                  </div>
+                </div>
+              </div>;
+            })}
+          </div>}
+        </div>
+
         <div className="card" style={{marginBottom:16}}>
           <span className="section-label">ORG ROOM ID</span>
           <div style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--tx-1)',background:'var(--bg-3)',padding:'8px 12px',borderRadius:'var(--r)',wordBreak:'break-all',marginTop:4}}>{orgRoom}</div>
-          <p style={{fontSize:11,color:'var(--tx-2)',marginTop:8}}>Share this room ID with providers who want to join your organization.</p>
+          <p style={{fontSize:11,color:'var(--tx-2)',marginTop:8}}>Share this room ID with providers who want to join your organization, or with other orgs to open a messaging channel.</p>
         </div>
 
         {/* EMAIL VERIFICATION CONFIGURATION */}
@@ -4954,6 +5362,131 @@ const ProviderApp = ({session, onLogout, showToast}) => {
             <strong style={{color:'var(--green)'}}>Polycentric governance:</strong> Shared prompts propagate Network → Org → Provider → Client. Observations vary locally; interpretations feeding into shared metrics use network-level definitions for consistency.
           </div>
         </div>}
+      </div>}
+
+      {/* ORG INBOX — Inter-org messaging view */}
+      {view==='org-inbox'&&orgRoom&&<div className="anim-up" style={{maxWidth:860,margin:'0 auto'}}>
+        {!activeChannel ? <>
+          {/* Channel list */}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:24}}>
+            <div>
+              <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Organization Inbox</h2>
+              <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>
+                Encrypted org-to-org messaging. Your opacity is set to <strong style={{color:orgOpacity==='opaque'?'var(--red)':orgOpacity==='translucent'?'var(--gold)':'var(--green)'}}>{OPACITY_LABELS[orgOpacity]}</strong>.
+                {orgRole==='admin'&&<span style={{color:'var(--tx-3)'}}> — change in Org Settings</span>}
+              </p>
+            </div>
+            <button onClick={()=>setComposeOrgModal(true)} className="b-pri" style={{display:'flex',alignItems:'center',gap:6}}><I n="plus" s={14}/>New Channel</button>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10,marginBottom:20}}>
+            {[{l:'Channels',v:orgChannels.length,c:'teal',i:'msg'},
+              {l:'Opacity',v:OPACITY_LABELS[orgOpacity],c:orgOpacity==='opaque'?'red':orgOpacity==='translucent'?'gold':'green',i:'eyeOff'},
+              {l:'Your Role',v:ORG_ROLE_LABELS[orgRole]||orgRole,c:'blue',i:'user'},
+            ].map((s,i)=><div key={i} className="card" style={{padding:14}}><span className="section-label">{s.l.toUpperCase()}</span>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:2}}>
+                <span style={{fontSize:16,fontWeight:700}}>{s.v}</span>
+                <span style={{color:`var(--${s.c})`,opacity:.5}}><I n={s.i} s={15}/></span></div></div>)}
+          </div>
+          {orgChannels.length===0?
+            <div className="card" style={{textAlign:'center',padding:'40px 20px',borderStyle:'dashed'}}>
+              <I n="msg" s={32}/>
+              <p style={{color:'var(--tx-2)',marginTop:10,fontSize:13}}>No messaging channels</p>
+              <p style={{color:'var(--tx-3)',fontSize:11.5,marginTop:4}}>Create a channel to start communicating with another organization.</p>
+              <button onClick={()=>setComposeOrgModal(true)} className="b-pri" style={{marginTop:14}}><I n="plus" s={14}/>New Channel</button>
+            </div>
+          :<div className="card" style={{padding:0,overflow:'hidden'}}>
+            <div style={{padding:'10px 16px',background:'var(--bg-3)',borderBottom:'1px solid var(--border-1)',display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:0}}>
+              {['ORGANIZATION','OPACITY','ACTIONS'].map(h=>
+                <span key={h} style={{fontSize:10,fontFamily:'var(--mono)',color:'var(--tx-2)',letterSpacing:'.07em',fontWeight:600}}>{h}</span>)}
+            </div>
+            {orgChannels.map((ch,i)=>{
+              const peerOrgId = ch.orgs?.find(o=>o!==orgRoom);
+              const peerName = ch.org_names?.[peerOrgId]||peerOrgId?.slice(0,20)||'Unknown Org';
+              return <div key={ch.roomId} style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:0,padding:'12px 16px',
+                borderBottom:i<orgChannels.length-1?'1px solid var(--border-0)':'none',alignItems:'center',transition:'background .15s'}}
+                onMouseEnter={e=>e.currentTarget.style.background='var(--bg-3)'}
+                onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <div style={{width:28,height:28,borderRadius:'50%',background:'var(--teal-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--teal)'}}><I n="msg" s={14}/></div>
+                  <div>
+                    <span style={{fontSize:13,fontWeight:600,display:'block'}}>{peerName}</span>
+                    <span style={{fontSize:9.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{ch.roomId?.slice(0,20)}…</span>
+                  </div>
+                </div>
+                <span className={`tag ${orgOpacity==='opaque'?'tag-red':orgOpacity==='translucent'?'tag-gold':'tag-green'}`} style={{fontSize:9,justifySelf:'start'}}>{OPACITY_LABELS[orgOpacity]}</span>
+                <button onClick={()=>openChannel(ch.roomId)} className="b-gho b-sm" style={{justifySelf:'start',display:'flex',alignItems:'center',gap:4}}>
+                  <I n="msg" s={12}/>Open
+                </button>
+              </div>;
+            })}
+          </div>}
+          <div style={{background:'var(--purple-dim)',border:'1px solid rgba(167,139,250,.15)',borderRadius:'var(--r)',padding:'14px 18px',marginTop:20,display:'flex',gap:10,alignItems:'flex-start'}}>
+            <I n="eyeOff" s={16} c="var(--purple)"/>
+            <span style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.6}}>
+              <strong style={{color:'var(--purple)'}}>Opacity governs outgoing messages.</strong> When your org responds, the receiving org will see your identity according to your opacity setting ({OPACITY_LABELS[orgOpacity]}). Incoming messages are displayed according to the <em>sending</em> org's opacity setting — you cannot force another org to reveal more than they choose to.
+            </span>
+          </div>
+        </>
+        : <>
+          {/* Active channel — message thread */}
+          <button onClick={()=>{setActiveChannel(null);setChannelMessages([])}} className="b-gho b-sm" style={{marginBottom:14,display:'flex',alignItems:'center',gap:4}}><I n="back" s={13}/>All Channels</button>
+          {(() => {
+            const ch = orgChannels.find(c=>c.roomId===activeChannel);
+            const peerOrgId = ch?.orgs?.find(o=>o!==orgRoom);
+            const peerName = ch?.org_names?.[peerOrgId]||peerOrgId?.slice(0,20)||'Unknown Org';
+            return <>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+                <div>
+                  <h2 style={{fontFamily:'var(--serif)',fontSize:20,fontWeight:700}}>{peerName}</h2>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
+                    <span className="tag tag-teal"><I n="lock" s={9}/>E2EE</span>
+                    <span className={`tag ${orgOpacity==='opaque'?'tag-red':orgOpacity==='translucent'?'tag-gold':'tag-green'}`} style={{fontSize:9}}>OUTGOING: {OPACITY_LABELS[orgOpacity]?.toUpperCase()}</span>
+                    <span style={{fontFamily:'var(--mono)',fontSize:9.5,color:'var(--tx-3)'}}>org-to-org channel</span>
+                  </div>
+                </div>
+                <button onClick={()=>loadChannelMessages(activeChannel)} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:4}}><I n="refresh-cw" s={11}/>Refresh</button>
+              </div>
+              <div className="card" style={{marginBottom:16}}>
+                <span className="section-label">MESSAGES</span>
+                <div style={{maxHeight:400,overflow:'auto',marginBottom:12}}>
+                  {channelMessages.length===0?
+                    <p style={{color:'var(--tx-3)',fontSize:12,padding:'20px 0',textAlign:'center'}}>No messages yet. Start the conversation.</p>
+                  :channelMessages.map((msg,i)=>{
+                    const sender = resolveMessageSender(msg);
+                    return <div key={msg.id||i} style={{padding:'10px 0',borderBottom:'1px solid var(--border-0)'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6}}>
+                          <span style={{fontFamily:'var(--mono)',fontSize:10.5,fontWeight:600,
+                            color:sender.isOwn?'var(--gold)':'var(--teal)'}}>
+                            {sender.isOwn?'You'+(sender.org?` (${sender.org})`:''):sender.label}
+                          </span>
+                          {msg.content?.[`${NS}.envelope`]&&<span className={`tag ${
+                            msg.content[`${NS}.envelope`].opacity==='opaque'?'tag-red':
+                            msg.content[`${NS}.envelope`].opacity==='translucent'?'tag-gold':'tag-green'
+                          }`} style={{fontSize:7.5}}>
+                            {msg.content[`${NS}.envelope`].opacity?.toUpperCase()}
+                          </span>}
+                        </div>
+                        <span style={{fontFamily:'var(--mono)',fontSize:9,color:'var(--tx-3)'}}>{msg.ts?new Date(msg.ts).toLocaleString():''}</span>
+                      </div>
+                      <p style={{fontSize:12.5,color:'var(--tx-1)',lineHeight:1.5}}>{msg.content?.body}</p>
+                    </div>;
+                  })}
+                </div>
+                {hasOrgMsgPermission('respond')?<div style={{display:'flex',gap:6}}>
+                  <input value={orgMsgText} onChange={e=>setOrgMsgText(e.target.value)}
+                    placeholder={`Message as ${orgOpacity==='transparent'?(providerProfile.display_name||'you'):orgOpacity==='translucent'?(orgMeta.name||'your org'):'anonymous org'}... (E2EE)`}
+                    onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)handleSendOrgMsg()}} style={{flex:1}}/>
+                  <button onClick={handleSendOrgMsg} className="b-pri" style={{display:'flex',alignItems:'center',gap:4}}><I n="send" s={13}/>Send</button>
+                </div>
+                :<div style={{padding:'10px 14px',background:'var(--gold-dim)',borderRadius:'var(--r)',display:'flex',alignItems:'center',gap:8}}>
+                  <I n="lock" s={13} c="var(--gold)"/>
+                  <span style={{fontSize:11.5,color:'var(--gold)'}}>Your role ({ORG_ROLE_LABELS[orgRole]||orgRole}) does not have permission to respond to org messages. Contact your admin.</span>
+                </div>}
+              </div>
+            </>;
+          })()}
+        </>}
       </div>}
 
       {/* ACTIVITY */}
@@ -5337,6 +5870,93 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         </div>
       </>}
     </Modal>
+    {/* COMPOSE ORG MESSAGE CHANNEL MODAL */}
+    <Modal open={composeOrgModal} onClose={()=>setComposeOrgModal(false)} title="New Org Messaging Channel" w={520}>
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>
+        Create an encrypted messaging channel with another organization. Messages you send will be governed by your opacity setting (<strong style={{color:orgOpacity==='opaque'?'var(--red)':orgOpacity==='translucent'?'var(--gold)':'var(--green)'}}>{OPACITY_LABELS[orgOpacity]}</strong>).
+      </p>
+      <div style={{marginBottom:14}}>
+        <span className="section-label">PEER ORGANIZATION ROOM ID</span>
+        <input value={composePeerOrgId} onChange={e=>setComposePeerOrgId(e.target.value)} placeholder="!orgroom:matrix.org"/>
+        <span style={{fontSize:10,color:'var(--tx-3)',display:'block',marginTop:4}}>The Matrix room ID of the organization you want to message.</span>
+      </div>
+      <div style={{marginBottom:14}}>
+        <span className="section-label">ORGANIZATION NAME (OPTIONAL)</span>
+        <input value={composePeerOrgName} onChange={e=>setComposePeerOrgName(e.target.value)} placeholder="e.g. Metro Housing Authority"/>
+        <span style={{fontSize:10,color:'var(--tx-3)',display:'block',marginTop:4}}>A display name for the other org. Helps identify the channel.</span>
+      </div>
+      {/* Opacity preview */}
+      <div style={{background:'var(--bg-3)',borderRadius:'var(--r)',padding:'12px 14px',marginBottom:14}}>
+        <span style={{fontSize:10,fontFamily:'var(--mono)',color:'var(--tx-3)',display:'block',marginBottom:6}}>OPACITY PREVIEW — THEY WILL SEE:</span>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span className={`tag ${orgOpacity==='opaque'?'tag-red':orgOpacity==='translucent'?'tag-gold':'tag-green'}`} style={{fontSize:9}}>{OPACITY_LABELS[orgOpacity]?.toUpperCase()}</span>
+          <span style={{fontSize:12,color:'var(--tx-1)'}}>
+            {orgOpacity==='transparent'?`${providerProfile.display_name||'Staff Name'} from ${orgMeta.name||'Your Org'}`
+            :orgOpacity==='translucent'?orgMeta.name||'Your Org'
+            :'An organization'}
+          </span>
+        </div>
+      </div>
+      <div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'10px 14px',marginBottom:16,fontSize:11.5,color:'var(--tx-1)',lineHeight:1.6}}>
+        Both organizations maintain independent opacity settings. You control what they see about you; they control what you see about them.
+      </div>
+      <button onClick={handleCreateOrgChannel} className="b-pri" disabled={!composePeerOrgId.trim()} style={{width:'100%',padding:12,fontSize:14}}>
+        <I n="msg" s={16}/> Create Channel
+      </button>
+    </Modal>
+
+    {/* MESSAGE ACCESS CONFIGURATION MODAL */}
+    <Modal open={msgAccessModal} onClose={()=>setMsgAccessModal(false)} title="Configure Message Access" w={560}>
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:16,lineHeight:1.6}}>
+        Control which staff roles in your organization can read and respond to inter-org messages. Only roles listed under "Respond" can send messages on behalf of your organization.
+      </p>
+      <div style={{marginBottom:16}}>
+        <span className="section-label">CAN READ ORG MESSAGES</span>
+        <p style={{fontSize:10.5,color:'var(--tx-3)',marginBottom:8}}>Select roles that can view messages sent to your organization.</p>
+        <div style={{display:'flex',flexDirection:'column',gap:4}}>
+          {ORG_ROLES.map(role=><div key={role} onClick={()=>{
+            setMsgAccessDraft(prev=>({...prev,read:prev.read.includes(role)?prev.read.filter(r=>r!==role):[...prev.read,role]}));
+          }} style={{padding:'10px 14px',borderRadius:'var(--r)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',
+            border:`1px solid ${msgAccessDraft.read?.includes(role)?'var(--blue)':'var(--border-1)'}`,
+            background:msgAccessDraft.read?.includes(role)?'var(--blue-dim)':'var(--bg-3)',transition:'all .15s'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{width:14,height:14,borderRadius:3,border:`2px solid ${msgAccessDraft.read?.includes(role)?'var(--blue)':'var(--tx-3)'}`,
+                background:msgAccessDraft.read?.includes(role)?'var(--blue)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:9,fontWeight:800}}>
+                {msgAccessDraft.read?.includes(role)?'✓':''}
+              </span>
+              <span style={{fontSize:12.5,fontWeight:msgAccessDraft.read?.includes(role)?600:400}}>{ORG_ROLE_LABELS[role]}</span>
+            </div>
+            <span className="tag tag-blue" style={{fontSize:8}}>READ</span>
+          </div>)}
+        </div>
+      </div>
+      <div style={{marginBottom:16}}>
+        <span className="section-label">CAN RESPOND TO ORG MESSAGES</span>
+        <p style={{fontSize:10.5,color:'var(--tx-3)',marginBottom:8}}>Select roles that can send messages on behalf of your organization. These roles can also read.</p>
+        <div style={{display:'flex',flexDirection:'column',gap:4}}>
+          {ORG_ROLES.map(role=><div key={role} onClick={()=>{
+            setMsgAccessDraft(prev=>({...prev,respond:prev.respond.includes(role)?prev.respond.filter(r=>r!==role):[...prev.respond,role]}));
+          }} style={{padding:'10px 14px',borderRadius:'var(--r)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',
+            border:`1px solid ${msgAccessDraft.respond?.includes(role)?'var(--gold)':'var(--border-1)'}`,
+            background:msgAccessDraft.respond?.includes(role)?'var(--gold-dim)':'var(--bg-3)',transition:'all .15s'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{width:14,height:14,borderRadius:3,border:`2px solid ${msgAccessDraft.respond?.includes(role)?'var(--gold)':'var(--tx-3)'}`,
+                background:msgAccessDraft.respond?.includes(role)?'var(--gold)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--bg-0)',fontSize:9,fontWeight:800}}>
+                {msgAccessDraft.respond?.includes(role)?'✓':''}
+              </span>
+              <span style={{fontSize:12.5,fontWeight:msgAccessDraft.respond?.includes(role)?600:400}}>{ORG_ROLE_LABELS[role]}</span>
+            </div>
+            <span className="tag tag-gold" style={{fontSize:8}}>RESPOND</span>
+          </div>)}
+        </div>
+      </div>
+      <div style={{background:'var(--purple-dim)',border:'1px solid rgba(167,139,250,.15)',borderRadius:'var(--r)',padding:'10px 14px',marginBottom:16,fontSize:11.5,color:'var(--tx-1)',lineHeight:1.6}}>
+        <strong style={{color:'var(--purple)'}}>Opacity + Access = Privacy.</strong> Opacity controls <em>what</em> external orgs see. Access controls <em>who inside your org</em> can participate. Together, they form your org's communication privacy posture.
+      </div>
+      <button onClick={handleSaveMsgAccess} className="b-pri" style={{width:'100%',padding:12,fontSize:14}}>
+        <I n="check" s={16}/> Save Access Settings
+      </button>
+    </Modal>
   </div>;
 };
 
@@ -5349,8 +5969,28 @@ const App = () => {
   const [accountType, setAccountType] = useState(null);
   const [toast, setToast] = useState(null);
   const [webhookData, setWebhookData] = useState(null);
+  const [restoring, setRestoring] = useState(true);
 
   const showToast = (msg, type='info') => setToast({msg, type, k:Date.now()});
+
+  // Attempt to restore previous session from sessionStorage on mount
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const restored = await svc.restoreSession();
+        if (restored) {
+          setSession(restored);
+          const savedType = sessionStorage.getItem('khora_account_type');
+          if (savedType) setAccountType(savedType);
+          // Hydrate webhook data in background
+          try {
+            const tables = await hydrateFromWebhooks(svc._token);
+            setWebhookData(tables);
+          } catch (e) { console.warn('Webhook hydration failed:', e.message); }
+        }
+      } catch {} finally { setRestoring(false); }
+    })();
+  }, []);
 
   const handleLogin = async (s) => {
     setSession(s);
@@ -5363,11 +6003,22 @@ const App = () => {
     }
   };
 
+  const handleSelectAccountType = (t) => {
+    setAccountType(t);
+    try { sessionStorage.setItem('khora_account_type', t); } catch {}
+  };
+
+  if (restoring) return <div className="grid-bg" style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <div style={{textAlign:'center'}}><Spin s={32}/><p style={{color:'var(--tx-2)',fontSize:13,marginTop:16}}>Restoring session…</p></div>
+  </div>;
   if (!welcomed && !session) return <WelcomeScreen onContinue={() => setWelcomed(true)}/>;
   if (!session) return <LoginScreen onLogin={handleLogin}/>;
-  if (!accountType) return <AccountTypeScreen onSelect={t => setAccountType(t)}/>;
+  if (!accountType) return <AccountTypeScreen onSelect={handleSelectAccountType}/>;
 
-  const handleLogout = async () => { await svc.logout(); setSession(null); setAccountType(null); setWebhookData(null); };
+  const handleLogout = async () => {
+    try { sessionStorage.removeItem('khora_session'); sessionStorage.removeItem('khora_account_type'); } catch {}
+    await svc.logout(); setSession(null); setAccountType(null); setWebhookData(null);
+  };
 
   return <>
     {accountType === 'client' ?
