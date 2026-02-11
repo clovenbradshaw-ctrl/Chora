@@ -25,6 +25,29 @@
   --serif:'Source Serif 4',Georgia,serif;--sans:'Manrope',system-ui,sans-serif;--mono:'IBM Plex Mono',monospace;
   --r:5px;--r-lg:8px;
 }
+/* ═══ Light theme — WCAG AA accessible (4.5:1+ text contrast) ═══ */
+html.light {
+  --bg-0:#f5f5f7;--bg-1:#ebedf0;--bg-2:#e0e2e7;--bg-3:#d4d7dd;--bg-4:#c8ccd4;
+  --border-0:#cdd0d7;--border-1:#b8bcc6;--border-2:#a0a5b2;
+  --tx-0:#1a1c20;--tx-1:#3d4250;--tx-2:#5a6073;--tx-3:#7e8498;
+  --gold:#8a6d1e;--gold-dim:rgba(138,109,30,0.10);--gold-mid:rgba(138,109,30,0.18);
+  --green:#177a4a;--green-dim:rgba(23,122,74,0.10);
+  --red:#c03030;--red-dim:rgba(192,48,48,0.10);
+  --blue:#2563b0;--blue-dim:rgba(37,99,176,0.10);
+  --teal:#137a6a;--teal-dim:rgba(19,122,106,0.10);
+  --orange:#a0600a;--orange-dim:rgba(160,96,10,0.10);
+  --purple:#6938c0;--purple-dim:rgba(105,56,192,0.10);
+}
+html.light .b-pri:hover{box-shadow:0 4px 16px rgba(138,109,30,0.18)}
+html.light .b-red{border-color:rgba(192,48,48,.22)}
+html.light .b-grn{border-color:rgba(23,122,74,.22)}
+html.light .toggle-knob{box-shadow:0 1px 3px rgba(0,0,0,.15);border:1px solid var(--border-1)}
+html.light ::-webkit-scrollbar-thumb{background:var(--border-2)}
+html.light .grid-bg{background-image:radial-gradient(circle at 20% 20%,rgba(138,109,30,.05) 0%,transparent 50%),radial-gradient(circle at 80% 80%,rgba(37,99,176,.04) 0%,transparent 50%),linear-gradient(var(--border-0) 1px,transparent 1px),linear-gradient(90deg,var(--border-0) 1px,transparent 1px);}
+html.light .gm-crossing{background:linear-gradient(135deg,rgba(19,122,106,.10) 0%,rgba(138,109,30,.10) 100%);border-left-color:rgba(19,122,106,.25);border-right-color:rgba(138,109,30,.25)}
+html.light .gm-crossing::before{background:repeating-linear-gradient(180deg,transparent,transparent 8px,rgba(138,109,30,.06) 8px,rgba(138,109,30,.06) 16px)}
+html.light .gm-divergence{background:rgba(138,109,30,.08)}
+html.light .gm-obs-field{background:var(--teal-dim);border-color:rgba(19,122,106,.20)}
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body,#root{height:100%;background:var(--bg-0);color:var(--tx-0);font-family:var(--sans);}
 ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border-1);border-radius:3px;}
@@ -38,7 +61,7 @@ input,textarea,select{font-family:var(--sans);background:var(--bg-1);border:1px 
 input:focus,textarea:focus,select:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-dim)}
 input::placeholder,textarea::placeholder{color:var(--tx-3)}textarea{resize:vertical;min-height:72px;line-height:1.55}
 button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r);font-size:12.5px;font-weight:600;padding:8px 16px;transition:all .18s;letter-spacing:.01em;}
-.b-pri{background:var(--gold);color:var(--bg-0)}.b-pri:hover{background:#d4af5e;transform:translateY(-1px);box-shadow:0 4px 16px var(--gold-dim)}.b-pri:disabled{opacity:.5;transform:none;cursor:default}
+.b-pri{background:var(--gold);color:var(--bg-0)}.b-pri:hover{filter:brightness(1.12);transform:translateY(-1px);box-shadow:0 4px 16px var(--gold-dim)}.b-pri:disabled{opacity:.5;transform:none;cursor:default;filter:none}
 .b-gho{background:transparent;color:var(--tx-1);border:1px solid var(--border-1)}.b-gho:hover{background:var(--bg-3);color:var(--tx-0);border-color:var(--border-2)}
 .b-red{background:var(--red-dim);color:var(--red);border:1px solid rgba(232,93,93,.18)}.b-red:hover{background:rgba(232,93,93,.18)}
 .b-grn{background:var(--green-dim);color:var(--green);border:1px solid rgba(61,214,140,.18)}
@@ -157,8 +180,62 @@ clipboard:<svg {...p}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 
 link:<svg {...p}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
 copy:<svg {...p}><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
 userPlus:<svg {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>,
+sun:<svg {...p}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
+moon:<svg {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+'alert-triangle':<svg {...p}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+'refresh-cw':<svg {...p}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
 };
 return <span style={{display:'inline-flex',alignItems:'center',flexShrink:0}}>{d[n]}</span>;
+};
+
+/* ═══════════════════ THEME SYSTEM ═══════════════════ */
+const getInitialTheme = () => {
+  const stored = localStorage.getItem('khora-theme');
+  if (stored === 'light' || stored === 'dark') return stored;
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+};
+
+// Apply theme immediately to avoid flash
+(() => {
+  const t = getInitialTheme();
+  if (t === 'light') document.documentElement.classList.add('light');
+})();
+
+const ThemeContext = React.createContext({theme:'dark', toggle:()=>{}});
+
+const ThemeProvider = ({children}) => {
+  const [theme, setTheme] = useState(getInitialTheme);
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light');
+    localStorage.setItem('khora-theme', theme);
+  }, [theme]);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const handler = (e) => {
+      if (!localStorage.getItem('khora-theme')) setTheme(e.matches ? 'light' : 'dark');
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  const toggle = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
+  return <ThemeContext.Provider value={{theme, toggle}}>{children}</ThemeContext.Provider>;
+};
+
+const useTheme = () => React.useContext(ThemeContext);
+
+const ThemeToggle = ({style:sx}) => {
+  const {theme, toggle} = useTheme();
+  const isDark = theme === 'dark';
+  return <button onClick={toggle} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+    title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+    style={{background:'var(--bg-3)',border:'1px solid var(--border-1)',borderRadius:'var(--r)',
+      padding:'6px 8px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:6,
+      color:'var(--tx-1)',fontSize:11,fontFamily:'var(--sans)',fontWeight:500,
+      transition:'all .18s',...sx}}
+    onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--gold)';e.currentTarget.style.color='var(--tx-0)'}}
+    onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border-1)';e.currentTarget.style.color='var(--tx-1)'}}>
+    <I n={isDark?'moon':'sun'} s={14}/>{isDark?'Dark':'Light'}
+  </button>;
 };
 
 /* ═══════════════════ PER-FIELD CRYPTO (AES-256-GCM) ═══════════════════ */
@@ -1574,7 +1651,7 @@ const RecordGivenMeant = ({promptKey, value, reporter, timestamp}) => {
 };
 
 /* ═══════════════════ SCHEMA WORKBENCH ═══════════════════ */
-const SWC = {
+const SWC_DARK = {
   bg: "#07090d", surface: "#0e1218", raised: "#151b23", hover: "#1b2330",
   border: "#1d2735", borderLit: "#2c3d52", text: "#adb8c4", muted: "#586a7c",
   dim: "#2d3c4d", white: "#e3e9ef",
@@ -1585,6 +1662,20 @@ const SWC = {
   fwBorder: i => `${["#60a5fa","#f0abfc","#fbbf24","#34d399","#fb7185"][i%5]}40`,
   sup: "#fbbf24", supBg: "rgba(251,191,36,0.06)", red: "#f87171",
 };
+const SWC_LIGHT = {
+  bg: "#f5f5f7", surface: "#ebedf0", raised: "#e0e2e7", hover: "#d4d7dd",
+  border: "#b8bcc6", borderLit: "#a0a5b2", text: "#3d4250", muted: "#5a6073",
+  dim: "#c8ccd4", white: "#1a1c20",
+  given: "#137a6a", givenBorder: "#0a5c4d",
+  meant: "#6938c0", meantBorder: "#4a2d8a",
+  fw: ["#2563b0","#9333b0","#8a6d1e","#177a4a","#c03050"],
+  fwBg: i => `${["#2563b0","#9333b0","#8a6d1e","#177a4a","#c03050"][i%5]}14`,
+  fwBorder: i => `${["#2563b0","#9333b0","#8a6d1e","#177a4a","#c03050"][i%5]}40`,
+  sup: "#8a6d1e", supBg: "rgba(138,109,30,0.08)", red: "#c03030",
+};
+const useSWC = () => { const {theme} = useTheme(); return theme === 'light' ? SWC_LIGHT : SWC_DARK; };
+/* Legacy alias — components that haven't migrated yet still read SWC */
+let SWC = SWC_DARK;
 
 let _swId = 100;
 const swUid = () => `id_${_swId++}`;
@@ -1685,6 +1776,7 @@ function SwMRow({opt,frameworks,getBindingCode,setBind,clearBind,hasConflict,isL
 }
 
 const SchemaWorkbench = ({isOrg = false}) => {
+  SWC = useSWC();
   const [screen, setScreen] = useState("start");
   const [prompts, setPrompts] = useState([]);
   const [frameworks, setFrameworks] = useState([]);
@@ -2446,7 +2538,8 @@ const ActivityStream = ({session}) => {
 /* ═══════════════════ WELCOME / INVITATION SCREEN ═══════════════════ */
 
 const WelcomeScreen = ({onContinue}) => (
-  <div className="grid-bg" style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
+  <div className="grid-bg" style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+    <div style={{position:'absolute',top:16,right:16}}><ThemeToggle/></div>
     <div className="anim-up" style={{width:'100%',maxWidth:600,padding:20}}>
       <div style={{background:'var(--bg-1)',border:'1px solid var(--border-0)',borderRadius:'var(--r-lg)',padding:'48px 44px',position:'relative',overflow:'hidden'}}>
         <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:'linear-gradient(90deg, var(--gold), var(--teal), var(--blue))'}}/>
@@ -2543,7 +2636,8 @@ const LoginScreen = ({onLogin}) => {
     setLoading(false);
   };
 
-  return <div className="grid-bg" style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
+  return <div className="grid-bg" style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+    <div style={{position:'absolute',top:16,right:16}}><ThemeToggle/></div>
     <div className="anim-up" style={{width:'100%',maxWidth:440,padding:20}}>
       <div style={{background:'var(--bg-1)',border:'1px solid var(--border-0)',borderRadius:'var(--r-lg)',padding:'44px 40px',position:'relative',overflow:'hidden'}}>
         <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:'linear-gradient(90deg, var(--gold), var(--teal), var(--blue))'}}/>
@@ -2587,7 +2681,8 @@ const LoginScreen = ({onLogin}) => {
 
 /* ═══════════════════ ACCOUNT TYPE SELECTOR ═══════════════════ */
 const AccountTypeScreen = ({onSelect}) => (
-  <div className="grid-bg" style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
+  <div className="grid-bg" style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+    <div style={{position:'absolute',top:16,right:16}}><ThemeToggle/></div>
     <div className="anim-up" style={{textAlign:'center',maxWidth:700,padding:20}}>
       <h2 style={{fontFamily:'var(--serif)',fontSize:28,fontWeight:700,letterSpacing:'-0.02em',marginBottom:8}}>Choose your role</h2>
       <p style={{color:'var(--tx-1)',fontSize:14,marginBottom:36}}>This determines your data access model and room topology</p>
@@ -2983,7 +3078,8 @@ const ClientApp = ({session, onLogout, showToast}) => {
             <span style={{fontSize:9.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{Object.values(p.sharedFields||{}).filter(Boolean).length} fields shared</span>
           </div>)}</>}
       </div>
-      <div style={{padding:'8px 10px',borderTop:'1px solid var(--border-0)'}}>
+      <div style={{padding:'8px 10px',borderTop:'1px solid var(--border-0)',display:'flex',flexDirection:'column',gap:6}}>
+        <ThemeToggle style={{width:'100%',justifyContent:'center'}}/>
         <button onClick={onLogout} className="b-gho b-sm" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}><I n="logout" s={12}/>Logout</button>
       </div>
     </div>
@@ -3934,7 +4030,8 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           <button onClick={()=>loadCases()} className="b-gho b-xs" style={{width:'100%'}}><I n="search" s={10}/>Refresh</button>
         </div>
       </div>
-      <div style={{padding:'8px 10px',borderTop:'1px solid var(--border-0)'}}>
+      <div style={{padding:'8px 10px',borderTop:'1px solid var(--border-0)',display:'flex',flexDirection:'column',gap:6}}>
+        <ThemeToggle style={{width:'100%',justifyContent:'center'}}/>
         <button onClick={onLogout} className="b-gho b-sm" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}><I n="logout" s={12}/>Logout</button>
       </div>
     </div>
@@ -4625,7 +4722,7 @@ const App = () => {
   </>;
 };
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+ReactDOM.createRoot(document.getElementById('root')).render(<ThemeProvider><App/></ThemeProvider>);
 </script>
 </body>
 </html>
