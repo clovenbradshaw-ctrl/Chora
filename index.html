@@ -931,6 +931,25 @@ class KhoraService {
     try { return await this._api('GET', `/rooms/${encodeURIComponent(roomId)}/state/${type}/${sk}`); } catch { return null; }
   }
 
+  // Get ALL state events of a given type (across all state keys).
+  // Returns: [ { stateKey, content } ] — one entry per state key.
+  async getAllStateOfType(roomId, type) {
+    if (this.client) {
+      const room = this.client.getRoom(roomId);
+      if (!room) return [];
+      const evts = room.currentState.getStateEvents(type);
+      if (!evts) return [];
+      const arr = Array.isArray(evts) ? evts : [evts];
+      return arr.map(ev => ({ stateKey: ev.getStateKey(), content: ev.getContent() }));
+    }
+    try {
+      const allState = await this._api('GET', `/rooms/${encodeURIComponent(roomId)}/state`);
+      return (allState || [])
+        .filter(ev => ev.type === type)
+        .map(ev => ({ stateKey: ev.state_key, content: ev.content }));
+    } catch { return []; }
+  }
+
   async setState(roomId, type, content, sk = '') {
     if (this.client) { await this._withRetry(() => this.client.sendStateEvent(roomId, type, content, sk)); }
     else { await this._api('PUT', `/rooms/${encodeURIComponent(roomId)}/state/${type}/${sk}`, content); }
@@ -1642,6 +1661,122 @@ const OPACITY_DESCRIPTIONS = DOMAIN_CONFIG.opacityDescriptions;
 const MSG_ACCESS_DEFAULTS = DOMAIN_CONFIG.msgAccessDefaults;
 const TERMINOLOGY_DEFAULTS = DOMAIN_CONFIG.terminologyDefaults;
 const RELATIONSHIP_TYPES = DOMAIN_CONFIG.relationshipTypes;
+
+/* ═══════════════════ SCHEMA LOADING & PROPAGATION ═══════════════════
+ * Reads schema state events from a room and returns a structured object.
+ * Used to load network schema, org schema, or provider schema dynamically
+ * instead of relying on hardcoded DEFAULT_* constants.
+ *
+ * Propagation flow:
+ *   Network → Org → Provider → Client
+ *
+ * loadSchemaFromRoom(svc, roomId) returns:
+ *   { forms[], fields[], assessments[], definitions[], authorities[], transforms{} }
+ *
+ * syncNetworkSchemaToOrg(svc, networkRoomId, orgSchemaRoomId) copies network
+ * schema to the org schema room, preserving propagation metadata and marking
+ * the source as network-inherited.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+async function loadSchemaFromRoom(svc, roomId) {
+  const [formEvts, promptEvts, assessEvts, defEvts, authEvts, transformEvt] = await Promise.all([
+    svc.getAllStateOfType(roomId, EVT.SCHEMA_FORM),
+    svc.getAllStateOfType(roomId, EVT.SCHEMA_PROMPT),
+    svc.getAllStateOfType(roomId, EVT.SCHEMA_ASSESSMENT),
+    svc.getAllStateOfType(roomId, EVT.SCHEMA_DEF),
+    svc.getAllStateOfType(roomId, EVT.SCHEMA_AUTHORITY),
+    svc.getState(roomId, EVT.SCHEMA_TRANSFORM, 'default'),
+  ]);
+  const forms = formEvts.map(e => e.content).filter(Boolean);
+  const fields = promptEvts.map(e => e.content).filter(Boolean);
+  const assessments = assessEvts.map(e => e.content).filter(Boolean);
+  const definitions = defEvts.map(e => e.content).filter(Boolean);
+  const authorities = authEvts.map(e => e.content).filter(Boolean);
+  const transforms = transformEvt?.transforms || {};
+  return { forms, fields, assessments, definitions, authorities, transforms };
+}
+
+// Sync network schema → org schema room.
+// Copies all network forms/fields/assessments/definitions/authorities with
+// propagation metadata intact. Existing org-local schema (source.level === 'local')
+// is preserved; network items are overwritten to latest network version.
+async function syncNetworkSchemaToOrg(svc, networkRoomId, orgSchemaRoomId, networkName) {
+  const net = await loadSchemaFromRoom(svc, networkRoomId);
+
+  // Seed forms with network source
+  for (const f of net.forms) {
+    const propagation = f.propagation || f.source?.propagation || 'standard';
+    await svc.setState(orgSchemaRoomId, EVT.SCHEMA_FORM,
+      { ...f, _inherited: true, _network: networkName, _networkRoom: networkRoomId, source: { level: 'network', propagation } },
+      f.id);
+  }
+  // Seed individual fields
+  for (const p of net.fields) {
+    const propagation = p.propagation || p.source?.propagation || 'standard';
+    await svc.setState(orgSchemaRoomId, EVT.SCHEMA_PROMPT,
+      { ...p, _inherited: true, _network: networkName, source: { level: 'network', propagation } },
+      p.key);
+  }
+  // Seed assessments (provider MEANT instruments)
+  for (const a of net.assessments) {
+    const propagation = a.propagation || a.source?.propagation || 'standard';
+    await svc.setState(orgSchemaRoomId, EVT.SCHEMA_ASSESSMENT,
+      { ...a, _inherited: true, _network: networkName, source: { level: 'network', propagation } },
+      a.key);
+  }
+  // Seed definitions (required propagation — immutable)
+  for (const d of net.definitions) {
+    await svc.setState(orgSchemaRoomId, EVT.SCHEMA_DEF,
+      { ...d, _inherited: true, _network: networkName, source: { level: 'network', propagation: 'required' } },
+      d.key);
+  }
+  // Seed authorities
+  for (const a of net.authorities) {
+    await svc.setState(orgSchemaRoomId, EVT.SCHEMA_AUTHORITY,
+      { ...a, _inherited: true, _network: networkName },
+      a.id);
+  }
+  // Seed transforms
+  if (Object.keys(net.transforms).length > 0) {
+    await svc.setState(orgSchemaRoomId, EVT.SCHEMA_TRANSFORM,
+      { id: 'transform_default', transforms: net.transforms, _inherited: true, _network: networkName },
+      'default');
+  }
+  return net;
+}
+
+// Merge loaded schema with defaults: loaded schema takes priority,
+// defaults fill gaps for any items not yet in the room.
+function mergeSchemaWithDefaults(loaded) {
+  const loadedFormIds = new Set(loaded.forms.map(f => f.id));
+  const loadedFieldKeys = new Set(loaded.fields.map(f => f.key));
+  const loadedAssessKeys = new Set(loaded.assessments.map(a => a.key));
+  const loadedDefKeys = new Set(loaded.definitions.map(d => d.key));
+  const loadedAuthIds = new Set(loaded.authorities.map(a => a.id));
+
+  return {
+    forms: [
+      ...loaded.forms,
+      ...DEFAULT_FORMS.filter(f => !loadedFormIds.has(f.id)),
+    ],
+    fields: [
+      ...loaded.fields,
+      ...DEFAULT_PROMPTS.filter(p => !loadedFieldKeys.has(p.key)),
+    ],
+    assessments: [
+      ...loaded.assessments,
+      ...DEFAULT_PROVIDER_PROMPTS.filter(a => !loadedAssessKeys.has(a.key)),
+    ],
+    definitions: [
+      ...loaded.definitions,
+      ...DEFAULT_DEFINITIONS.filter(d => !loadedDefKeys.has(d.key)),
+    ],
+    authorities: [
+      ...loaded.authorities,
+      ...DEFAULT_AUTHORITIES.filter(a => !loadedAuthIds.has(a.id)),
+    ],
+    transforms: Object.keys(loaded.transforms).length > 0 ? loaded.transforms : DEFAULT_TRANSFORMS,
+  };
+}
 
 /* ═══════════════════ FRAMEWORK BINDINGS (§C.2) ═══════════════════ */
 // Multi-framework value mappings: same observation value → different classifications
@@ -5408,6 +5543,17 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const [composePeerOrgName, setComposePeerOrgName] = useState('');
   const [msgAccessModal, setMsgAccessModal] = useState(false);
   const [msgAccessDraft, setMsgAccessDraft] = useState({read:[],respond:[]});
+  // ─── Dynamic schema (loaded from room state, not hardcoded) ───
+  const [liveSchema, setLiveSchema] = useState(null); // { forms, fields, assessments, definitions, authorities, transforms }
+  const [schemaLoading, setSchemaLoading] = useState(false);
+
+  // Accessor: use live schema if loaded, fall back to defaults
+  const S_FORMS = liveSchema?.forms || DEFAULT_FORMS;
+  const S_FIELDS = liveSchema?.fields || DEFAULT_PROMPTS;
+  const S_ASSESSMENTS = liveSchema?.assessments || DEFAULT_PROVIDER_PROMPTS;
+  const S_DEFINITIONS = liveSchema?.definitions || DEFAULT_DEFINITIONS;
+  const S_AUTHORITIES = liveSchema?.authorities || DEFAULT_AUTHORITIES;
+
   // ─── Org terminology customization ───
   const [orgTerminology, setOrgTerminology] = useState({...TERMINOLOGY_DEFAULTS});
   const [terminologyDraft, setTerminologyDraft] = useState({...TERMINOLOGY_DEFAULTS});
@@ -5536,6 +5682,13 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         }
         // Load detected org messaging channels
         if (detectedOrgChannels.length > 0) setOrgChannels(detectedOrgChannels);
+      }
+      // Load dynamic schema from schema room (forms + interpretations)
+      if (schema) {
+        try {
+          const loaded = await loadSchemaFromRoom(svc, schema);
+          setLiveSchema(mergeSchemaWithDefaults(loaded));
+        } catch (e) { console.warn('Schema load:', e.message); }
       }
       // Load teams detected during scan
       if (detectedTeams.length > 0) setTeams(detectedTeams);
@@ -5852,6 +6005,24 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       else { await svc._api('POST', `/join/${encodeURIComponent(joinNetworkId)}`, {}); }
       setNetworkRoom(joinNetworkId);
       await loadNetworkMembers(joinNetworkId);
+
+      // Sync network schema → org schema room (propagation: network → org)
+      if (schemaRoom) {
+        try {
+          const netId = await svc.getState(joinNetworkId, EVT.IDENTITY);
+          const netName = netId?.name || joinNetworkId;
+          showToast('Syncing network schema...','info');
+          await syncNetworkSchemaToOrg(svc, joinNetworkId, schemaRoom, netName);
+          // Reload live schema to reflect synced data
+          const loaded = await loadSchemaFromRoom(svc, schemaRoom);
+          setLiveSchema(mergeSchemaWithDefaults(loaded));
+          showToast('Network schema synced to organization','success');
+        } catch (e) {
+          console.warn('Schema sync on network join failed:', e.message);
+          showToast('Joined network, but schema sync failed: ' + e.message, 'warn');
+        }
+      }
+
       setJoinNetworkModal(false); setJoinNetworkId('');
       showToast('Joined network','success');
     } catch(e) { showToast('Failed to join: '+e.message,'error'); }
@@ -6426,6 +6597,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           </div>
           {[
             {id:'org-settings',icon:'settings',label:'Org Settings',reqRole:'admin'},
+            {id:'org-schema',icon:'grid',label:'Schema & Forms',reqRole:'admin'},
             {id:'org-inbox',icon:'msg',label:`Inbox${orgChannels.length?` (${orgChannels.length})`:''}`},
             {id:'staff',icon:'users',label:'Staff'},
             {id:'network',icon:'globe',label:'Network'},
@@ -6947,7 +7119,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           </div>
           <p style={{fontSize:11,color:'var(--tx-2)',marginBottom:10}}>Structured assessments and case management observations. Each entry is an EO event in the bridge room with full provenance.</p>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:6,marginBottom:12}}>
-            {DEFAULT_PROVIDER_PROMPTS.map(p=><div key={p.id} className="card-h" onClick={()=>{setProvObsModal(p);setProvObsValue('');setProvObsNotes('')}}
+            {S_ASSESSMENTS.map(p=><div key={p.id} className="card-h" onClick={()=>{setProvObsModal(p);setProvObsValue('');setProvObsNotes('')}}
               style={{padding:10}}>
               <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:4,flexWrap:'wrap'}}>
                 <span className={`tag tag-${OBS_CAT_COLORS[p.category]||'purple'}`} style={{fontSize:8.5}}>{p.category}</span>
@@ -6961,7 +7133,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
             <span className="section-label">RECORDED ({provObservations.length})</span>
             <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:4}}>
               {[...provObservations].reverse().map((obs,i)=>{
-                const prompt = DEFAULT_PROVIDER_PROMPTS.find(p=>p.id===obs.prompt_id||p.key===obs.prompt_key);
+                const prompt = S_ASSESSMENTS.find(p=>p.id===obs.prompt_id||p.key===obs.prompt_key);
                 const optLabel = prompt?.options?.find(o=>o.v===obs.value)?.l || obs.value;
                 return <div key={obs.id||i} style={{padding:'8px 12px',background:'var(--bg-3)',borderRadius:'var(--r)',display:'flex',alignItems:'center',gap:8}}>
                   <span className={`tag tag-${OBS_CAT_COLORS[prompt?.category]||'purple'}`} style={{fontSize:8.5}}>{prompt?.category||'obs'}</span>
@@ -7270,6 +7442,143 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         </div>
       </div>}
 
+      {/* ORG SCHEMA & FORMS VIEW — Inherited schema + org extensions */}
+      {view==='org-schema'&&orgRoom&&orgRole==='admin'&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:24}}>
+          <div><h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Schema & Forms</h2>
+            <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>Forms collect GIVEN data from clients. Interpretations create MEANT classifications. {networkRoom ? 'Network-inherited schema is shown with propagation levels.' : 'No network connected — all schema is local.'}</p></div>
+          {networkRoom && <button className="b-gho b-sm" onClick={async ()=>{
+            if (!schemaRoom) return;
+            try {
+              setSchemaLoading(true);
+              const netId = await svc.getState(networkRoom, EVT.IDENTITY);
+              await syncNetworkSchemaToOrg(svc, networkRoom, schemaRoom, netId?.name||'Network');
+              const loaded = await loadSchemaFromRoom(svc, schemaRoom);
+              setLiveSchema(mergeSchemaWithDefaults(loaded));
+              showToast('Schema re-synced from network','success');
+            } catch(e) { showToast('Sync failed: '+e.message,'error'); }
+            finally { setSchemaLoading(false); }
+          }} disabled={schemaLoading}>{schemaLoading ? 'Syncing...' : 'Re-sync from Network'}</button>}
+        </div>
+
+        {/* FORMS — GIVEN data collection */}
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+            <span className="section-label" style={{marginBottom:0}}>FORMS (GIVEN DATA COLLECTION)</span>
+            <span className="tag tag-teal" style={{fontSize:8}}>GIVEN</span>
+          </div>
+          <p style={{fontSize:11,color:'var(--tx-2)',marginBottom:12}}>
+            Forms are structured data collection instruments. {networkRoom ? 'Required forms cannot be modified; Standard forms can have fields added.' : 'All forms are local and fully editable.'}
+          </p>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {S_FORMS.map(f => {
+              const prop = f.source?.propagation || 'optional';
+              const inherited = f._inherited;
+              const locked = inherited && prop === 'required';
+              const extendable = inherited && prop === 'standard';
+              return <div key={f.id} style={{background:'var(--bg-3)',borderRadius:'var(--r-lg)',border:`1px solid ${locked?'rgba(232,93,93,.18)':inherited?'rgba(201,163,82,.18)':'var(--border-0)'}`,overflow:'hidden'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',borderBottom:'1px solid var(--border-0)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{fontSize:13,fontWeight:600}}>{f.name}</span>
+                    <span style={{fontSize:10,color:'var(--tx-2)'}}>{f.fields?.length || 0} field{(f.fields?.length||0)!==1?'s':''}</span>
+                    {locked && <span className="tag tag-red" style={{fontSize:8}}>LOCKED</span>}
+                    {extendable && <span className="tag tag-gold" style={{fontSize:8}}>EXTENDABLE</span>}
+                    {!inherited && <span className="tag tag-purple" style={{fontSize:8}}>LOCAL</span>}
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <MaturityBadge maturity={f.maturity}/>
+                    <SourceBadge source={f.source}/>
+                  </div>
+                </div>
+                {f.description && <div style={{padding:'6px 14px',fontSize:10.5,color:'var(--tx-2)',borderBottom:'1px solid var(--border-0)'}}>{f.description}</div>}
+                <div style={{padding:'6px 14px'}}>
+                  {(f.fields||[]).map(p => <div key={p.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border-0)'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:6,flex:1,minWidth:0}}>
+                      <span style={{fontSize:11.5,color:'var(--tx-0)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.question}</span>
+                      {p.sensitive && <span className="tag tag-red" style={{fontSize:7.5}}>SENSITIVE</span>}
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+                      <span style={{fontSize:9.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{p.type}</span>
+                      <span style={{fontSize:9.5,color:'var(--tx-3)'}}>{p.options?.length||0} opt</span>
+                    </div>
+                  </div>)}
+                  {extendable && <div style={{padding:'8px 0'}}>
+                    <button className="b-gho b-xs" style={{fontSize:10}} onClick={()=>showToast('Field creation coming in next update','info')}>+ Add org field to this form</button>
+                  </div>}
+                </div>
+              </div>;
+            })}
+          </div>
+        </div>
+
+        {/* INTERPRETATIONS — MEANT frameworks */}
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+            <span className="section-label" style={{marginBottom:0}}>INTERPRETATIONS (MEANT FRAMEWORKS)</span>
+            <span className="tag tag-gold" style={{fontSize:8}}>MEANT</span>
+          </div>
+          <p style={{fontSize:11,color:'var(--tx-2)',marginBottom:12}}>
+            Assessments are provider-side instruments that create MEANT observations. Definitions are classification rules that derive MEANT from GIVEN.
+          </p>
+
+          {/* Assessments */}
+          {S_ASSESSMENTS.length > 0 && <div style={{marginBottom:12}}>
+            <span style={{fontSize:10.5,fontFamily:'var(--mono)',color:'var(--gold)',fontWeight:600,letterSpacing:'.04em',display:'block',marginBottom:6}}>ASSESSMENTS</span>
+            <div style={{display:'flex',flexDirection:'column',gap:4}}>
+              {S_ASSESSMENTS.map(a => {
+                const locked = a._inherited && a.source?.propagation === 'required';
+                return <div key={a.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'var(--bg-3)',borderRadius:'var(--r)',border:locked?'1px solid rgba(232,93,93,.12)':'1px solid var(--border-0)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,flex:1,minWidth:0}}>
+                    <span style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.question}</span>
+                    {locked && <span className="tag tag-red" style={{fontSize:7.5}}>LOCKED</span>}
+                    {a._inherited && <span className="tag tag-blue" style={{fontSize:7.5}}>NETWORK</span>}
+                    {!a._inherited && <span className="tag tag-purple" style={{fontSize:7.5}}>LOCAL</span>}
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+                    <span style={{fontSize:9.5,fontFamily:'var(--mono)',color:'var(--tx-3)'}}>{a.type}</span>
+                    <MaturityBadge maturity={a.maturity}/>
+                    <SourceBadge source={a.source}/>
+                  </div>
+                </div>;
+              })}
+            </div>
+          </div>}
+
+          {/* Definitions */}
+          {S_DEFINITIONS.length > 0 && <div>
+            <span style={{fontSize:10.5,fontFamily:'var(--mono)',color:'var(--purple)',fontWeight:600,letterSpacing:'.04em',display:'block',marginBottom:6}}>CLASSIFICATION RULES</span>
+            <div style={{display:'flex',flexDirection:'column',gap:4}}>
+              {S_DEFINITIONS.map(d => {
+                const locked = d._inherited;
+                return <div key={d.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'var(--bg-3)',borderRadius:'var(--r)',border:locked?'1px solid rgba(232,93,93,.12)':'1px solid var(--border-0)'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,flex:1,minWidth:0}}>
+                    <span style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.name}</span>
+                    {locked && <span className="tag tag-red" style={{fontSize:7.5}}>LOCKED</span>}
+                    <span style={{fontSize:9.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{d.rules?.length||0} rule{(d.rules?.length||0)!==1?'s':''}</span>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+                    <MaturityBadge maturity={d.maturity}/>
+                    <SourceBadge source={d.source||{level:'network',propagation:'required'}}/>
+                  </div>
+                </div>;
+              })}
+            </div>
+          </div>}
+        </div>
+
+        {/* Propagation model reference */}
+        <div className="card" style={{marginBottom:16}}>
+          <span className="section-label">PROPAGATION MODEL</span>
+          <p style={{fontSize:11,color:'var(--tx-2)',marginBottom:10}}>How network schema elements propagate to this organization.</p>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+            {Object.values(PROPAGATION_LEVELS).map(p=><div key={p.id} style={{padding:'8px 12px',background:'var(--bg-3)',borderRadius:'var(--r)'}}>
+              <span className={`tag tag-${p.color}`} style={{fontSize:9,marginBottom:4,display:'inline-block'}}>{p.label}</span>
+              <span style={{fontSize:10.5,color:'var(--tx-2)',display:'block'}}>{p.desc}</span>
+            </div>)}
+          </div>
+        </div>
+      </div>}
+
       {/* STAFF ROSTER VIEW */}
       {view==='staff'&&orgRoom&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:24}}>
@@ -7426,11 +7735,11 @@ const ProviderApp = ({session, onLogout, showToast}) => {
                 <span className="tag tag-teal" style={{fontSize:8}}>GIVEN</span>
               </div>
               <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                {DEFAULT_FORMS.map(f=><div key={f.id} style={{background:'var(--bg-3)',borderRadius:'var(--r)',border:'1px solid var(--border-0)',overflow:'hidden'}}>
+                {S_FORMS.map(f=><div key={f.id} style={{background:'var(--bg-3)',borderRadius:'var(--r)',border:'1px solid var(--border-0)',overflow:'hidden'}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',borderBottom:'1px solid var(--border-0)'}}>
                     <div style={{display:'flex',alignItems:'center',gap:8}}>
                       <span style={{fontSize:12,fontWeight:600}}>{f.name}</span>
-                      <span style={{fontSize:10,color:'var(--tx-2)'}}>{f.fields.length} field{f.fields.length!==1?'s':''}</span>
+                      <span style={{fontSize:10,color:'var(--tx-2)'}}>{(f.fields||[]).length} field{(f.fields||[]).length!==1?'s':''}</span>
                     </div>
                     <div style={{display:'flex',alignItems:'center',gap:6}}>
                       <MaturityBadge maturity={f.maturity || 'normative'}/>
@@ -7438,7 +7747,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
                     </div>
                   </div>
                   <div style={{padding:'4px 12px'}}>
-                    {f.fields.map(p=><div key={p.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border-0)'}}>
+                    {(f.fields||[]).map(p=><div key={p.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--border-0)'}}>
                       <span style={{fontSize:11.5,color:'var(--tx-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.question}</span>
                       <span style={{fontSize:9.5,color:'var(--tx-3)',fontFamily:'var(--mono)',flexShrink:0,marginLeft:8}}>{p.type}</span>
                     </div>)}
@@ -7454,7 +7763,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
                 <span className="tag tag-gold" style={{fontSize:8}}>MEANT</span>
               </div>
               <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                {DEFAULT_PROVIDER_PROMPTS.map(p=><div key={p.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'var(--bg-3)',borderRadius:'var(--r)'}}>
+                {S_ASSESSMENTS.map(p=><div key={p.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'var(--bg-3)',borderRadius:'var(--r)'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,flex:1,minWidth:0}}>
                     <span style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.question}</span>
                     <span className="tag tag-gold" style={{fontSize:8}}>ASSESSMENT</span>
@@ -7464,7 +7773,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
                     <SourceBadge source={p.source || {level:'network',propagation:'standard'}}/>
                   </div>
                 </div>)}
-                {DEFAULT_DEFINITIONS.map(d=><div key={d.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'var(--bg-3)',borderRadius:'var(--r)'}}>
+                {S_DEFINITIONS.map(d=><div key={d.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'var(--bg-3)',borderRadius:'var(--r)'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,flex:1,minWidth:0}}>
                     <span style={{fontSize:12,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.name}</span>
                     <span className="tag tag-purple" style={{fontSize:8}}>CLASSIFICATION</span>
@@ -7479,9 +7788,9 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           </div>
 
           {/* Adoption metrics (MVP §Screen 4B — ambient monitoring) */}
-          <AdoptionMetrics adopted={DEFAULT_FORMS.length + DEFAULT_DEFINITIONS.length + DEFAULT_PROVIDER_PROMPTS.length}
-            total={DEFAULT_FORMS.length + DEFAULT_DEFINITIONS.length + DEFAULT_PROVIDER_PROMPTS.length + 2}
-            extensions={1} divergences={0}/>
+          <AdoptionMetrics adopted={S_FORMS.length + S_DEFINITIONS.length + S_ASSESSMENTS.length}
+            total={S_FORMS.length + S_DEFINITIONS.length + S_ASSESSMENTS.length + 2}
+            extensions={S_FORMS.filter(f=>!f._inherited).length} divergences={0}/>
 
           {/* Propagation model reference */}
           <div className="card" style={{marginBottom:16,marginTop:16}}>
