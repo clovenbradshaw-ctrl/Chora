@@ -6984,6 +6984,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
   const [enabledFrameworks, setEnabledFrameworks] = useState([]); // framework ids toggled on
   const [frameworkModal, setFrameworkModal] = useState(false);
   const [myTeams, setMyTeams] = useState([]);
+  const [myResources, setMyResources] = useState([]); // resource vault records from bridges
 
   useEffect(() => { initVault(); }, []);
 
@@ -7135,6 +7136,50 @@ const ClientApp = ({session, onLogout, showToast}) => {
       };
     });
     setProviders(enrichedProviders);
+    // Load resource records from vault and bridge rooms
+    const resources = [];
+    if (svc.client) {
+      // Load from vault shadow records
+      const vRoom = svc.client.getRoom(rid);
+      if (vRoom) {
+        const vaultResEvents = vRoom.currentState.getStateEvents(EVT.RESOURCE_VAULT);
+        if (vaultResEvents) {
+          const evArr = Array.isArray(vaultResEvents) ? vaultResEvents : [vaultResEvents];
+          for (const ev of evArr) {
+            const c = ev.getContent ? ev.getContent() : ev;
+            if (c && c.allocation_id) resources.push(c);
+          }
+        }
+      }
+      // Also load from bridge rooms directly (bridge is source of truth)
+      for (const p of enrichedProviders) {
+        const bRoom = svc.client.getRoom(p.bridgeRoomId);
+        if (!bRoom) continue;
+        const allocEvents = bRoom.currentState.getStateEvents(EVT.RESOURCE_ALLOC);
+        if (!allocEvents) continue;
+        const evArr = Array.isArray(allocEvents) ? allocEvents : [allocEvents];
+        for (const ev of evArr) {
+          const c = ev.getContent ? ev.getContent() : ev;
+          if (c && c.id && !resources.find(r => r.allocation_id === c.id)) {
+            resources.push({
+              allocation_id: c.id,
+              resource_type_id: c.resource_type_id,
+              resource_name: c.resource_type_id, // will be overridden by vault shadow if available
+              quantity: c.quantity,
+              unit: c.unit,
+              provider_display_name: c.allocated_by,
+              org_display_name: c.org_id || '',
+              allocated_at: c.allocated_at,
+              status: c.status,
+              notes: c.notes,
+              bridge_room_id: p.bridgeRoomId,
+              _provider_name: p.providerName || p.providerUserId,
+            });
+          }
+        }
+      }
+    }
+    setMyResources(resources);
   };
 
   const saveSnapshot = async (fields, obs, mc, cfd, ef) => {
@@ -7415,6 +7460,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
       <div style={{flex:1,overflow:'auto',padding:'6px 6px'}}>
         {[{id:'vault',icon:'folder',label:'My Vault'},{id:'inbox',icon:'msg',label:'Messages'},
           {id:'observations',icon:'clipboard',label:'Observations'},
+          {id:'resources',icon:'layers',label:`My Resources${myResources.length?` (${myResources.length})`:''}`},
           {id:'providers',icon:'users',label:'People & Teams'},{id:'records',icon:'shield',label:'My Records'},
           {id:'metrics',icon:'bar',label:'Metrics'},{id:'activity',icon:'zap',label:'Activity Stream'}
         ].map(item=><div key={item.id} onClick={()=>{setView(item.id);setActiveBridge(null);if(item.id!=='inbox')setInboxConvo(null)}}
@@ -7562,6 +7608,62 @@ const ClientApp = ({session, onLogout, showToast}) => {
             )}
           </div>
         </div>}
+      </div>}
+
+      {/* MY RESOURCES VIEW */}
+      {view==='resources'&&!activeBridge&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
+        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>My Resources</h2>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4,marginBottom:20}}>Resources allocated to you by providers across all your bridges. This is your record — encrypted in your vault.</p>
+        {myResources.length === 0 ? <div className="card" style={{textAlign:'center',padding:'30px 20px',borderStyle:'dashed'}}>
+          <I n="layers" s={28} c="var(--tx-3)"/>
+          <p style={{color:'var(--tx-2)',marginTop:8,fontSize:12}}>No resources have been allocated to you yet.</p>
+          <p style={{color:'var(--tx-3)',fontSize:11,marginTop:4}}>When a provider allocates resources (vouchers, funds, services), they'll appear here.</p>
+        </div> : <>
+          {/* Summary cards */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:20}}>
+            {[
+              {l:'Total',v:myResources.length,c:'teal'},
+              {l:'Active',v:myResources.filter(r=>r.status==='active').length,c:'green'},
+              {l:'Used',v:myResources.filter(r=>r.status==='consumed').length,c:'blue'},
+              {l:'Expired',v:myResources.filter(r=>r.status==='expired').length,c:'orange'},
+            ].map((s,i)=><div key={i} className="card" style={{padding:12}}>
+              <span className="section-label">{s.l.toUpperCase()}</span>
+              <span style={{fontSize:18,fontWeight:700,color:`var(--${s.c})`}}>{s.v}</span>
+            </div>)}
+          </div>
+          {/* Group by provider */}
+          {(()=>{
+            const byProvider = {};
+            myResources.forEach(r => {
+              const key = r.org_display_name || r.provider_display_name || r.bridge_room_id || 'Unknown';
+              if (!byProvider[key]) byProvider[key] = [];
+              byProvider[key].push(r);
+            });
+            return Object.entries(byProvider).map(([provName, allocs]) => <div key={provName} style={{marginBottom:16}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
+                <I n="briefcase" s={14} c="var(--gold)"/>
+                <span style={{fontSize:13,fontWeight:600}}>{provName}</span>
+                <span className="tag tag-gold" style={{fontSize:8}}>{allocs.length}</span>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {allocs.sort((a,b)=>(b.allocated_at||0)-(a.allocated_at||0)).map((alloc,i)=>{
+                  const statusColors = {active:'teal',consumed:'blue',expired:'orange',revoked:'red'};
+                  return <div key={alloc.allocation_id||i} className="card" style={{padding:'10px 14px'}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:2}}>
+                      <span style={{fontSize:13,fontWeight:600}}>{alloc.resource_name||alloc.resource_type_id}</span>
+                      <span className={`tag tag-${statusColors[alloc.status]||'teal'}`} style={{fontSize:8.5}}>{(alloc.status||'active').toUpperCase()}</span>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <span style={{fontSize:11,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>x{alloc.quantity} {alloc.unit||''}</span>
+                      <span style={{fontSize:9.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{alloc.allocated_at ? new Date(alloc.allocated_at).toLocaleDateString() : ''}</span>
+                    </div>
+                    {alloc.notes && <p style={{fontSize:11,color:'var(--tx-2)',marginTop:4,fontStyle:'italic'}}>{alloc.notes}</p>}
+                  </div>;
+                })}
+              </div>
+            </div>);
+          })()}
+        </>}
       </div>}
 
       {/* PROVIDERS / TEAMS / CONTACTS VIEW */}
@@ -8223,6 +8325,14 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const [resourceInventory, setResourceInventory] = useState({}); // { [relationId]: inventory object }
   const [createResourceModal, setCreateResourceModal] = useState(false);
   const [resourceDraft, setResourceDraft] = useState({name:'',category:'general',unit:'unit',fungible:true,perishable:false,ttl_days:'',tags:''});
+  // ─── Resource allocation state (case-level) ───
+  const [allocModal, setAllocModal] = useState(false);
+  const [allocDraft, setAllocDraft] = useState({resource_type_id:'',quantity:1,notes:''});
+  const [caseAllocations, setCaseAllocations] = useState([]); // allocations for active case
+  // ─── Inventory management state ───
+  const [restockModal, setRestockModal] = useState(null); // relation object or null
+  const [restockQty, setRestockQty] = useState('');
+  const [restockNote, setRestockNote] = useState('');
 
   // Notification helpers
   const addNotification = (notif) => {
@@ -8878,6 +8988,116 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Error: '+e.message,'error'); }
   };
 
+  // ─── Load allocations for active case (bridge room) ───
+  const loadCaseAllocations = async (bridgeRoomId) => {
+    if (!svc.client) return;
+    const room = svc.client.getRoom(bridgeRoomId);
+    if (!room) { setCaseAllocations([]); return; }
+    const allocEvents = room.currentState.getStateEvents(EVT.RESOURCE_ALLOC);
+    const allocs = [];
+    if (allocEvents) {
+      const evArr = Array.isArray(allocEvents) ? allocEvents : [allocEvents];
+      for (const ev of evArr) {
+        const c = ev.getContent ? ev.getContent() : ev;
+        if (c && c.id) allocs.push(c);
+      }
+    }
+    setCaseAllocations(allocs);
+  };
+
+  // ─── Allocate resource to client in active case ───
+  const handleAllocateResource = async () => {
+    if (!allocDraft.resource_type_id || !activeCase || !orgRoom) return;
+    const caseData = cases.find(c => c.bridgeRoomId === activeCase);
+    if (!caseData) return;
+    // Find vault room for client (from bridge meta)
+    const bridgeMeta = caseData.meta;
+    const clientId = bridgeMeta?.client;
+    // Find client vault room from scanned state
+    let vaultRoomId = null;
+    if (svc.client) {
+      for (const room of svc.client.getRooms()) {
+        const idEv = room.currentState.getStateEvents(EVT.IDENTITY, '');
+        if (idEv) {
+          const content = idEv.getContent();
+          if (content.account_type === 'client' && content.owner === clientId) {
+            vaultRoomId = room.roomId;
+            break;
+          }
+        }
+      }
+    }
+    // Find the relation for this resource type
+    const relation = resourceRelations.find(r => r.resource_type_id === allocDraft.resource_type_id);
+    try {
+      const result = await ResourceService.allocateResource(activeCase, {
+        resource_type_id: allocDraft.resource_type_id,
+        relation_id: relation?.id || null,
+        quantity: parseInt(allocDraft.quantity) || 1,
+        allocated_to: clientId,
+        notes: allocDraft.notes || null,
+      }, orgRoom, vaultRoomId);
+      if (!result.valid) {
+        const msgs = result.violations.map(v => v.message).join('; ');
+        showToast(`Allocation blocked: ${msgs}`, 'error');
+        return;
+      }
+      setAllocModal(false);
+      setAllocDraft({resource_type_id:'',quantity:1,notes:''});
+      showToast('Resource allocated successfully','success');
+      await loadCaseAllocations(activeCase);
+      await loadResources(orgRoom, networkRoom);
+    } catch(e) { showToast('Error allocating resource: '+e.message,'error'); }
+  };
+
+  // ─── Record lifecycle event (consumed, revoked, returned) ───
+  const handleResourceLifecycle = async (allocationId, eventType) => {
+    if (!activeCase || !orgRoom) return;
+    const alloc = caseAllocations.find(a => a.id === allocationId);
+    if (!alloc) return;
+    const caseData = cases.find(c => c.bridgeRoomId === activeCase);
+    const clientId = caseData?.meta?.client;
+    let vaultRoomId = null;
+    if (clientId && svc.client) {
+      for (const room of svc.client.getRooms()) {
+        const idEv = room.currentState.getStateEvents(EVT.IDENTITY, '');
+        if (idEv) {
+          const content = idEv.getContent();
+          if (content.account_type === 'client' && content.owner === clientId) {
+            vaultRoomId = room.roomId;
+            break;
+          }
+        }
+      }
+    }
+    try {
+      await ResourceService.recordResourceEvent(activeCase, {
+        allocation_id: allocationId,
+        event: eventType,
+        quantity: alloc.quantity,
+      }, orgRoom, vaultRoomId);
+      showToast(`Resource marked as ${eventType}`, 'success');
+      await loadCaseAllocations(activeCase);
+      await loadResources(orgRoom, networkRoom);
+    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+  };
+
+  // ─── Restock inventory ───
+  const handleRestock = async () => {
+    if (!restockModal || !restockQty || !orgRoom) return;
+    try {
+      await ResourceService.restockInventory(orgRoom, restockModal.id, parseInt(restockQty), {
+        note: restockNote || undefined,
+        restocked_by: svc.userId,
+      });
+      setRestockModal(null);
+      setRestockQty('');
+      setRestockNote('');
+      showToast('Inventory restocked', 'success');
+      await loadResources(orgRoom, networkRoom);
+    } catch(e) { showToast('Error restocking: ' + e.message, 'error'); }
+  };
+
   const handleCreateOrg = async () => {
     if (!setupData.name.trim()) return;
     try {
@@ -9339,7 +9559,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     return myOrg?.role || 'member';
   }, [networkRoom, orgRoom, networkMembers]);
 
-  const openCase = (bid) => { setView('case'); setActiveCase(bid); loadMessages(bid); loadProviderObservations(bid); };
+  const openCase = (bid) => { setView('case'); setActiveCase(bid); loadMessages(bid); loadProviderObservations(bid); loadCaseAllocations(bid); };
   const activeCaseData = cases.find(c=>c.bridgeRoomId===activeCase);
 
   // Aggregate metrics for dashboard
@@ -10055,6 +10275,41 @@ const ProviderApp = ({session, onLogout, showToast}) => {
               })}
             </div>
           </>}
+        </div>
+
+        {/* RESOURCE ALLOCATIONS */}
+        <div className="card" style={{marginBottom:16}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+            <span className="section-label" style={{marginBottom:0}}>RESOURCES</span>
+            {orgRoom && resourceTypes.length > 0 && <button onClick={()=>{setAllocDraft({resource_type_id:resourceTypes[0]?.id||'',quantity:1,notes:''});setAllocModal(true)}} className="b-pri b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="plus" s={11}/>Allocate</button>}
+          </div>
+          <p style={{fontSize:11,color:'var(--tx-2)',marginBottom:10}}>Resources allocated to this {T.client_term.toLowerCase()} through this bridge. Each allocation is an EO event with full provenance.</p>
+          {caseAllocations.length === 0 ? <div style={{textAlign:'center',padding:'16px 0',color:'var(--tx-3)',fontSize:12}}>
+            <I n="layers" s={20}/><p style={{marginTop:6}}>No resources allocated yet</p>
+          </div> : <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {[...caseAllocations].sort((a,b)=>(b.allocated_at||0)-(a.allocated_at||0)).map(alloc=>{
+              const rt = resourceTypes.find(t=>t.id===alloc.resource_type_id);
+              const statusColors = {active:'teal',consumed:'blue',expired:'orange',revoked:'red'};
+              return <div key={alloc.id} style={{padding:'10px 14px',background:'var(--bg-3)',borderRadius:'var(--r)',border:'1px solid var(--border-0)'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <span style={{fontSize:13,fontWeight:600}}>{rt?.name||alloc.resource_type_id}</span>
+                    <span style={{fontSize:11,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>x{alloc.quantity} {alloc.unit||rt?.unit||''}</span>
+                  </div>
+                  <span className={`tag tag-${statusColors[alloc.status]||'teal'}`} style={{fontSize:8.5}}>{alloc.status?.toUpperCase()}</span>
+                </div>
+                {alloc.notes && <p style={{fontSize:11,color:'var(--tx-2)',marginBottom:4,fontStyle:'italic'}}>{alloc.notes}</p>}
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                  <span style={{fontSize:9.5,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{alloc.allocated_at ? new Date(alloc.allocated_at).toLocaleDateString() : ''}{alloc.expires_at ? ` · expires ${new Date(alloc.expires_at).toLocaleDateString()}` : ''}</span>
+                  {alloc.status === 'active' && <div style={{display:'flex',gap:4}}>
+                    <button onClick={()=>handleResourceLifecycle(alloc.id,'consumed')} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:3}}><I n="check" s={10}/>Used</button>
+                    <button onClick={()=>handleResourceLifecycle(alloc.id,'returned')} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:3}}><I n="refresh-cw" s={10}/>Return</button>
+                    <button onClick={()=>handleResourceLifecycle(alloc.id,'revoked')} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:3,color:'var(--red)'}}><I n="x" s={10}/>Revoke</button>
+                  </div>}
+                </div>
+              </div>;
+            })}
+          </div>}
         </div>
 
         <div className="card" style={{marginBottom:16}}>
@@ -10818,11 +11073,15 @@ const ProviderApp = ({session, onLogout, showToast}) => {
                         <span style={{fontSize:10,fontWeight:600,color:'var(--blue)'}}>{RESOURCE_RELATION_LABELS[relation.relation_type]||relation.relation_type}</span>
                         {relation.opacity!==undefined&&<span className={`tag tag-${['teal','blue','green','gold'][relation.opacity]||'teal'}`} style={{fontSize:7.5}}>{RESOURCE_OPACITY_LABELS[relation.opacity]||'Sovereign'}</span>}
                       </div>
-                      {inv&&<div style={{display:'flex',gap:12}}>
-                        <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>Cap: {inv.capacity||0}</span>
-                        <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>Avail: {inv.available||0}</span>
-                        <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>Alloc: {inv.allocated||0}</span>
+                      {inv&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                        <div style={{display:'flex',gap:12}}>
+                          <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>Cap: {inv.total_capacity||inv.capacity||0}</span>
+                          <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>Avail: {inv.available||0}</span>
+                          <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>Alloc: {inv.allocated||0}</span>
+                        </div>
+                        <button onClick={()=>{setRestockModal(relation);setRestockQty('');setRestockNote('')}} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:3,flexShrink:0}}><I n="plus" s={9}/>Restock</button>
                       </div>}
+                      {!inv&&<button onClick={()=>{setRestockModal(relation);setRestockQty('');setRestockNote('')}} className="b-gho b-xs" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:3,marginTop:4}}><I n="plus" s={9}/>Add Initial Stock</button>}
                     </div>
                     : orgRoom&&<button onClick={()=>handleEstablishRelation(rt.id)} className="b-gho b-xs" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:4,marginTop:4}}><I n="link" s={10}/>Establish Relation</button>}
                   </div>;
@@ -10889,6 +11148,59 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         <input value={resourceDraft.tags} onChange={e=>setResourceDraft({...resourceDraft,tags:e.target.value})} placeholder="e.g. transit, emergency, shelter"/>
       </div>
       <button onClick={handleCreateResourceType} className="b-pri" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:4}}><I n="plus" s={13}/>Create Resource Type</button>
+    </Modal>
+
+    {/* ALLOCATE RESOURCE TO CLIENT MODAL */}
+    <Modal open={allocModal} onClose={()=>setAllocModal(false)} title="Allocate Resource" w={480}>
+      <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>Allocate a resource to this {T.client_term.toLowerCase()}. The allocation is recorded in the bridge room (visible to both parties) and updates org inventory.</p>
+      <div style={{marginBottom:14}}>
+        <span className="section-label">RESOURCE TYPE</span>
+        <select value={allocDraft.resource_type_id} onChange={e=>setAllocDraft({...allocDraft,resource_type_id:e.target.value})}>
+          <option value="">Select a resource...</option>
+          {resourceTypes.map(rt=>{
+            const relation = resourceRelations.find(r=>r.resource_type_id===rt.id);
+            const inv = relation ? resourceInventory[relation.id] : null;
+            return <option key={rt.id} value={rt.id}>{rt.name} ({rt.unit}){inv ? ` — ${inv.available||0} available` : ''}</option>;
+          })}
+        </select>
+      </div>
+      {allocDraft.resource_type_id && (()=>{
+        const rt = resourceTypes.find(t=>t.id===allocDraft.resource_type_id);
+        if (!rt) return null;
+        return <div style={{background:'var(--bg-2)',border:'1px solid var(--border-0)',borderRadius:'var(--r)',padding:'10px 14px',marginBottom:14}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
+            <span className={`tag tag-${RESOURCE_CATEGORY_COLORS[rt.category]||'teal'}`} style={{fontSize:8.5}}>{RESOURCE_CATEGORY_LABELS[rt.category]||rt.category}</span>
+            {rt.fungible && <span style={{fontSize:9,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>fungible</span>}
+            {rt.perishable && <span style={{fontSize:9,color:'var(--orange)',fontFamily:'var(--mono)'}}>expires {rt.ttl_days}d</span>}
+          </div>
+          {rt.tags?.length > 0 && <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>{rt.tags.map(tag=><span key={tag} style={{fontSize:8,padding:'1px 5px',borderRadius:99,background:'var(--bg-3)',color:'var(--tx-2)',fontFamily:'var(--mono)'}}>{tag}</span>)}</div>}
+        </div>;
+      })()}
+      <div style={{marginBottom:14}}>
+        <span className="section-label">QUANTITY</span>
+        <input type="number" min="1" value={allocDraft.quantity} onChange={e=>setAllocDraft({...allocDraft,quantity:e.target.value})} placeholder="1"/>
+      </div>
+      <div style={{marginBottom:20}}>
+        <span className="section-label">NOTES (OPTIONAL)</span>
+        <input value={allocDraft.notes} onChange={e=>setAllocDraft({...allocDraft,notes:e.target.value})} placeholder="e.g. For medical appointments this week"/>
+      </div>
+      <button onClick={handleAllocateResource} className="b-pri" disabled={!allocDraft.resource_type_id} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:4}}><I n="plus" s={13}/>Allocate Resource</button>
+    </Modal>
+
+    {/* RESTOCK INVENTORY MODAL */}
+    <Modal open={restockModal!==null} onClose={()=>{setRestockModal(null);setRestockQty('');setRestockNote('')}} title="Restock Inventory" w={420}>
+      {restockModal && <>
+        <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:14,lineHeight:1.6}}>Add inventory for <strong>{resourceTypes.find(t=>t.id===restockModal.resource_type_id)?.name||restockModal.resource_type_id}</strong>.</p>
+        <div style={{marginBottom:14}}>
+          <span className="section-label">QUANTITY TO ADD</span>
+          <input type="number" min="1" value={restockQty} onChange={e=>setRestockQty(e.target.value)} placeholder="e.g. 100" autoFocus/>
+        </div>
+        <div style={{marginBottom:20}}>
+          <span className="section-label">NOTE (OPTIONAL)</span>
+          <input value={restockNote} onChange={e=>setRestockNote(e.target.value)} placeholder="e.g. Grant #2024-A quarterly restock"/>
+        </div>
+        <button onClick={handleRestock} className="b-pri" disabled={!restockQty||parseInt(restockQty)<=0} style={{width:'100%'}}>Restock</button>
+      </>}
     </Modal>
 
     {/* CREATE ORGANIZATION MODAL */}
