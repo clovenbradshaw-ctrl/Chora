@@ -8610,16 +8610,26 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     const types = [];
     const relations = [];
     const inv = {};
+    if (!svc.client) { setResourceTypes(types); setResourceRelations(relations); setResourceInventory(inv); return; }
     // Load resource types from org room
     if (oRoom) {
       const room = svc.client.getRoom(oRoom);
       if (room) {
         const stateEvents = room.currentState.getStateEvents(EVT.RESOURCE_TYPE);
-        if (stateEvents) stateEvents.forEach(e => { const c = e.getContent(); if (c && c.id) types.push({...c, _source: 'org'}); });
+        if (stateEvents) {
+          const evArr = Array.isArray(stateEvents) ? stateEvents : [stateEvents];
+          evArr.forEach(e => { const c = e.getContent ? e.getContent() : e; if (c && c.id) types.push({...c, _source: 'org'}); });
+        }
         const relEvents = room.currentState.getStateEvents(EVT.RESOURCE_RELATION);
-        if (relEvents) relEvents.forEach(e => { const c = e.getContent(); if (c && c.id) relations.push(c); });
+        if (relEvents) {
+          const evArr = Array.isArray(relEvents) ? relEvents : [relEvents];
+          evArr.forEach(e => { const c = e.getContent ? e.getContent() : e; if (c && c.id) relations.push(c); });
+        }
         const invEvents = room.currentState.getStateEvents(EVT.RESOURCE_INVENTORY);
-        if (invEvents) invEvents.forEach(e => { const c = e.getContent(); if (c && c.relation_id) inv[c.relation_id] = c; });
+        if (invEvents) {
+          const evArr = Array.isArray(invEvents) ? invEvents : [invEvents];
+          evArr.forEach(e => { const c = e.getContent ? e.getContent() : e; if (c && c.relation_id) inv[c.relation_id] = c; });
+        }
       }
     }
     // Load resource types from network room (if different)
@@ -8627,7 +8637,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       const room = svc.client.getRoom(nRoom);
       if (room) {
         const stateEvents = room.currentState.getStateEvents(EVT.RESOURCE_TYPE);
-        if (stateEvents) stateEvents.forEach(e => { const c = e.getContent(); if (c && c.id && !types.find(t=>t.id===c.id)) types.push({...c, _source: 'network'}); });
+        if (stateEvents) {
+          const evArr = Array.isArray(stateEvents) ? stateEvents : [stateEvents];
+          evArr.forEach(e => { const c = e.getContent ? e.getContent() : e; if (c && c.id && !types.find(t=>t.id===c.id)) types.push({...c, _source: 'network'}); });
+        }
       }
     }
     setResourceTypes(types);
@@ -8930,6 +8943,8 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       for (const pp of DEFAULT_PROVIDER_PROMPTS) await svc.setState(nRoom, EVT.SCHEMA_ASSESSMENT, {...pp, propagation:pp.source?.propagation||'standard', network:networkName}, `net:${pp.key}`);
       // Definitions propagate as required (immutable at org level)
       for (const d of DEFAULT_DEFINITIONS) await svc.setState(nRoom, EVT.SCHEMA_DEF, {...d, propagation:'required', network:networkName}, `net:${d.key}`);
+      // Seed default resource types into network catalog (draft maturity, optional propagation)
+      try { await ResourceService.loadSeedResourceTypes(nRoom); } catch (e) { console.warn('Resource seed loading failed:', e.message); }
       await emitOp(nRoom, 'INS', {entity:'network',field:networkName}, {created_by:svc.userId,org:orgMeta.name}, networkFrame(nRoom));
       setNetworkRoom(nRoom);
       await loadNetworkMembers(nRoom);
