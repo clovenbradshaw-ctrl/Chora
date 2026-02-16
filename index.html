@@ -6894,6 +6894,7 @@ const classifyEvent = (ev, roomInfo) => {
       case EVT.RESOURCE_POLICY: return {op:'SEG',epistemic:'MEANT',label:'Resource Policy',desc:ev.getStateKey()};
       case EVT.RESOURCE_OPACITY: return {op:'SEG',epistemic:'MEANT',label:'Resource Opacity',desc:`${RESOURCE_OPACITY_LABELS[content.opacity]||content.opacity}`};
       case EVT.RESOURCE_VAULT: return {op:'INS',epistemic:'GIVEN',label:'Vault Resource Record',desc:`${content.resource_name}: ${content.quantity} ${content.unit}`};
+      case EVT.RESOURCE_PERM: return {op:'ALT',epistemic:'MEANT',label:'Resource Permission',desc:`${content.resource_type_id}: updated by ${content.updated_by?.slice(0,16)}`};
       case 'm.room.encryption': return {op:'REC',epistemic:'GIVEN',label:'Encryption Policy',desc:content.algorithm};
       case 'm.room.tombstone': return {op:'NUL',epistemic:'MEANT',label:'Room Tombstoned',desc:`→ ${content.replacement_room?.slice(0,24)}…`};
       case 'm.room.create': return {op:'INS',epistemic:'GIVEN',label:'Room Created',desc:'New room initialized'};
@@ -7019,7 +7020,7 @@ const ActivityStream = ({session}) => {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(new Set());
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const [filter, setFilter] = useState({ triad: 'all', operator: 'all', roomType: 'all', epistemic: 'all' });
   const [viewMode, setViewMode] = useState('stream'); // stream | table | triads
   const [jsonExpanded, setJsonExpanded] = useState(new Set());
@@ -7036,13 +7037,28 @@ const ActivityStream = ({session}) => {
         if (svc.client) {
           const room = svc.client.getRoom(rid);
           if (room) {
+            const seenIds = new Set();
             for (const ev of room.getLiveTimeline().getEvents()) {
               const cls = classifyEvent(ev, roomInfo);
+              seenIds.add(ev.getId());
               allEvents.push({
                 id: ev.getId(), roomId: rid, roomInfo, sender: ev.getSender(),
                 ts: ev.getTs(), type: ev.getType(),
                 stateKey: (ev.isState && ev.isState()) ? ev.getStateKey() : null,
                 content: ev.getContent(), isState: ev.isState && ev.isState(), ...cls
+              });
+            }
+            // Also capture current state events not in the timeline window
+            // (e.g. resource events sent after the last sync but before reload)
+            for (const ev of room.currentState.getStateEvents()) {
+              if (seenIds.has(ev.getId())) continue;
+              const cls = classifyEvent(ev, roomInfo);
+              seenIds.add(ev.getId());
+              allEvents.push({
+                id: ev.getId(), roomId: rid, roomInfo, sender: ev.getSender(),
+                ts: ev.getTs(), type: ev.getType(),
+                stateKey: ev.getStateKey() ?? null,
+                content: ev.getContent(), isState: true, ...cls
               });
             }
           }
@@ -9541,11 +9557,21 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         tags: resourceDraft.tags ? resourceDraft.tags.split(',').map(t=>t.trim()).filter(Boolean) : [],
         permissions: resourceDraft.permissions || buildDefaultResourcePermissions(),
       };
-      await ResourceService.createResourceType(targetRoom, typeData, orgRoom ? 'org' : 'network');
+      const created = await ResourceService.createResourceType(targetRoom, typeData, orgRoom ? 'org' : 'network');
       setCreateResourceModal(false);
       setResourceDraft({name:'',category:'general',unit:'unit',fungible:true,perishable:false,ttl_days:'',tags:'',permissions:buildDefaultResourcePermissions()});
       showToast(`Resource type "${typeData.name}" created`,'success');
-      await loadResources(orgRoom, networkRoom);
+      // Optimistically add the new resource type to local state immediately,
+      // since room.currentState won't reflect the new state event until the
+      // next /sync response from the server.
+      if (created && created.id) {
+        setResourceTypes(prev => {
+          if (prev.some(t => t.id === created.id)) return prev;
+          return [...prev, { ...created, _source: orgRoom ? 'org' : 'network' }];
+        });
+      }
+      // Delayed reload to reconcile with server state after sync
+      setTimeout(() => loadResources(orgRoom, networkRoom), 800);
     } catch(e) { showToast('Error creating resource: '+e.message,'error'); }
   };
 
@@ -9556,7 +9582,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       await ResourceService.updateResourcePermissions(orgRoom, permModal.id, permDraft, orgRole);
       setPermModal(null);
       showToast(`Permissions updated for "${permModal.name}"`,'success');
-      await loadResources(orgRoom, networkRoom);
+      setTimeout(() => loadResources(orgRoom, networkRoom), 800);
     } catch(e) { showToast('Error updating permissions: '+e.message,'error'); }
   };
 
@@ -9597,7 +9623,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         capacity: 0, available: 0,
       });
       showToast('Resource relation established','success');
-      await loadResources(orgRoom, networkRoom);
+      setTimeout(() => loadResources(orgRoom, networkRoom), 800);
     } catch(e) { showToast('Error: '+e.message,'error'); }
   };
 
@@ -9658,8 +9684,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       setAllocModal(false);
       setAllocDraft({resource_type_id:'',quantity:1,notes:''});
       showToast('Resource allocated successfully','success');
-      await loadCaseAllocations(activeCase);
-      await loadResources(orgRoom, networkRoom);
+      setTimeout(() => { loadCaseAllocations(activeCase); loadResources(orgRoom, networkRoom); }, 800);
     } catch(e) { showToast('Error allocating resource: '+e.message,'error'); }
   };
 
@@ -9690,8 +9715,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         quantity: alloc.quantity,
       }, orgRoom, vaultRoomId);
       showToast(`Resource marked as ${eventType}`, 'success');
-      await loadCaseAllocations(activeCase);
-      await loadResources(orgRoom, networkRoom);
+      setTimeout(() => { loadCaseAllocations(activeCase); loadResources(orgRoom, networkRoom); }, 800);
     } catch(e) { showToast('Error: ' + e.message, 'error'); }
   };
 
@@ -9707,7 +9731,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       setRestockQty('');
       setRestockNote('');
       showToast('Inventory restocked', 'success');
-      await loadResources(orgRoom, networkRoom);
+      setTimeout(() => loadResources(orgRoom, networkRoom), 800);
     } catch(e) { showToast('Error restocking: ' + e.message, 'error'); }
   };
 
