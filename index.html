@@ -348,6 +348,84 @@ button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r)
 @media(max-width:700px){
   .choreo-op-row [style*="gridTemplateColumns: 100px"]{grid-template-columns:1fr!important}
 }
+
+/* ═══ Data Table (dt-*) ═══ */
+.dt-wrap{border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border-0);background:var(--bg-1)}
+.dt-scroll{overflow-x:auto}
+table.dt{width:100%;border-collapse:collapse;font-size:13px}
+table.dt thead tr{background:var(--bg-2);border-bottom:2px solid var(--border-0)}
+table.dt th{padding:10px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tx-2);cursor:pointer;user-select:none;white-space:nowrap;border-right:1px solid var(--border-0)}
+table.dt th:hover{color:var(--tx-0)}
+table.dt td{padding:10px 12px;border-bottom:1px solid var(--border-0);border-right:1px solid var(--bg-2);vertical-align:middle}
+table.dt tr.dt-row:hover{background:var(--bg-2)}
+table.dt tr.dt-row.selected{background:var(--green-dim)}
+table.dt tr.dt-row.revoked{opacity:.55}
+table.dt tr.dt-grp{background:var(--bg-3);cursor:pointer}
+table.dt tr.dt-grp td{padding:9px 12px;font-size:12px;font-weight:700;color:var(--tx-0);border-bottom:1px solid var(--border-0)}
+.dt-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.dt-search{padding:8px 14px;border-radius:var(--r);border:1px solid var(--border-1);background:var(--bg-1);font-size:13px;color:var(--tx-0);outline:none;font-family:var(--sans);width:240px}
+.dt-search:focus{border-color:var(--gold)}
+.dt-search::placeholder{color:var(--tx-3)}
+.dt-toolbar-right{margin-left:auto;font-size:12px;color:var(--tx-2)}
+.dt-dd-wrap{position:relative}
+.dt-dd{position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:var(--bg-1);border:1px solid var(--border-0);border-radius:var(--r-lg);box-shadow:0 8px 32px rgba(0,0,0,.25);padding:6px;min-width:200px;max-height:340px;overflow-y:auto}
+.dt-dd-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tx-2);padding:4px 8px 6px}
+.dt-dd-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--r);cursor:pointer;font-size:13px;color:var(--tx-0)}
+.dt-dd-item:hover{background:var(--bg-3)}
+.dt-dd-item.sel{background:var(--green-dim);color:var(--green);font-weight:600}
+.dt-check{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--border-2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px;color:#fff}
+.dt-check.on{background:var(--green);border-color:var(--green)}
+.dt-disc{display:flex;gap:2px;align-items:center}
+.dt-disc .seg{width:5px;height:12px;border-radius:2px;background:var(--border-1)}
+.dt-disc .seg.on{background:var(--green)}
+.dt-disc .pct{font-size:10px;color:var(--tx-2);margin-left:4px;font-variant-numeric:tabular-nums}
+.dt-util{display:flex;align-items:center;gap:6px}
+.dt-util-track{width:48px;height:6px;border-radius:3px;background:var(--border-1);overflow:hidden}
+.dt-util-fill{height:100%;border-radius:3px;transition:width .3s}
+.dt-util-label{font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
+.dt-locked{display:inline-flex;align-items:center;gap:4px;color:var(--tx-3);font-size:11px;font-style:italic}
+.dt-editable{border-bottom:1px dashed var(--border-2);padding-bottom:1px;cursor:pointer}
+.dt-editable:hover{border-color:var(--green)}
+.dt-edit-input{width:100%;padding:2px 5px;font-size:13px;border:1.5px solid var(--green);border-radius:4px;background:var(--bg-1);outline:none;font-family:var(--sans);color:var(--tx-0)}
+.dt-eo{font-family:var(--mono);font-size:10px;font-weight:500;padding:1px 5px;border-radius:4px;background:var(--bg-3);color:var(--tx-1);letter-spacing:.04em;display:inline-flex;align-items:center}
+.dt-room{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:5px;background:var(--bg-3);font-size:10px;font-family:var(--mono);color:var(--tx-2)}
+/* Panel */
+.dt-panel-overlay{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:290}
+.dt-panel{position:fixed;top:0;right:0;bottom:0;width:520px;max-width:90vw;background:var(--bg-1);border-left:1px solid var(--border-0);box-shadow:-6px 0 30px rgba(0,0,0,.15);z-index:300;display:flex;flex-direction:column;overflow:hidden;animation:slideInRight .2s ease both}
+.dt-panel-head{padding:18px 22px;border-bottom:1px solid var(--border-0);display:flex;justify-content:space-between;align-items:flex-start;background:var(--bg-2)}
+.dt-panel-head h2{font-size:18px;font-weight:700;margin:0}
+.dt-panel-tabs{display:flex;border-bottom:1px solid var(--border-0);background:var(--bg-1)}
+.dt-panel-tab{padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--tx-2);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:var(--sans)}
+.dt-panel-tab.active{color:var(--green);border-bottom-color:var(--green)}
+.dt-panel-tab:hover:not(.active){color:var(--tx-0)}
+.dt-panel-body{flex:1;overflow-y:auto;padding:18px 22px}
+.dt-field-grid{display:grid;grid-template-columns:95px 1fr;gap:7px 10px;font-size:13px;margin-bottom:16px}
+.dt-field-key{color:var(--tx-2);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.05em;padding-top:2px}
+.dt-gm{padding:11px 14px;border-radius:var(--r);background:var(--bg-3);border:1px solid var(--border-0);margin-bottom:14px;font-size:12px;color:var(--tx-1);line-height:1.5}
+.dt-gm .g{color:var(--teal);font-weight:600}.dt-gm .m{color:var(--gold);font-weight:600}
+.dt-note{padding:12px 14px;border-radius:var(--r);border:1px solid var(--border-0);margin-bottom:8px;position:relative}
+.dt-note.shared{background:var(--bg-1);border-left:3px solid var(--green)}
+.dt-note.internal{background:var(--bg-2);border-left:3px solid var(--gold)}
+.dt-note-meta{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--tx-2);margin-bottom:6px;flex-wrap:wrap}
+.dt-note-text{font-size:13px;color:var(--tx-0);line-height:1.5}
+.dt-note-tags{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.dt-note-tag{font-size:10px;padding:1px 6px;border-radius:6px;background:var(--bg-3);color:var(--tx-2)}
+.dt-alloc{padding:14px;border-radius:var(--r);border:1px solid var(--border-0);background:var(--bg-1);margin-bottom:8px}
+.dt-alloc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.dt-alloc-title{font-size:14px;font-weight:600}
+.dt-alloc-detail{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;color:var(--tx-1)}
+.dt-alloc-events{margin-top:10px;padding-top:10px;border-top:1px solid var(--border-0)}
+.dt-alloc-event{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tx-1);padding:3px 0}
+.dt-alloc-event .dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.dt-prov{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-0);font-size:12px}
+.dt-prov:last-child{border-bottom:none}
+.dt-prov-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.dt-cap{display:flex;gap:20px;margin-bottom:16px}
+.dt-cap-box{padding:10px 14px;border-radius:var(--r);background:var(--bg-3);border:1px solid var(--border-0);flex:1;text-align:center}
+.dt-cap-box .num{font-size:22px;font-weight:700}
+.dt-cap-box .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--tx-2)}
+.dt-sov{margin-top:14px;padding:12px 16px;border-radius:var(--r-lg);background:var(--green-dim);border:1px solid rgba(61,214,140,.15);display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--green);line-height:1.5}
+.dt-hint{margin-top:8px;padding:10px 12px;border-radius:var(--r);background:var(--gold-dim);border:1px solid var(--gold-mid);font-size:12px;color:var(--tx-1);line-height:1.5}
 </style>
 </head>
 <body>
@@ -9019,6 +9097,805 @@ const ClientApp = ({session, onLogout, showToast}) => {
   </div>;
 };
 
+/* ═══════════════════ DATA TABLE COMPONENTS ═══════════════════ */
+
+// Config objects for data table display
+const DT_STATUS_CFG = {
+  imported: {l:'Imported', bg:'var(--gold-dim)', c:'var(--gold)'},
+  invited:  {l:'Invited',  bg:'var(--teal-dim)', c:'var(--teal)'},
+  joined:   {l:'Joined',   bg:'var(--green-dim)',c:'var(--green)'},
+  claimed:  {l:'Claimed',  bg:'var(--green-dim)',c:'var(--green)'},
+  active:   {l:'Active',   bg:'var(--green-dim)',c:'var(--green)'},
+  revoked:  {l:'Revoked',  bg:'var(--red-dim)',  c:'var(--red)'},
+};
+const DT_PRI_CFG = {
+  critical:'tag-red', high:'tag-gold', medium:'tag-teal', low:'tag-purple', none:'tag-purple'
+};
+const DT_NEED_COLORS = {
+  housing:'tag-blue', medical:'tag-purple', legal:'tag-gold',
+  employment:'tag-teal', substance:'tag-orange', outreach:'tag-purple', childcare:'tag-green'
+};
+const DT_OP_CFG = {
+  sovereign:  {l:'Sovereign',   cls:'tag-purple'},
+  attested:   {l:'Attested',    cls:'tag-teal'},
+  contributed:{l:'Contributed', cls:'tag-blue'},
+  published:  {l:'Published',   cls:'tag-green'},
+};
+const DT_PROV_COLORS = {
+  restocked:'var(--green)', allocated:'var(--teal)', returned:'var(--blue)',
+  expired:'var(--gold)', capacity_reduced:'var(--red)', capacity_restored:'var(--green)', completed:'var(--green)'
+};
+
+// Small helper components
+const DtEo = ({op}) => <span className="dt-eo">{op}</span>;
+
+const DtRoom = ({room}) => {
+  if (!room) return <span className="dt-room">no room</span>;
+  const short = room.replace(/!|:[\w.-]+/g,'').substring(0,22);
+  return <span className="dt-room">{'⬡ '+short}</span>;
+};
+
+const DtDiscBar = ({level=0}) => {
+  const segs = [];
+  for (let i=0;i<5;i++) segs.push(<span key={i} className={'seg'+(i<Math.round(level*5)?' on':'')}/>);
+  return <div className="dt-disc">{segs}<span className="pct">{Math.round(level*100)}%</span></div>;
+};
+
+const DtUtilBar = ({pct=0}) => {
+  const c = pct>.9?'var(--red)':pct>.7?'var(--gold)':'var(--green)';
+  return <div className="dt-util">
+    <div className="dt-util-track"><div className="dt-util-fill" style={{width:(pct*100)+'%',background:c}}/></div>
+    <span className="dt-util-label" style={{color:c}}>{Math.round(pct*100)}%</span>
+  </div>;
+};
+
+const DtLock = () => <svg width="10" height="10" viewBox="0 0 16 16">
+  <rect x="2" y="7" width="12" height="8" rx="2" fill="currentColor"/>
+  <path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+</svg>;
+
+const DtStatusBadge = ({status}) => {
+  const c = DT_STATUS_CFG[status] || DT_STATUS_CFG.imported;
+  return <span className="tag" style={{background:c.bg,color:c.c,fontSize:11}}>{c.l}</span>;
+};
+
+const dtFmtDate = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso), now = new Date(), diff = now - d;
+  if (diff < 864e5) return 'Today';
+  if (diff < 1728e5) return 'Yesterday';
+  if (diff < 6048e5) return Math.floor(diff/864e5)+'d ago';
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+};
+
+/* ─── Generic DataTable component ─── */
+const DataTable = ({data, columns, groupOptions, defaultVisibleCols, onRowClick, renderCell, getVal, selectedId, label}) => {
+  const [search, setSearch] = useState('');
+  const [groupBy, setGroupBy] = useState('none');
+  const [sortField, setSortField] = useState(null);
+  const [sortDir, setSortDir] = useState('asc');
+  const [visibleCols, setVisibleCols] = useState(defaultVisibleCols || columns.map(c=>c.key));
+  const [colDd, setColDd] = useState(false);
+  const [grpDd, setGrpDd] = useState(false);
+
+  const visCols = columns.filter(c => c.fixed || visibleCols.includes(c.key));
+
+  // Filter
+  const filtered = data.filter(row => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return visCols.some(c => {
+      const v = getVal(row, c.key);
+      return v && String(v).toLowerCase().includes(s);
+    });
+  });
+
+  // Sort
+  const sorted = [...filtered];
+  if (sortField) {
+    sorted.sort((a,b) => {
+      const va = getVal(a, sortField), vb = getVal(b, sortField);
+      const cmp = String(va||'').localeCompare(String(vb||''), undefined, {numeric:true});
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }
+
+  // Group
+  let grouped;
+  if (groupBy !== 'none') {
+    grouped = {};
+    sorted.forEach(row => {
+      const gk = getVal(row, groupBy) || 'Other';
+      if (!grouped[gk]) grouped[gk] = [];
+      grouped[gk].push(row);
+    });
+  } else {
+    grouped = {'__all': sorted};
+  }
+
+  const handleSort = (key) => {
+    if (sortField === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(key); setSortDir('asc'); }
+  };
+
+  const toggleCol = (key) => {
+    setVisibleCols(prev => prev.includes(key) ? prev.filter(k=>k!==key) : [...prev, key]);
+  };
+
+  return <>
+    <div className="dt-toolbar">
+      <input className="dt-search" placeholder={`Search ${label||''}...`} value={search}
+        onChange={e=>setSearch(e.target.value)}/>
+
+      {groupOptions && <div className="dt-dd-wrap">
+        <button className={groupBy!=='none'?'b-gho b-sm':'b-gho b-sm'} style={groupBy!=='none'?{background:'var(--green-dim)',color:'var(--green)',borderColor:'rgba(61,214,140,.2)'}:{}}
+          onClick={()=>{setGrpDd(!grpDd);setColDd(false)}}>
+          {'≡ '+(groupBy==='none'?'Group':(groupOptions.find(g=>g.k===groupBy)||{}).l||groupBy)}
+        </button>
+        {grpDd && <div className="dt-dd">
+          <div className="dt-dd-label">Group By</div>
+          {groupOptions.map(g => <div key={g.k} className={'dt-dd-item'+(groupBy===g.k?' sel':'')}
+            onClick={()=>{setGroupBy(g.k);setGrpDd(false)}}>{g.l}</div>)}
+        </div>}
+      </div>}
+
+      <div className="dt-dd-wrap">
+        <button className="b-gho b-sm" onClick={()=>{setColDd(!colDd);setGrpDd(false)}}>
+          {'⊞ Columns ('+visCols.length+')'}
+        </button>
+        {colDd && <div className="dt-dd">
+          <div className="dt-dd-label">Toggle Columns</div>
+          {columns.map(c => {
+            const on = c.fixed || visibleCols.includes(c.key);
+            return <div key={c.key} className="dt-dd-item" style={c.fixed?{opacity:.5}:{}}
+              onClick={()=>!c.fixed && toggleCol(c.key)}>
+              <span className={'dt-check'+(on?' on':'')}>{on?'✓':''}</span>
+              {c.label}{c.fixed?' (always)':''}
+            </div>;
+          })}
+        </div>}
+      </div>
+
+      <span className="dt-toolbar-right">{filtered.length} {label||'rows'}</span>
+    </div>
+
+    <div className="dt-wrap"><div className="dt-scroll">
+      <table className="dt">
+        <thead><tr>
+          {visCols.map(c => <th key={c.key} onClick={()=>handleSort(c.key)}>
+            {c.label}{sortField===c.key?(sortDir==='asc'?' ↑':' ↓'):''}
+          </th>)}
+        </tr></thead>
+        <tbody>
+          {Object.entries(grouped).map(([gName, rows]) => <React.Fragment key={gName}>
+            {gName !== '__all' && <tr className="dt-grp">
+              <td colSpan={visCols.length}>{'▾ '+gName+' ('+rows.length+')'}</td>
+            </tr>}
+            {rows.map(row => <tr key={row.id} className={'dt-row'+(selectedId===row.id?' selected':'')+(row.status==='revoked'?' revoked':'')}
+              onClick={()=>onRowClick&&onRowClick(row)}>
+              {visCols.map(col => <td key={col.key}>{renderCell(row, col)}</td>)}
+            </tr>)}
+          </React.Fragment>)}
+        </tbody>
+      </table>
+    </div></div>
+  </>;
+};
+
+/* ─── Individual Side Panel ─── */
+const IndividualPanel = ({row, notes, allocations, onClose, panelTab, setPanelTab, provenanceField, setProvenanceField}) => {
+  if (!row) return null;
+  const indNotes = (notes||[]).filter(n=>n.indId===row.id);
+  const indAllocs = (allocations||[]).filter(a=>a.indId===row.id);
+
+  return <>
+    <div className="dt-panel-overlay" onClick={onClose}/>
+    <div className="dt-panel">
+      <div className="dt-panel-head">
+        <div>
+          <h2>{row.name||row.alias||'Unknown'}</h2>
+          <div style={{display:'flex',gap:8,alignItems:'center',marginTop:6,flexWrap:'wrap'}}>
+            <DtStatusBadge status={row.status}/>
+            <DtDiscBar level={row.disclosureLevel||0}/>
+            <DtRoom room={row.bridgeRoom}/>
+          </div>
+        </div>
+        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,color:'var(--tx-2)'}}>✕</button>
+      </div>
+
+      <div className="dt-panel-tabs">
+        {['fields','notes','allocations'].map(t => <button key={t}
+          className={'dt-panel-tab'+(panelTab===t?' active':'')}
+          onClick={()=>setPanelTab(t)}>
+          {t==='fields'?'Fields':t==='notes'?`Notes (${indNotes.length})`:`Allocations (${indAllocs.length})`}
+        </button>)}
+      </div>
+
+      <div className="dt-panel-body">
+        {/* Fields Tab */}
+        {panelTab==='fields' && <>
+          <span className="section-label">Schema Fields — click for provenance</span>
+          {Object.entries(row.fields||{}).map(([key,f]) => <React.Fragment key={key}>
+            <div style={{padding:'10px 12px',borderRadius:'var(--r)',border:'1px solid var(--border-0)',marginBottom:6,cursor:'pointer',
+              background:provenanceField===key?'var(--green-dim)':'var(--bg-2)',transition:'all .15s'}}
+              onClick={()=>setProvenanceField(provenanceField===key?null:key)}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.05em',color:'var(--tx-2)'}}>{key.replace(/_/g,' ')}</span>
+                <div style={{display:'flex',gap:4}}>
+                  {f.eo_op && <DtEo op={f.eo_op}/>}
+                  {f.frame && <span className="dt-eo" style={{background:f.frame==='GIVEN'?'var(--teal-dim)':'var(--gold-dim)',
+                    color:f.frame==='GIVEN'?'var(--teal)':'var(--gold)'}}>{f.frame}</span>}
+                  {f.room && <span className="dt-eo">{f.room}</span>}
+                </div>
+              </div>
+              {f.disclosed===false
+                ? <div style={{marginTop:4}}><span className="dt-locked"><DtLock/> not disclosed</span></div>
+                : <div style={{marginTop:4,fontSize:14,fontWeight:500}}>{f.value||'—'}</div>}
+            </div>
+
+            {provenanceField===key && f.disclosed!==false && <div className="dt-gm">
+              {f.given && <div><span className="g">GIVEN: </span>{f.given}</div>}
+              {f.meant && <div style={{marginTop:3}}><span className="m">MEANT: </span>{f.meant}</div>}
+              {f.source && <div style={{marginTop:6,fontSize:11}}>
+                <strong>Source: </strong>{f.source} · <strong>Confidence: </strong>{f.confidence}
+              </div>}
+              {f.history && f.history.length > 0 && <>
+                <div style={{marginTop:10,marginBottom:6}}><span className="section-label">EVENT HISTORY</span></div>
+                {[...f.history].reverse().map((evt,i) => <div key={i} style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:'var(--tx-1)',padding:'4px 0'}}>
+                  <DtEo op={evt.eo_op}/>
+                  <span style={{fontWeight:500,minWidth:55}}>{dtFmtDate(evt.at)}</span>
+                  <span style={{color:'var(--tx-2)'}}>{evt.by}</span>
+                  <span style={{marginLeft:'auto',fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-3)'}}>{evt.type}</span>
+                </div>)}
+              </>}
+            </div>}
+          </React.Fragment>)}
+        </>}
+
+        {/* Notes Tab */}
+        {panelTab==='notes' && <>
+          {(()=>{
+            const shared = indNotes.filter(n=>n.type==='shared');
+            const internal = indNotes.filter(n=>n.type==='internal');
+            return <>
+              {shared.length > 0 && <>
+                <span className="section-label">Shared Notes (bridge room — individual can see)</span>
+                {shared.map(n => <div key={n.id} className="dt-note shared">
+                  <div className="dt-note-meta">
+                    <strong>{n.author}</strong>
+                    <span>{dtFmtDate(n.at)}</span>
+                    <DtEo op={n.eo_op||'INS'}/>
+                    <span className="dt-eo" style={{background:'var(--green-dim)',color:'var(--green)'}}>{n.frame||'GIVEN'}</span>
+                    {n.category && <span className="tag tag-purple" style={{fontSize:9}}>{n.category}</span>}
+                  </div>
+                  <div className="dt-note-text">{n.text}</div>
+                  {n.tags && n.tags.length > 0 && <div className="dt-note-tags">{n.tags.map(t=><span key={t} className="dt-note-tag">{t}</span>)}</div>}
+                </div>)}
+              </>}
+              {internal.length > 0 && <>
+                <span className="section-label" style={{marginTop:16}}>Internal Notes (roster room — org-only, individual CANNOT see)</span>
+                {internal.map(n => <div key={n.id} className="dt-note internal">
+                  <div className="dt-note-meta">
+                    <strong>{n.author}</strong>
+                    <span>{dtFmtDate(n.at)}</span>
+                    <DtEo op={n.eo_op||'INS'}/>
+                    <span className="dt-eo" style={{background:'var(--gold-dim)',color:'var(--gold)'}}>{n.frame||'MEANT'}</span>
+                    {n.category && <span className="tag tag-purple" style={{fontSize:9}}>{n.category}</span>}
+                    <span style={{fontSize:10,color:'var(--gold)'}}> internal</span>
+                  </div>
+                  <div className="dt-note-text">{n.text}</div>
+                  {n.tags && n.tags.length > 0 && <div className="dt-note-tags">{n.tags.map(t=><span key={t} className="dt-note-tag">{t}</span>)}</div>}
+                </div>)}
+              </>}
+              {indNotes.length === 0 && <div style={{padding:'40px 0',textAlign:'center',color:'var(--tx-3)'}}>No notes recorded.</div>}
+              <div className="dt-hint">
+                <strong>Privacy logic: </strong>Shared notes emit <DtEo op="INS"/> in the <strong>bridge room</strong> → encrypted via Megolm + per-field AES-256-GCM → client + provider can read. Internal notes emit <DtEo op="INS"/> in the <strong>roster room</strong> → only org staff can read.
+              </div>
+            </>;
+          })()}
+        </>}
+
+        {/* Allocations Tab */}
+        {panelTab==='allocations' && <>
+          {indAllocs.length === 0
+            ? <div style={{padding:'40px 0',textAlign:'center',color:'var(--tx-3)'}}>No allocations recorded.</div>
+            : <>
+              <span className="section-label">Resources Received (dual-write: bridge + vault shadow)</span>
+              {indAllocs.map(a => {
+                const stCls = a.status==='active'?'tag-green':a.status==='consumed'?'tag-purple':'tag-gold';
+                return <div key={a.id} className="dt-alloc">
+                  <div className="dt-alloc-header">
+                    <div>
+                      <div className="dt-alloc-title">{a.resourceName}</div>
+                      <div style={{fontSize:11,color:'var(--tx-2)',marginTop:2}}>{a.quantity} {a.unit} · {a.org}</div>
+                    </div>
+                    <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                      <DtEo op={a.eo_op||'CON'}/><span className={'tag '+stCls} style={{fontSize:10}}>{a.status}</span>
+                    </div>
+                  </div>
+                  <div className="dt-alloc-detail">
+                    <div><strong>By: </strong>{a.allocatedBy}</div>
+                    <div><strong>Date: </strong>{dtFmtDate(a.at)}</div>
+                    <div><strong>Bridge: </strong><DtRoom room={a.bridgeRoom}/></div>
+                    {a.expiresAt && <div><strong>Expires: </strong>{a.expiresAt}</div>}
+                  </div>
+                  {a.constraintsChecked && a.constraintsChecked.length > 0 && <div style={{marginTop:8,fontSize:11,color:'var(--tx-1)'}}>
+                    <strong>Constraints verified: </strong>
+                    {a.constraintsChecked.map(c=><span key={c} style={{display:'inline-block',padding:'1px 6px',borderRadius:5,background:'var(--green-dim)',color:'var(--green)',fontSize:10,marginRight:3,marginBottom:2}}>{c}</span>)}
+                  </div>}
+                  {a.vaultShadow && <div style={{marginTop:8,padding:'8px 10px',borderRadius:'var(--r)',background:'var(--bg-3)',border:'1px solid var(--border-0)',fontSize:11,color:'var(--tx-2)'}}>
+                    <strong>Vault shadow: </strong>"{a.vaultShadow.resource_name}" from {a.vaultShadow.org} — denormalized, survives bridge severance
+                  </div>}
+                  {a.events && a.events.length > 0 && <div className="dt-alloc-events">
+                    <div style={{fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--tx-2)',marginBottom:4}}>Lifecycle Events</div>
+                    {a.events.map((evt,i) => <div key={i} className="dt-alloc-event">
+                      <span className="dot" style={{background:evt.event==='allocated'?'var(--green)':evt.event==='consumed'?'var(--tx-3)':'var(--gold)'}}/>
+                      <DtEo op={evt.eo_op||'ALT'}/>
+                      <span style={{fontWeight:500}}>{evt.event}</span>
+                      <span>{dtFmtDate(evt.at)}</span>
+                      <span style={{color:'var(--tx-3)',fontSize:11,marginLeft:'auto'}}>{evt.note}</span>
+                    </div>)}
+                  </div>}
+                </div>;
+              })}
+              <div className="dt-hint">
+                <strong>Allocation logic: </strong>Every allocation emits <DtEo op="CON"/> (⋈ connecting individual to resource). Status changes emit <DtEo op="ALT"/> (∿). Revocations emit <DtEo op="NUL"/> (∅). The bridge room gets the live record; the vault gets a denormalized shadow copy.
+              </div>
+            </>}
+        </>}
+      </div>
+    </div>
+  </>;
+};
+
+/* ─── Resource Side Panel ─── */
+const ResourcePanel = ({row, allocations, onClose, panelTab, setPanelTab}) => {
+  if (!row) return null;
+  const resAllocs = (allocations||[]).filter(a=>a.resourceId===row.id);
+
+  return <>
+    <div className="dt-panel-overlay" onClick={onClose}/>
+    <div className="dt-panel">
+      <div className="dt-panel-head">
+        <div>
+          <h2>{row.name}</h2>
+          <div style={{display:'flex',gap:6,alignItems:'center',marginTop:6,flexWrap:'wrap'}}>
+            <span className={'tag tag-'+(RESOURCE_CATEGORY_COLORS[row.category]||'teal')} style={{fontSize:10}}>{RESOURCE_CATEGORY_LABELS[row.category]||row.category}</span>
+            {row.relation && <span className="tag tag-gold" style={{fontSize:10}}>{row.relation}</span>}
+            {row.opacityLevel && (()=>{const o=DT_OP_CFG[row.opacityLevel];return o?<span className={'tag '+o.cls} style={{fontSize:10}}>{o.l}</span>:null;})()}
+            <DtRoom room={row.orgRoom}/>
+          </div>
+        </div>
+        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',fontSize:20,color:'var(--tx-2)'}}>✕</button>
+      </div>
+
+      <div className="dt-panel-tabs">
+        {['details','provisioning','allocations'].map(t => <button key={t}
+          className={'dt-panel-tab'+(panelTab===t?' active':'')}
+          onClick={()=>setPanelTab(t)}>
+          {t==='details'?'Details':t==='provisioning'?'Provisioning':`Allocations (${resAllocs.length})`}
+        </button>)}
+      </div>
+
+      <div className="dt-panel-body">
+        {/* Details Tab */}
+        {panelTab==='details' && <>
+          <div className="dt-cap">
+            {[{n:row.available||0,l:'Available',c:'var(--green)'},{n:row.allocated||0,l:'Allocated',c:'var(--teal)'},
+              {n:row.reserved||0,l:'Reserved',c:'var(--gold)'},{n:row.totalCapacity||0,l:'Total',c:'var(--tx-0)'}]
+              .map((s,i) => <div key={i} className="dt-cap-box">
+                <div className="num" style={{color:s.c}}>{s.n}</div><div className="lbl">{s.l}</div>
+              </div>)}
+          </div>
+          <div style={{marginBottom:14}}><DtUtilBar pct={row.utilizationPct||0}/></div>
+
+          <span className="section-label">Details</span>
+          <div className="dt-field-grid">
+            {[{k:'Holder',v:(row.holder||'—')+' ('+(row.holderType||'org')+')'},{k:'Relation',v:row.relation||'—'},
+              {k:'Network',v:row.network||'—'},{k:'Governance',v:row.governance||'—'},{k:'Updated',v:dtFmtDate(row.lastUpdated)}]
+              .map(({k,v}) => <React.Fragment key={k}><div className="dt-field-key">{k}</div><div>{v}</div></React.Fragment>)}
+          </div>
+
+          {row.constraints && row.constraints.length > 0 && <>
+            <span className="section-label" style={{marginTop:12}}>Constraints (with governance provenance)</span>
+            {row.constraints.map((c,i) => <div key={i} style={{padding:'6px 10px',borderRadius:'var(--r)',border:'1px solid var(--border-0)',marginBottom:4,fontSize:12,display:'flex',alignItems:'center',gap:8}}>
+              <span style={{color:'var(--green)'}}>✓</span>{c}
+              <span style={{marginLeft:'auto',fontSize:10,color:'var(--tx-3)',fontStyle:'italic'}}>{row.governance}</span>
+            </div>)}
+          </>}
+        </>}
+
+        {/* Provisioning Tab */}
+        {panelTab==='provisioning' && <>
+          <span className="section-label">Provisioning Timeline (org room events)</span>
+          <div style={{marginBottom:12,padding:'8px 10px',borderRadius:'var(--r)',background:'var(--bg-3)',fontSize:11,color:'var(--tx-2)'}}>
+            These events live in <DtRoom room={row.orgRoom}/>. Individual identities are NOT in these events — only bridge room references. Inventory = total - allocated - reserved.
+          </div>
+          {(row.provisioningEvents||[]).map((evt,i) => {
+            const color = DT_PROV_COLORS[evt.event]||'var(--tx-2)';
+            const icon = evt.event==='restocked'?'↑':evt.event==='allocated'?'→':evt.event==='returned'?'←':evt.event==='expired'?'⏱':evt.event.includes('capacity')?'⚡':'✓';
+            return <div key={i} className="dt-prov">
+              <div className="dt-prov-icon" style={{background:color+'18',color}}>{icon}</div>
+              <div style={{flex:1}}>
+                <div><strong>{(evt.event||'').replace(/_/g,' ')}</strong> <DtEo op={evt.eo_op||'ALT'}/>{' '}
+                  <span style={{color,fontWeight:600,fontFamily:'var(--mono)',fontSize:12}}>{evt.delta}</span></div>
+                <div style={{marginTop:2,fontSize:12,color:'var(--tx-1)'}}>{evt.detail}</div>
+                <div style={{fontSize:11,color:'var(--tx-3)'}}>{dtFmtDate(evt.at)} · {evt.by}</div>
+              </div>
+            </div>;
+          })}
+          {(!row.provisioningEvents || row.provisioningEvents.length === 0) && <div style={{padding:'40px 0',textAlign:'center',color:'var(--tx-3)'}}>No provisioning events recorded.</div>}
+          <div className="dt-hint">
+            <strong>Provisioning logic: </strong>Capacity changes emit <DtEo op="ALT"/> (∿) or <DtEo op="NUL"/> (∅). New funding emits <DtEo op="INS"/> (△). Allocations emit <DtEo op="CON"/> (⋈). All events carry full provenance.
+          </div>
+        </>}
+
+        {/* Allocations Tab */}
+        {panelTab==='allocations' && <>
+          {resAllocs.length === 0
+            ? <div style={{padding:'40px 0',textAlign:'center',color:'var(--tx-3)'}}>No allocations from this resource.</div>
+            : <>
+              <span className="section-label">Allocations from this resource (anonymized in org view)</span>
+              {resAllocs.map(a => <div key={a.id} className="dt-alloc">
+                <div className="dt-alloc-header">
+                  <div>
+                    <div style={{fontWeight:600,fontSize:13}}>{a.indName||'[bridge ref]'}</div>
+                    <div style={{fontSize:11,color:'var(--tx-2)'}}>{a.quantity} {a.unit} · {dtFmtDate(a.at)}</div>
+                  </div>
+                  <div style={{display:'flex',gap:4}}><DtEo op={a.eo_op||'CON'}/>
+                    <span className={'tag '+(a.status==='active'?'tag-green':'tag-purple')} style={{fontSize:10}}>{a.status}</span>
+                  </div>
+                </div>
+                <div style={{fontSize:11,color:'var(--tx-2)',marginTop:4}}>
+                  Bridge: <DtRoom room={a.bridgeRoom}/> · By: {a.allocatedBy}
+                </div>
+              </div>)}
+              <div className="dt-hint">
+                <strong>Privacy note: </strong>In production, this panel shows bridge room references, not individual names, unless the viewer has access to each bridge. Names resolve only for bridges you're a member of.
+              </div>
+            </>}
+        </>}
+      </div>
+    </div>
+  </>;
+};
+
+/* ─── IndividualsView — replaces old dashboard card grid ─── */
+const IndividualsView = ({cases, caseAssignments, openCase, T, svc, caseAllocations, providerProfile, orgRoom, orgMeta, staff, orgRole, showToast,
+  bridgeNotes, rosterNotes, allAllocations, onCreateOrg, onEditProfile, onDiscover, myVerification, emailVerifyConfig, openEmailVerifyModal, orgChannels,
+  ORG_TYPE_LABELS, ORG_ROLE_LABELS}) => {
+
+  const [dtTab, setDtTab] = useState('individuals');
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [panelTab, setPanelTab] = useState('fields');
+  const [provenanceField, setProvenanceField] = useState(null);
+
+  // Transform cases into individual rows
+  const individuals = cases.map(c => {
+    const assignment = caseAssignments[c.bridgeRoomId];
+    const fields = {};
+    Object.entries(c.sharedData||{}).forEach(([k,v]) => {
+      if (k === 'full_name') return; // handled as name
+      fields[k] = {
+        value: v,
+        disclosed: true,
+        eo_op: 'INS',
+        frame: 'GIVEN',
+        room: 'bridge',
+        editable: false,
+        history: []
+      };
+    });
+
+    return {
+      id: c.bridgeRoomId,
+      name: c.sharedData.full_name || c.clientUserId || 'Unknown',
+      alias: null,
+      status: c.meta?.status === 'tombstoned' ? 'revoked' : (c.sharedData.full_name ? 'active' : 'imported'),
+      disclosureLevel: Object.keys(c.sharedData||{}).length > 0 ? Math.min(Object.keys(c.sharedData).length / 10, 1) : 0,
+      lastContact: c.meta?.last_updated || c.meta?.created,
+      assignedTo: (assignment?.primary || c.meta?.provider || '').split(':')[0]?.replace('@','') || '—',
+      activeCases: 1,
+      needs: [],
+      priority: assignment?.priority || 'none',
+      nextAction: assignment?.next_action || null,
+      nextActionDue: assignment?.next_action_due || null,
+      bridgeRoom: c.bridgeRoomId,
+      vaultRoom: null,
+      rosterRef: null,
+      fields,
+      transferable: c.transferable,
+      _case: c, // preserve original for openCase
+    };
+  });
+
+  const IND_COLS = [
+    {key:'name', label:'Individual', fixed:true},
+    {key:'status', label:'Status'},
+    {key:'priority', label:'Priority'},
+    {key:'assignedTo', label:'Assigned'},
+    {key:'fields_count', label:'Fields'},
+    {key:'transferable', label:'Transfer'},
+  ];
+
+  // Add dynamic field columns from shared data
+  const fieldKeys = new Set();
+  cases.forEach(c => Object.keys(c.sharedData||{}).forEach(k => { if (k !== 'full_name') fieldKeys.add(k); }));
+  fieldKeys.forEach(k => {
+    IND_COLS.push({key:k, label:k.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase()), isField:true});
+  });
+
+  const IND_GROUPS = [
+    {k:'none',l:'No grouping'},
+    {k:'status',l:'Status'},
+    {k:'assignedTo',l:'Assigned To'},
+    {k:'priority',l:'Priority'},
+  ];
+
+  const defaultVisCols = ['name','status','priority','assignedTo','fields_count','transferable',
+    ...Array.from(fieldKeys).slice(0,3)];
+
+  const getIndVal = (row, key) => {
+    if (key === 'fields_count') return Object.keys(row.fields||{}).length;
+    if (key === 'transferable') return row.transferable ? 'Yes' : 'Locked';
+    if (row.fields && row.fields[key]) return row.fields[key].value || '';
+    return row[key] || '';
+  };
+
+  const renderIndCell = (row, col) => {
+    const k = col.key;
+    if (k === 'name') {
+      const initial = (row.name||'?')[0].toUpperCase();
+      return <div style={{display:'flex',alignItems:'center',gap:8}}>
+        <div style={{width:24,height:24,borderRadius:'50%',background:row.status==='revoked'?'var(--border-1)':'var(--green)',
+          display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:11,fontWeight:700,flexShrink:0}}>{initial}</div>
+        <div>
+          <div style={{fontWeight:600,fontSize:13}}>{row.name}</div>
+          {row.alias && <div style={{fontSize:11,color:'var(--tx-3)'}}>"{row.alias}"</div>}
+        </div>
+      </div>;
+    }
+    if (k === 'status') return <DtStatusBadge status={row.status}/>;
+    if (k === 'priority') {
+      const cls = DT_PRI_CFG[row.priority] || 'tag-purple';
+      return <span className={'tag '+cls} style={{fontSize:10}}>{row.priority}</span>;
+    }
+    if (k === 'assignedTo') return <span style={{fontSize:13,color:'var(--tx-1)'}}>{row.assignedTo}</span>;
+    if (k === 'fields_count') {
+      const ct = Object.keys(row.fields||{}).length;
+      return <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:22,height:22,
+        borderRadius:5,background:ct>0?'var(--green-dim)':'var(--bg-3)',color:ct>0?'var(--green)':'var(--tx-3)',
+        fontSize:12,fontWeight:700}}>{ct}</span>;
+    }
+    if (k === 'transferable') {
+      return row.transferable
+        ? <span className="tag tag-teal" style={{fontSize:9}}>Transferable</span>
+        : <span className="tag tag-red" style={{fontSize:9}}>Locked</span>;
+    }
+    if (k === 'needs' && row.needs) {
+      return row.needs.length > 0
+        ? row.needs.map(n => <span key={n} className={'tag '+(DT_NEED_COLORS[n]||'tag-purple')} style={{fontSize:9,marginRight:2}}>{n}</span>)
+        : <span style={{color:'var(--tx-3)',fontSize:12}}>—</span>;
+    }
+    // Field columns
+    if (col.isField && row.fields && row.fields[k]) {
+      const f = row.fields[k];
+      if (f.disclosed === false) return <span className="dt-locked"><DtLock/> not disclosed</span>;
+      return <span style={{fontSize:13}}>{f.value || '—'}</span>;
+    }
+    return <span style={{color:'var(--tx-3)',fontSize:12}}>—</span>;
+  };
+
+  const selectedInd = selectedRow ? individuals.find(r => r.id === selectedRow) : null;
+
+  // Combine notes for selected individual
+  const allNotes = [
+    ...(bridgeNotes[selectedRow]||[]).map(n=>({...n, type:'shared'})),
+    ...(rosterNotes||[]).filter(n=>n.indId===selectedRow).map(n=>({...n, type:'internal'})),
+  ];
+
+  return <div className="anim-up" style={{maxWidth:1200,margin:'0 auto'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+      <div>
+        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>{T.provider_term} Dashboard</h2>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:2}}>Each row is an encrypted bridge room. Click to view fields, notes, and allocations.</p>
+      </div>
+      <div style={{display:'flex',gap:6}}>
+        <button onClick={onDiscover} className="b-gho b-sm" style={{display:'flex',alignItems:'center',gap:4}}>Find Client</button>
+      </div>
+    </div>
+
+    {/* Summary cards */}
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10,marginBottom:20}}>
+      {[{l:'Active Cases',v:cases.length,c:'gold'},{l:'Staff',v:staff.length||'—',c:'blue'},
+        {l:'Access Model',v:`${T.client_term}-granted`,c:'teal'},{l:'Fields Shared',v:cases.reduce((s,c)=>s+Object.keys(c.sharedData||{}).length,0),c:'green'}
+      ].map((s,i)=><div key={i} className="card" style={{padding:12}}><span className="section-label">{s.l.toUpperCase()}</span>
+        <span style={{fontSize:18,fontWeight:700,display:'block',marginTop:2}}>{s.v}</span></div>)}
+    </div>
+
+    <DataTable
+      data={individuals}
+      columns={IND_COLS}
+      groupOptions={IND_GROUPS}
+      defaultVisibleCols={defaultVisCols}
+      onRowClick={(row) => { setSelectedRow(row.id); setPanelTab('fields'); setProvenanceField(null); }}
+      renderCell={renderIndCell}
+      getVal={getIndVal}
+      selectedId={selectedRow}
+      label="individuals"
+    />
+
+    <div className="dt-sov">
+      <span style={{fontSize:14,flexShrink:0}}>◇</span>
+      <div><strong>Sovereignty model: </strong>Every row is a Matrix room. Edits append EO events — INS (△) instantiates new observations, ALT (∿) transitions state, NUL (∅) marks revocation. Nothing is overwritten. Shared notes live in the bridge room (client can see). Internal notes live in the roster room (org-only).</div>
+    </div>
+
+    {selectedInd && <IndividualPanel
+      row={selectedInd}
+      notes={allNotes}
+      allocations={allAllocations||[]}
+      onClose={()=>setSelectedRow(null)}
+      panelTab={panelTab}
+      setPanelTab={setPanelTab}
+      provenanceField={provenanceField}
+      setProvenanceField={setProvenanceField}
+    />}
+  </div>;
+};
+
+/* ─── ResourcesTableView — replaces old card-based resource view ─── */
+const ResourcesTableView = ({resourceTypes, resourceRelations, resourceInventory, T, svc, orgRole, orgRoom, rosterRoom, networkRoom,
+  allAllocations, onCreateResource, onRefresh, onRestock, onEstablishRelation, canViewResource, canControlResource, canAllocateResource, individuals}) => {
+
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [panelTab, setPanelTab] = useState('details');
+
+  // Build resource rows
+  const resources = resourceTypes.filter(rt => canViewResource(rt, svc.userId, orgRole)).map(rt => {
+    const relation = resourceRelations.find(rel => rel.resource_type_id === rt.id);
+    const inv = relation ? resourceInventory[relation.id] : null;
+    const total = inv ? (inv.total_capacity || inv.capacity || 0) : 0;
+    const allocated = inv ? (inv.allocated || 0) : 0;
+    const reserved = inv ? (inv.reserved || 0) : 0;
+    const available = total - allocated - reserved;
+    const utilPct = total > 0 ? (allocated + reserved) / total : 0;
+
+    return {
+      id: rt.id,
+      name: rt.name,
+      type: rt.category,
+      category: rt.category,
+      holder: rt._sourceRoom ? 'Organization' : 'Personal',
+      holderType: rt._source || 'org',
+      relation: relation ? (relation.relation_type || 'operates') : '—',
+      network: rt._source === 'network' ? 'Network' : '—',
+      totalCapacity: total,
+      available: Math.max(0, available),
+      allocated,
+      reserved,
+      utilizationPct: utilPct,
+      lastUpdated: inv?.last_updated || rt.created,
+      opacityLevel: relation?.opacity !== undefined ? ['sovereign','attested','contributed','published'][relation.opacity] || 'sovereign' : 'sovereign',
+      governance: rt.constraints?.join(', ') || '—',
+      constraints: rt.constraints || [],
+      orgRoom: rt._sourceRoom || orgRoom,
+      provisioningEvents: inv?.events || [],
+      unit: rt.unit,
+      _rt: rt,
+      _relation: relation,
+      _inv: inv,
+    };
+  });
+
+  const RES_COLS = [
+    {key:'name', label:'Resource', fixed:true},
+    {key:'category', label:'Category'},
+    {key:'holder', label:'Source'},
+    {key:'relation', label:'Relation'},
+    {key:'capacity', label:'Capacity'},
+    {key:'utilization', label:'Utilization'},
+    {key:'opacityLevel', label:'Opacity'},
+    {key:'unit', label:'Unit'},
+  ];
+
+  const RES_GROUPS = [
+    {k:'none',l:'No grouping'},
+    {k:'category',l:'Category'},
+    {k:'holder',l:'Source'},
+    {k:'relation',l:'Relation'},
+    {k:'opacityLevel',l:'Opacity'},
+  ];
+
+  const defaultVisCols = ['name','category','holder','relation','capacity','utilization','opacityLevel'];
+
+  const getResVal = (row, key) => {
+    if (key === 'capacity') return row.available;
+    if (key === 'utilization') return row.utilizationPct;
+    return row[key] || '';
+  };
+
+  const renderResCell = (row, col) => {
+    const k = col.key;
+    if (k === 'name') return <div>
+      <div style={{fontWeight:600,fontSize:13}}>{row.name}</div>
+      <div style={{fontSize:11,color:'var(--tx-2)'}}>{(row.type||'').replace(/_/g,' ')}</div>
+    </div>;
+    if (k === 'category') return <span className={'tag tag-'+(RESOURCE_CATEGORY_COLORS[row.category]||'teal')} style={{fontSize:10}}>{RESOURCE_CATEGORY_LABELS[row.category]||row.category}</span>;
+    if (k === 'holder') return <div>
+      <div style={{fontSize:13,fontWeight:500}}>{row.holder}</div>
+      <div style={{fontSize:11,color:'var(--tx-2)'}}>{row.holderType}</div>
+    </div>;
+    if (k === 'relation') return <span className="tag tag-gold" style={{fontSize:10}}>{row.relation}</span>;
+    if (k === 'network') return <span style={{fontSize:13,color:'var(--tx-1)'}}>{row.network}</span>;
+    if (k === 'capacity') return <div style={{fontSize:13}}>
+      <span style={{fontWeight:600,color:'var(--green)'}}>{row.available}</span>
+      <span style={{color:'var(--tx-2)'}}> / {row.totalCapacity}</span>
+      <span style={{fontSize:11,color:'var(--tx-3)',marginLeft:4}}>avail</span>
+    </div>;
+    if (k === 'utilization') return <DtUtilBar pct={row.utilizationPct}/>;
+    if (k === 'opacityLevel') {
+      const o = DT_OP_CFG[row.opacityLevel];
+      return o ? <span className={'tag '+o.cls} style={{fontSize:10}}>{o.l}</span> : <span style={{color:'var(--tx-3)'}}>—</span>;
+    }
+    if (k === 'unit') return <span style={{fontSize:12,color:'var(--tx-1)',fontFamily:'var(--mono)'}}>{row.unit}</span>;
+    return <span style={{color:'var(--tx-3)',fontSize:12}}>—</span>;
+  };
+
+  const selectedRes = selectedRow ? resources.find(r => r.id === selectedRow) : null;
+
+  return <div className="anim-up" style={{maxWidth:1200,margin:'0 auto'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+      <div>
+        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Resources</h2>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:2}}>Resource types, inventory tracking, and allocation history. Click a row for details.</p>
+      </div>
+      <div style={{display:'flex',gap:6}}>
+        <button onClick={onRefresh} className="b-gho b-sm" style={{display:'flex',alignItems:'center',gap:4}}>Refresh</button>
+        {(orgRoom||networkRoom||rosterRoom) && <button onClick={onCreateResource} className="b-pri b-sm" style={{display:'flex',alignItems:'center',gap:4}}>New Resource Type</button>}
+      </div>
+    </div>
+
+    {/* Summary cards */}
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10,marginBottom:20}}>
+      {[{l:'Visible Types',v:resources.length,c:'teal'},{l:'With Inventory',v:resources.filter(r=>r.totalCapacity>0).length,c:'green'},
+        {l:'Relations',v:resourceRelations.length,c:'blue'},{l:'Categories',v:[...new Set(resources.map(r=>r.category))].length,c:'gold'}
+      ].map((s,i)=><div key={i} className="card" style={{padding:12}}><span className="section-label">{s.l.toUpperCase()}</span>
+        <span style={{fontSize:18,fontWeight:700,display:'block',marginTop:2}}>{s.v}</span></div>)}
+    </div>
+
+    {resources.length === 0
+      ? <div className="card" style={{textAlign:'center',padding:'40px 20px'}}>
+          <h3 style={{fontSize:16,fontWeight:700,marginBottom:8}}>No Resource Types Yet</h3>
+          <p style={{fontSize:12.5,color:'var(--tx-1)',lineHeight:1.6,marginBottom:16}}>Resource types define the services and goods you can track and allocate.</p>
+          {(orgRoom||networkRoom||rosterRoom) && <button onClick={onCreateResource} className="b-pri">Create Resource Type</button>}
+        </div>
+      : <DataTable
+          data={resources}
+          columns={RES_COLS}
+          groupOptions={RES_GROUPS}
+          defaultVisibleCols={defaultVisCols}
+          onRowClick={(row) => { setSelectedRow(row.id); setPanelTab('details'); }}
+          renderCell={renderResCell}
+          getVal={getResVal}
+          selectedId={selectedRow}
+          label="resources"
+        />}
+
+    <div className="dt-sov">
+      <span style={{fontSize:14,flexShrink:0}}>◇</span>
+      <div><strong>Resource model: </strong>Resources live in org rooms. Allocations dual-write to bridge + vault via CON (⋈). The org room tracks inventory via INS/ALT/NUL events. Bridge references are anonymized in org-level views.</div>
+    </div>
+
+    {selectedRes && <ResourcePanel
+      row={selectedRes}
+      allocations={allAllocations||[]}
+      onClose={()=>setSelectedRow(null)}
+      panelTab={panelTab}
+      setPanelTab={setPanelTab}
+    />}
+  </div>;
+};
+
 /* ═══════════════════ PROVIDER APP ═══════════════════ */
 const ProviderApp = ({session, onLogout, showToast}) => {
   const [rosterRoom, setRosterRoom] = useState(null);
@@ -9140,6 +10017,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const [restockModal, setRestockModal] = useState(null); // relation object or null
   const [restockQty, setRestockQty] = useState('');
   const [restockNote, setRestockNote] = useState('');
+  // ─── Data table state ───
+  const [bridgeNotes, setBridgeNotes] = useState({}); // {bridgeRoomId: notes[]}
+  const [rosterNotes, setRosterNotes] = useState([]);  // internal notes from roster
+  const [allAllocations, setAllAllocations] = useState([]); // all allocations across cases
 
   // Notification helpers
   const addNotification = (notif) => {
@@ -9359,6 +10240,8 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       });
     }
     setCases(found);
+    // Load data table extras (notes, allocations) in background
+    loadDataTableExtras(found).catch(e => console.warn('DT extras load:', e.message));
   };
 
   const loadCases = async () => {
@@ -9373,6 +10256,77 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       }
     }
     await loadCasesFromScan(bridgeData);
+  };
+
+  // Load notes and allocations for the data table view
+  const loadDataTableExtras = async (currentCases) => {
+    if (!svc.client) return;
+    const notesMap = {};
+    const allAllocs = [];
+    for (const c of currentCases) {
+      const room = svc.client.getRoom(c.bridgeRoomId);
+      if (!room) continue;
+      const events = room.getLiveTimeline().getEvents();
+      // Extract observations as "shared notes"
+      const obs = events.filter(e => e.getType() === EVT.OBSERVATION).map(e => {
+        const content = e.getContent();
+        return {
+          id: e.getId(),
+          indId: c.bridgeRoomId,
+          type: 'shared',
+          eo_op: 'INS',
+          frame: content.frame || 'GIVEN',
+          room: 'bridge',
+          category: content.category || 'observation',
+          author: (e.getSender()||'').split(':')[0]?.replace('@','') || 'Unknown',
+          at: content.ts || e.getTs(),
+          text: content.notes || content.value || content.question || '(observation recorded)',
+          tags: content.tags || [],
+        };
+      });
+      // Extract messages as shared notes
+      const msgs = events.filter(e => e.getType() === 'm.room.message' && e.getContent().msgtype === 'm.text').slice(-10).map(e => ({
+        id: e.getId(),
+        indId: c.bridgeRoomId,
+        type: 'shared',
+        eo_op: 'INS',
+        frame: 'GIVEN',
+        room: 'bridge',
+        category: 'message',
+        author: (e.getSender()||'').split(':')[0]?.replace('@','') || 'Unknown',
+        at: e.getTs(),
+        text: e.getContent().body || '',
+        tags: [],
+      }));
+      notesMap[c.bridgeRoomId] = [...obs, ...msgs].sort((a,b) => (b.at||0) - (a.at||0));
+      // Extract allocations
+      const allocEvts = events.filter(e => e.getType() === EVT.RESOURCE_ALLOC).map(e => {
+        const content = e.getContent();
+        return {
+          id: content.id || e.getId(),
+          indId: c.bridgeRoomId,
+          resourceId: content.resource_type_id,
+          eo_op: 'CON',
+          frame: 'MEANT',
+          resourceName: content.resource_name || content.resource_type_id || 'Resource',
+          quantity: content.quantity || 1,
+          unit: content.unit || 'unit',
+          status: content.status || 'active',
+          allocatedBy: (content.allocated_by||'').split(':')[0]?.replace('@','') || 'Staff',
+          org: 'Organization',
+          at: content.allocated_at || e.getTs(),
+          expiresAt: content.expires_at || null,
+          bridgeRoom: c.bridgeRoomId,
+          vaultShadow: content.vault_shadow || null,
+          events: content.events || [],
+          constraintsChecked: content.constraints_checked || [],
+          indName: c.sharedData.full_name || c.clientUserId || 'Unknown',
+        };
+      });
+      allAllocs.push(...allocEvts);
+    }
+    setBridgeNotes(notesMap);
+    setAllAllocations(allAllocs);
   };
 
   // Auto-register cases in org ROSTER_ASSIGN when they aren't tracked yet
@@ -10652,88 +11606,33 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     {/* Main */}
     <div className="app-main" style={{flex:1,overflow:'auto',padding:24}}>
 
-      {/* DASHBOARD */}
-      {view==='dashboard'&&!activeCase&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
-        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700,marginBottom:4}}>{T.provider_term} Dashboard</h2>
-        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:24}}>You can only see data {T.client_term_plural.toLowerCase()} have explicitly shared. Each case is a separate encrypted bridge room.</p>
-
-        {/* Provider identity card */}
-        <div className="card" style={{marginBottom:20,padding:0,overflow:'hidden'}}>
-          <div style={{padding:'16px 18px',display:'flex',alignItems:'center',gap:14}}>
-            <div style={{width:48,height:48,borderRadius:'50%',background:orgRoom?'var(--blue-dim)':'var(--gold-dim)',
-              display:'flex',alignItems:'center',justifyContent:'center',color:orgRoom?'var(--blue)':'var(--gold)',
-              border:orgRoom?'2px solid var(--blue)':'2px solid var(--gold)',flexShrink:0}}>
-              <I n={orgRoom?'shieldCheck':'user'} s={24}/>
-            </div>
-            <div style={{flex:1,minWidth:0}}>
-              <span style={{fontSize:17,fontWeight:700,display:'block'}}>{providerProfile.display_name || svc.userId?.split(':')[0]?.replace('@','') || T.provider_term}</span>
-              {providerProfile.title && <span style={{fontSize:12,color:'var(--tx-2)',display:'block'}}>{providerProfile.title}</span>}
-              {providerProfile.credentials && <span style={{fontSize:10.5,color:'var(--tx-2)',fontFamily:'var(--mono)',display:'block',marginTop:2}}>{providerProfile.credentials}</span>}
-            </div>
-            <button onClick={openProfileModal} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:4}}><I n="settings" s={11}/>Edit</button>
-          </div>
-          {orgRoom ? <div style={{padding:'10px 18px',background:'var(--blue-dim)',borderTop:'1px solid rgba(91,156,245,.12)',display:'flex',alignItems:'center',gap:10}}>
-            <I n="shieldCheck" s={16} c="var(--blue)"/>
-            <div style={{flex:1}}>
-              <span style={{fontSize:12.5,fontWeight:600,color:'var(--blue)',display:'block'}}>{orgMeta.name||'Organization'}</span>
-              <span style={{fontSize:10,color:'var(--tx-2)'}}>{ORG_TYPE_LABELS[orgMeta.type]||orgMeta.type} · {staff.length} staff · {ORG_ROLE_LABELS[orgRole]||orgRole}</span>
-            </div>
-            {myVerification?.status==='verified' ? <span className="tag tag-green" style={{fontSize:8}}>VERIFIED</span>
-            : emailVerifyConfig.enabled ? <span className="tag tag-gold" style={{fontSize:8,cursor:'pointer'}} onClick={openEmailVerifyModal}>VERIFY</span>
-            : <span className="tag tag-green" style={{fontSize:8}}>VERIFIED</span>}
-            <button onClick={()=>setView('org-settings')} className="b-gho b-xs"><I n="settings" s={11}/></button>
-          </div> : <div style={{padding:'10px 18px',background:'var(--gold-dim)',borderTop:'1px solid var(--gold-mid)',display:'flex',alignItems:'center',gap:8}}>
-            <I n="alert" s={14} c="var(--gold)"/>
-            <span style={{fontSize:11,color:'var(--gold)',flex:1}}>Not affiliated with an organization</span>
-            <button onClick={()=>setCreateOrgModal(true)} className="b-gho b-xs">Set Up</button>
-          </div>}
-          {providerProfile.bio && <div style={{padding:'10px 18px',borderTop:'1px solid var(--border-0)'}}>
-            <span style={{fontSize:11.5,color:'var(--tx-1)',lineHeight:1.5}}>{providerProfile.bio}</span>
-          </div>}
-          {!providerProfile.display_name && <div style={{padding:'10px 18px',borderTop:'1px solid var(--border-0)',display:'flex',alignItems:'center',gap:8}}>
-            <I n="alert" s={13} c="var(--gold)"/>
-            <span style={{fontSize:11,color:'var(--gold)'}}>Set up your profile — {T.client_term_plural.toLowerCase()} will see your name, title, and org membership on bridges.</span>
-            <button onClick={openProfileModal} className="b-pri b-xs">Set Up</button>
-          </div>}
-        </div>
-
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10,marginBottom:24}}>
-          {[{l:'Active Cases',v:cases.length,c:'gold',i:'briefcase'},
-            {l:orgRoom?'Staff':'Organization',v:orgRoom?`${staff.length} members`:'Not set up',c:orgRoom?'blue':'teal',i:orgRoom?'users':'plus'},
-            {l:'Access Model',v:`${T.client_term}-granted`,c:'teal',i:'shield'},{l:'Metric Events',v:metrics.length,c:'orange',i:'bar'}
-          ].map((s,i)=><div key={i} className="card" style={{padding:14}}><span className="section-label">{s.l.toUpperCase()}</span>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:2}}>
-              <span style={{fontSize:18,fontWeight:700}}>{s.v}</span>
-              <span style={{color:`var(--${s.c})`,opacity:.5}}><I n={s.i} s={15}/></span></div></div>)}
-        </div>
-        {cases.length>0&&<><span className="section-label">ALL CASES</span>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(250px,1fr))',gap:10,marginTop:6}}>
-            {cases.map(c=>{
-              const assignment = caseAssignments[c.bridgeRoomId];
-              const primaryProvider = assignment?.primary || c.meta?.provider;
-              const isPrimaryMine = primaryProvider === svc.userId;
-              return <div key={c.bridgeRoomId} className="card-h" onClick={()=>openCase(c.bridgeRoomId)}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-                <span style={{fontSize:14,fontWeight:600}}>{c.sharedData.full_name||`Anonymous ${T.client_term}`}</span>
-                <I n="chevR" s={13} c="var(--tx-3)"/></div>
-              {c.sharedData.email&&<span style={{fontFamily:'var(--mono)',fontSize:10.5,color:'var(--tx-2)',display:'block',marginBottom:6}}>{c.sharedData.email}</span>}
-              <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                <span className="tag tag-green"><I n="lock" s={9}/>E2EE</span>
-                <span className="tag tag-blue">{Object.keys(c.sharedData).length} fields</span>
-                {c.transferable ? <span className="tag tag-teal"><I n="users" s={9}/>Transferable</span>
-                  : <span className="tag tag-red"><I n="lock" s={9}/>Locked</span>}
-                {!isPrimaryMine && <span className="tag tag-gold" style={{fontSize:8}}>{primaryProvider?.split(':')[0]?.replace('@','')}</span>}
-              </div>
-              {assignment?.transferred_from && <div style={{marginTop:6,fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>
-                Transferred from {assignment.transferred_from.split(':')[0]?.replace('@','')}
-              </div>}
-            </div>;})}
-          </div></>}
-        <div style={{background:'var(--gold-dim)',border:'1px solid var(--gold-mid)',borderRadius:'var(--r)',padding:'14px 18px',marginTop:20,display:'flex',gap:10,alignItems:'flex-start'}}>
-          <I n="eye" s={16} c="var(--gold)"/>
-          <span style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.6}}>As a provider, you cannot modify client vault data. Clients can revoke your access at any time.{!orgRoom&&' Create or join an organization to manage staff, cases across your team, and participate in networks.'}{orgRoom&&' Cases marked "Transferable" can be reassigned to other org staff. Clients can lock transfers at any time.'}</span>
-        </div>
-      </div>}
+      {/* DASHBOARD — Data Table View */}
+      {view==='dashboard'&&!activeCase&&<IndividualsView
+        cases={cases}
+        caseAssignments={caseAssignments}
+        openCase={openCase}
+        T={T}
+        svc={svc}
+        caseAllocations={caseAllocations}
+        providerProfile={providerProfile}
+        orgRoom={orgRoom}
+        orgMeta={orgMeta}
+        staff={staff}
+        orgRole={orgRole}
+        showToast={showToast}
+        bridgeNotes={bridgeNotes}
+        rosterNotes={rosterNotes}
+        allAllocations={allAllocations}
+        onCreateOrg={()=>setCreateOrgModal(true)}
+        onEditProfile={openProfileModal}
+        onDiscover={()=>setDiscoverModal(true)}
+        myVerification={myVerification}
+        emailVerifyConfig={emailVerifyConfig}
+        openEmailVerifyModal={openEmailVerifyModal}
+        orgChannels={orgChannels}
+        ORG_TYPE_LABELS={ORG_TYPE_LABELS}
+        ORG_ROLE_LABELS={ORG_ROLE_LABELS}
+      />}
 
       {/* MESSAGES VIEW */}
       {view==='inbox'&&!activeCase&&<div className="anim-up inbox-wrap">
@@ -11956,137 +12855,27 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         </>}
       </div>}
 
-      {/* RESOURCES */}
-      {view==='resources'&&!activeCase&&<div className="anim-up" style={{maxWidth:900,margin:'0 auto'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-          <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Resources</h2>
-          <div style={{display:'flex',gap:6}}>
-            <button onClick={()=>loadResources(orgRoom,networkRoom,rosterRoom)} className="b-gho b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="refresh-cw" s={12}/>Refresh</button>
-            {(orgRoom||networkRoom||rosterRoom)&&<button onClick={()=>{setResourceDraft({name:'',category:'general',unit:'unit',fungible:true,perishable:false,ttl_days:'',tags:'',permissions:buildDefaultResourcePermissions()});setCreateResourceModal(true)}} className="b-pri b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="plus" s={12}/>New Resource Type</button>}
-          </div>
-        </div>
-        <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:24,lineHeight:1.6}}>Resource types define what your organization can allocate to {T.client_term_plural.toLowerCase()} — beds, vouchers, funds, services. Each resource has a category, unit of measure, and inventory tracking.</p>
-
-        {/* Summary cards */}
-        {(()=>{
-          const visible = resourceTypes.filter(rt => canViewResource(rt, svc.userId, orgRole));
-          const controllable = resourceTypes.filter(rt => canControlResource(rt, svc.userId, orgRole));
-          return <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10,marginBottom:24}}>
-            {[
-              {l:'Visible Types',v:visible.length,c:'teal',i:'layers'},
-              {l:'You Control',v:controllable.length,c:'gold',i:'settings'},
-              {l:'Relations',v:resourceRelations.length,c:'blue',i:'link'},
-              {l:'Categories',v:[...new Set(visible.map(r=>r.category))].length,c:'green',i:'grid'},
-            ].map((s,i)=><div key={i} className="card" style={{padding:14}}><span className="section-label">{s.l.toUpperCase()}</span>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:2}}>
-                <span style={{fontSize:18,fontWeight:700}}>{s.v}</span>
-                <span style={{color:`var(--${s.c})`,opacity:.5}}><I n={s.i} s={15}/></span></div></div>)}
-          </div>;
-        })()}
-
-        {/* Resource types by category */}
-        {resourceTypes.length===0?
-          <div className="card" style={{textAlign:'center',padding:'40px 20px'}}>
-            <div style={{width:48,height:48,borderRadius:'var(--r-lg)',background:'var(--teal-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--teal)',margin:'0 auto 16px'}}><I n="layers" s={24}/></div>
-            <h3 style={{fontSize:16,fontWeight:700,marginBottom:8}}>No Resource Types Yet</h3>
-            <p style={{fontSize:12.5,color:'var(--tx-1)',lineHeight:1.6,marginBottom:16}}>Resource types define the services and goods you can track and allocate. Create a resource type to get started — it will be tagged to you personally{orgRoom?'':' and can be promoted to your organization later'}.</p>
-            {(orgRoom||networkRoom||rosterRoom)&&<button onClick={()=>{setResourceDraft({name:'',category:'general',unit:'unit',fungible:true,perishable:false,ttl_days:'',tags:'',permissions:buildDefaultResourcePermissions()});setCreateResourceModal(true)}} className="b-pri" style={{display:'flex',alignItems:'center',gap:4,margin:'0 auto'}}><I n="plus" s={13}/>Create Resource Type</button>}
-          </div>
-        :
-          <>
-            {(()=>{
-              const visibleTypes = resourceTypes.filter(rt => canViewResource(rt, svc.userId, orgRole));
-              const hiddenCount = resourceTypes.length - visibleTypes.length;
-              return <>
-                <span className="section-label">RESOURCE CATALOG ({visibleTypes.length}{hiddenCount > 0 ? ` · ${hiddenCount} hidden` : ''})</span>
-                {RESOURCE_CATEGORIES.filter(cat=>visibleTypes.some(r=>r.category===cat)).map(cat=><div key={cat} style={{marginBottom:20}}>
-                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
-                    <span className={`tag tag-${RESOURCE_CATEGORY_COLORS[cat]||'teal'}`} style={{fontSize:9}}>{RESOURCE_CATEGORY_LABELS[cat]||cat}</span>
-                    <span style={{fontSize:11,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>{visibleTypes.filter(r=>r.category===cat).length} type{visibleTypes.filter(r=>r.category===cat).length!==1?'s':''}</span>
-                  </div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:8}}>
-                    {visibleTypes.filter(r=>r.category===cat).map(rt=>{
-                      const relation = resourceRelations.find(rel=>rel.resource_type_id===rt.id);
-                      const inv = relation ? resourceInventory[relation.id] : null;
-                      const isController = canControlResource(rt, svc.userId, orgRole);
-                      const isAllocator = canAllocateResource(rt, svc.userId, orgRole);
-                      return <div key={rt.id} className="card" style={{padding:14}}>
-                        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:8}}>
-                          <div>
-                            <span style={{fontSize:13.5,fontWeight:600,display:'block'}}>{rt.name}</span>
-                            <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>{rt.unit}{rt.fungible?' · fungible':' · non-fungible'}{rt.perishable?` · expires ${rt.ttl_days}d`:''}</span>
-                          </div>
-                          <div style={{display:'flex',gap:3,flexShrink:0}}>
-                            <span className={`tag tag-${rt._source==='network'?'green':rt._source==='personal'?'gold':'blue'}`} style={{fontSize:8}}>{rt._source==='network'?'NETWORK':rt._source==='personal'?'PERSONAL':'ORG'}</span>
-                          </div>
-                        </div>
-
-                        {/* Permission badges */}
-                        <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:8}}>
-                          {isController && <span className="tag tag-gold" style={{fontSize:7.5}}><I n="settings" s={8}/> CONTROLLER</span>}
-                          {isAllocator && <span className="tag tag-blue" style={{fontSize:7.5}}><I n="send" s={8}/> ALLOCATOR</span>}
-                          {rt.permissions?.viewers?.length > 0 && <span className="tag tag-teal" style={{fontSize:7.5}}><I n="eye" s={8}/> RESTRICTED</span>}
-                        </div>
-
-                        {/* Permission summary */}
-                        {rt.permissions && <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:8}}>
-                          {rt.permissions.controllers?.length > 0 && <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>
-                            Controlled by: {rt.permissions.controllers.slice(0,3).map(g => g.type==='role' ? (ORG_ROLE_LABELS[g.id]||g.id) : g.id).join(', ')}{rt.permissions.controllers.length > 3 ? ` +${rt.permissions.controllers.length-3}` : ''}
-                          </span>}
-                        </div>}
-
-                        {rt.tags&&rt.tags.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:8}}>
-                          {rt.tags.map(tag=><span key={tag} style={{fontSize:9,padding:'1px 6px',borderRadius:99,background:'var(--bg-3)',color:'var(--tx-2)',fontFamily:'var(--mono)'}}>{tag}</span>)}
-                        </div>}
-                        {rt.maturity&&<div style={{display:'flex',alignItems:'center',gap:4,marginBottom:8}}>
-                          <span style={{fontSize:9,color:'var(--tx-2)'}}>Maturity:</span>
-                          <span className={`tag tag-${MATURITY_LEVELS[rt.maturity]?.color||'blue'}`} style={{fontSize:8}}>{MATURITY_LEVELS[rt.maturity]?.label||rt.maturity}</span>
-                        </div>}
-                        {relation ? <div style={{padding:'8px 10px',background:'var(--bg-2)',borderRadius:'var(--r)',border:'1px solid var(--border-0)'}}>
-                          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-                            <span style={{fontSize:10,fontWeight:600,color:'var(--blue)'}}>{RESOURCE_RELATION_LABELS[relation.relation_type]||relation.relation_type}</span>
-                            {relation.opacity!==undefined&&<span className={`tag tag-${['teal','blue','green','gold'][relation.opacity]||'teal'}`} style={{fontSize:7.5}}>{RESOURCE_OPACITY_LABELS[relation.opacity]||'Sovereign'}</span>}
-                          </div>
-                          {inv&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                            <div style={{display:'flex',gap:12}}>
-                              <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>Cap: {inv.total_capacity||inv.capacity||0}</span>
-                              <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>Avail: {inv.available||0}</span>
-                              <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>Alloc: {inv.allocated||0}</span>
-                            </div>
-                            {isController&&<button onClick={()=>{setRestockModal(relation);setRestockQty('');setRestockNote('')}} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:3,flexShrink:0}}><I n="plus" s={9}/>Restock</button>}
-                          </div>}
-                          {!inv&&isController&&<button onClick={()=>{setRestockModal(relation);setRestockQty('');setRestockNote('')}} className="b-gho b-xs" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:3,marginTop:4}}><I n="plus" s={9}/>Add Initial Stock</button>}
-                        </div>
-                        : (orgRoom||rosterRoom)&&isController&&<button onClick={()=>handleEstablishRelation(rt.id)} className="b-gho b-xs" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:4,marginTop:4}}><I n="link" s={10}/>Establish Relation</button>}
-
-                        {/* Promote personal resource to organization */}
-                        {rt._source==='personal'&&orgRoom&&<button onClick={()=>handlePromoteResource(rt)} className="b-gho b-xs" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:4,marginTop:4}}><I n="arrow-up" s={10}/>Promote to Organization</button>}
-
-                        {/* Permissions button — visible to controllers */}
-                        {isController&&<button onClick={()=>openPermModal(rt)} className="b-gho b-xs" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:4,marginTop:6}}><I n="shield" s={10}/>Permissions</button>}
-                      </div>;
-                    })}
-                  </div>
-                </div>)}
-
-                {/* Unrelated resources info */}
-                {resourceRelations.length===0&&visibleTypes.length>0&&<div style={{background:'var(--teal-dim)',border:'1px solid rgba(94,234,212,.15)',borderRadius:'var(--r)',padding:'14px 18px',marginTop:12,display:'flex',gap:10,alignItems:'flex-start'}}>
-                  <I n="alert" s={16} c="var(--teal)"/>
-                  <span style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.6}}>
-                    <strong style={{color:'var(--teal)'}}>No resource relations established.</strong> Click "Establish Relation" on a resource type to indicate your organization operates, funds, or refers clients to that resource. Relations enable inventory tracking and client allocation.
-                  </span>
-                </div>}
-
-                {/* Hidden resources notice */}
-                {hiddenCount > 0 && <div style={{background:'var(--gold-dim)',border:'1px solid rgba(234,179,8,.15)',borderRadius:'var(--r)',padding:'10px 14px',marginTop:12,display:'flex',gap:8,alignItems:'center'}}>
-                  <I n="eye-off" s={14} c="var(--gold)"/>
-                  <span style={{fontSize:11.5,color:'var(--gold)'}}>{hiddenCount} resource type{hiddenCount!==1?'s':''} hidden based on your permissions. Contact a controller to request access.</span>
-                </div>}
-              </>;
-            })()}
-          </>
-        }
-      </div>}
+      {/* RESOURCES — Data Table View */}
+      {view==='resources'&&!activeCase&&<ResourcesTableView
+        resourceTypes={resourceTypes}
+        resourceRelations={resourceRelations}
+        resourceInventory={resourceInventory}
+        T={T}
+        svc={svc}
+        orgRole={orgRole}
+        orgRoom={orgRoom}
+        rosterRoom={rosterRoom}
+        networkRoom={networkRoom}
+        allAllocations={allAllocations}
+        onCreateResource={()=>{setResourceDraft({name:'',category:'general',unit:'unit',fungible:true,perishable:false,ttl_days:'',tags:'',permissions:buildDefaultResourcePermissions()});setCreateResourceModal(true)}}
+        onRefresh={()=>loadResources(orgRoom,networkRoom,rosterRoom)}
+        onRestock={(relation)=>{setRestockModal(relation);setRestockQty('');setRestockNote('')}}
+        onEstablishRelation={handleEstablishRelation}
+        canViewResource={canViewResource}
+        canControlResource={canControlResource}
+        canAllocateResource={canAllocateResource}
+        individuals={cases}
+      />}
 
       {/* ACTIVITY STREAM (Choreo-aligned) */}
       {view==='activity'&&<ActivityStream session={session}/>}
