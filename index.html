@@ -2752,21 +2752,31 @@ const ResourceService = {
    * Emits DES operation. Returns event ID.
    */
   async createResourceType(roomId, typeData, roomType) {
-    const level = roomType === 'network' ? 'network' : 'org';
+    const level = roomType === 'network' ? 'network' : roomType === 'individual' ? 'individual' : 'org';
     if (level === 'network' && !typeData.source?.propagation) {
       throw new Error('Network-level resource types require a propagation level');
     }
 
     // Build permissions — merge caller-provided with defaults, add creator as explicit controller
-    const defaultPerms = buildDefaultResourcePermissions();
-    const permissions = typeData.permissions ? {
-      controllers: typeData.permissions.controllers || defaultPerms.controllers,
-      allocators:  typeData.permissions.allocators  || defaultPerms.allocators,
-      viewers:     typeData.permissions.viewers      || defaultPerms.viewers,
-    } : defaultPerms;
-    // Ensure creator is always a controller
-    if (svc.userId && !permissions.controllers.some(g => g.type === 'user' && g.id === svc.userId)) {
-      permissions.controllers.push({ type: 'user', id: svc.userId });
+    let permissions;
+    if (level === 'individual') {
+      // Individual resources: owner is sole controller and allocator
+      permissions = {
+        controllers: [{ type: 'user', id: svc.userId }],
+        allocators: [{ type: 'user', id: svc.userId }],
+        viewers: [],
+      };
+    } else {
+      const defaultPerms = buildDefaultResourcePermissions();
+      permissions = typeData.permissions ? {
+        controllers: typeData.permissions.controllers || defaultPerms.controllers,
+        allocators:  typeData.permissions.allocators  || defaultPerms.allocators,
+        viewers:     typeData.permissions.viewers      || defaultPerms.viewers,
+      } : defaultPerms;
+      // Ensure creator is always a controller
+      if (svc.userId && !permissions.controllers.some(g => g.type === 'user' && g.id === svc.userId)) {
+        permissions.controllers.push({ type: 'user', id: svc.userId });
+      }
     }
 
     const resourceType = {
@@ -2804,7 +2814,7 @@ const ResourceService = {
     await emitOp(roomId, 'DES',
       { entity: resourceType.id, designation: resourceType.name },
       { category: resourceType.category, unit: resourceType.unit, source_level: level, permissions },
-      { type: roomType === 'network' ? 'network' : 'org', room: roomId, epistemic: 'GIVEN' }
+      { type: roomType === 'network' ? 'network' : roomType === 'individual' ? 'individual' : 'org', room: roomId, epistemic: 'GIVEN' }
     );
 
     return resourceType;
@@ -9076,7 +9086,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       // Process bridge data collected during scan (no second pass needed)
       await loadCasesFromScan(bridgeData, metricsR);
       await loadMetrics(metricsR);
-      await loadResources(detectedOrg, network);
+      await loadResources(detectedOrg, network, roster);
       // Auto-register bridges in org assignments if needed
       if (detectedOrg && bridgeData.length > 0) {
         const currentAssignments = {};
@@ -9180,7 +9190,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     setNetworkMembers(members?.organizations || []);
   };
 
-  const loadResources = async (oRoom, nRoom) => {
+  const loadResources = async (oRoom, nRoom, pRoom) => {
     const types = [];
     const relations = [];
     const inv = {};
@@ -9214,6 +9224,27 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         if (stateEvents) {
           const evArr = Array.isArray(stateEvents) ? stateEvents : [stateEvents];
           evArr.forEach(e => { const c = e.getContent ? e.getContent() : e; if (c && c.id && !types.find(t=>t.id===c.id)) types.push({...c, _source: 'network'}); });
+        }
+      }
+    }
+    // Load personal resource types from roster room
+    if (pRoom) {
+      const room = svc.client.getRoom(pRoom);
+      if (room) {
+        const stateEvents = room.currentState.getStateEvents(EVT.RESOURCE_TYPE);
+        if (stateEvents) {
+          const evArr = Array.isArray(stateEvents) ? stateEvents : [stateEvents];
+          evArr.forEach(e => { const c = e.getContent ? e.getContent() : e; if (c && c.id && !types.find(t=>t.id===c.id)) types.push({...c, _source: 'personal'}); });
+        }
+        const relEvents = room.currentState.getStateEvents(EVT.RESOURCE_RELATION);
+        if (relEvents) {
+          const evArr = Array.isArray(relEvents) ? relEvents : [relEvents];
+          evArr.forEach(e => { const c = e.getContent ? e.getContent() : e; if (c && c.id) relations.push(c); });
+        }
+        const invEvents = room.currentState.getStateEvents(EVT.RESOURCE_INVENTORY);
+        if (invEvents) {
+          const evArr = Array.isArray(invEvents) ? invEvents : [invEvents];
+          evArr.forEach(e => { const c = e.getContent ? e.getContent() : e; if (c && c.relation_id) inv[c.relation_id] = c; });
         }
       }
     }
@@ -9544,9 +9575,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   // ─── Organization management ───
   const handleCreateResourceType = async () => {
     if (!resourceDraft.name.trim()) return;
-    const targetRoom = orgRoom || networkRoom;
-    if (!targetRoom) { showToast('No organization or network room available','error'); return; }
+    const targetRoom = orgRoom || networkRoom || rosterRoom;
+    if (!targetRoom) { showToast('No room available for resource creation','error'); return; }
     try {
+      const level = orgRoom ? 'org' : networkRoom ? 'network' : 'individual';
       const typeData = {
         name: resourceDraft.name.trim(),
         category: resourceDraft.category,
@@ -9557,7 +9589,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         tags: resourceDraft.tags ? resourceDraft.tags.split(',').map(t=>t.trim()).filter(Boolean) : [],
         permissions: resourceDraft.permissions || buildDefaultResourcePermissions(),
       };
-      const created = await ResourceService.createResourceType(targetRoom, typeData, orgRoom ? 'org' : 'network');
+      const created = await ResourceService.createResourceType(targetRoom, typeData, level);
       setCreateResourceModal(false);
       setResourceDraft({name:'',category:'general',unit:'unit',fungible:true,perishable:false,ttl_days:'',tags:'',permissions:buildDefaultResourcePermissions()});
       showToast(`Resource type "${typeData.name}" created`,'success');
@@ -9567,22 +9599,42 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       if (created && created.id) {
         setResourceTypes(prev => {
           if (prev.some(t => t.id === created.id)) return prev;
-          return [...prev, { ...created, _source: orgRoom ? 'org' : 'network' }];
+          return [...prev, { ...created, _source: level === 'individual' ? 'personal' : level === 'network' ? 'network' : 'org' }];
         });
       }
       // Delayed reload to reconcile with server state after sync
-      setTimeout(() => loadResources(orgRoom, networkRoom), 800);
+      setTimeout(() => loadResources(orgRoom, networkRoom, rosterRoom), 800);
     } catch(e) { showToast('Error creating resource: '+e.message,'error'); }
+  };
+
+  // ─── Promote personal resource to organization (move semantics) ───
+  const handlePromoteResource = async (rt) => {
+    if (!orgRoom || !rosterRoom) return;
+    try {
+      const { _source, ...typeData } = rt;
+      await ResourceService.createResourceType(orgRoom, typeData, 'org');
+      // Remove from roster room by writing empty content (Matrix tombstone pattern)
+      await svc.setState(rosterRoom, EVT.RESOURCE_TYPE, {}, rt.id);
+      await svc.setState(rosterRoom, EVT.RESOURCE_PERM, {}, rt.id);
+      // If there was a personal relation, remove it too
+      const personalRelation = resourceRelations.find(r => r.resource_type_id === rt.id && r.holder === rosterRoom);
+      if (personalRelation) {
+        await svc.setState(rosterRoom, EVT.RESOURCE_RELATION, {}, personalRelation.id);
+      }
+      showToast(`"${rt.name}" promoted to organization`,'success');
+      setTimeout(() => loadResources(orgRoom, networkRoom, rosterRoom), 800);
+    } catch(e) { showToast('Error promoting resource: '+e.message,'error'); }
   };
 
   // ─── Update resource permissions ───
   const handleSavePermissions = async () => {
-    if (!permModal || !orgRoom) return;
+    const targetRoom = orgRoom || rosterRoom;
+    if (!permModal || !targetRoom) return;
     try {
-      await ResourceService.updateResourcePermissions(orgRoom, permModal.id, permDraft, orgRole);
+      await ResourceService.updateResourcePermissions(targetRoom, permModal.id, permDraft, orgRole);
       setPermModal(null);
       showToast(`Permissions updated for "${permModal.name}"`,'success');
-      setTimeout(() => loadResources(orgRoom, networkRoom), 800);
+      setTimeout(() => loadResources(orgRoom, networkRoom, rosterRoom), 800);
     } catch(e) { showToast('Error updating permissions: '+e.message,'error'); }
   };
 
@@ -9615,15 +9667,16 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   };
 
   const handleEstablishRelation = async (resourceTypeId) => {
-    if (!orgRoom) { showToast('Organization required to establish resource relations','error'); return; }
+    const targetRoom = orgRoom || rosterRoom;
+    if (!targetRoom) { showToast('No room available to establish resource relations','error'); return; }
     try {
-      await ResourceService.establishRelation(orgRoom, {
+      await ResourceService.establishRelation(targetRoom, {
         resource_type_id: resourceTypeId,
         relation_type: 'operates',
         capacity: 0, available: 0,
       });
       showToast('Resource relation established','success');
-      setTimeout(() => loadResources(orgRoom, networkRoom), 800);
+      setTimeout(() => loadResources(orgRoom, networkRoom, rosterRoom), 800);
     } catch(e) { showToast('Error: '+e.message,'error'); }
   };
 
@@ -9646,7 +9699,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
 
   // ─── Allocate resource to client in active case ───
   const handleAllocateResource = async () => {
-    if (!allocDraft.resource_type_id || !activeCase || !orgRoom) return;
+    if (!allocDraft.resource_type_id || !activeCase || !(orgRoom||rosterRoom)) return;
     const caseData = cases.find(c => c.bridgeRoomId === activeCase);
     if (!caseData) return;
     // Find vault room for client (from bridge meta)
@@ -9668,6 +9721,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     }
     // Find the relation for this resource type
     const relation = resourceRelations.find(r => r.resource_type_id === allocDraft.resource_type_id);
+    const holderRoom = orgRoom || rosterRoom;
     try {
       const result = await ResourceService.allocateResource(activeCase, {
         resource_type_id: allocDraft.resource_type_id,
@@ -9675,7 +9729,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         quantity: parseInt(allocDraft.quantity) || 1,
         allocated_to: clientId,
         notes: allocDraft.notes || null,
-      }, orgRoom, vaultRoomId);
+      }, holderRoom, vaultRoomId);
       if (!result.valid) {
         const msgs = result.violations.map(v => v.message).join('; ');
         showToast(`Allocation blocked: ${msgs}`, 'error');
@@ -9684,13 +9738,13 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       setAllocModal(false);
       setAllocDraft({resource_type_id:'',quantity:1,notes:''});
       showToast('Resource allocated successfully','success');
-      setTimeout(() => { loadCaseAllocations(activeCase); loadResources(orgRoom, networkRoom); }, 800);
+      setTimeout(() => { loadCaseAllocations(activeCase); loadResources(orgRoom, networkRoom, rosterRoom); }, 800);
     } catch(e) { showToast('Error allocating resource: '+e.message,'error'); }
   };
 
   // ─── Record lifecycle event (consumed, revoked, returned) ───
   const handleResourceLifecycle = async (allocationId, eventType) => {
-    if (!activeCase || !orgRoom) return;
+    if (!activeCase || !(orgRoom||rosterRoom)) return;
     const alloc = caseAllocations.find(a => a.id === allocationId);
     if (!alloc) return;
     const caseData = cases.find(c => c.bridgeRoomId === activeCase);
@@ -9708,22 +9762,24 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         }
       }
     }
+    const holderRoom = orgRoom || rosterRoom;
     try {
       await ResourceService.recordResourceEvent(activeCase, {
         allocation_id: allocationId,
         event: eventType,
         quantity: alloc.quantity,
-      }, orgRoom, vaultRoomId);
+      }, holderRoom, vaultRoomId);
       showToast(`Resource marked as ${eventType}`, 'success');
-      setTimeout(() => { loadCaseAllocations(activeCase); loadResources(orgRoom, networkRoom); }, 800);
+      setTimeout(() => { loadCaseAllocations(activeCase); loadResources(orgRoom, networkRoom, rosterRoom); }, 800);
     } catch(e) { showToast('Error: ' + e.message, 'error'); }
   };
 
   // ─── Restock inventory ───
   const handleRestock = async () => {
-    if (!restockModal || !restockQty || !orgRoom) return;
+    const holderRoom = orgRoom || rosterRoom;
+    if (!restockModal || !restockQty || !holderRoom) return;
     try {
-      await ResourceService.restockInventory(orgRoom, restockModal.id, parseInt(restockQty), {
+      await ResourceService.restockInventory(holderRoom, restockModal.id, parseInt(restockQty), {
         note: restockNote || undefined,
         restocked_by: svc.userId,
       });
@@ -9731,7 +9787,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       setRestockQty('');
       setRestockNote('');
       showToast('Inventory restocked', 'success');
-      setTimeout(() => loadResources(orgRoom, networkRoom), 800);
+      setTimeout(() => loadResources(orgRoom, networkRoom, rosterRoom), 800);
     } catch(e) { showToast('Error restocking: ' + e.message, 'error'); }
   };
 
@@ -11651,8 +11707,8 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
           <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Resources</h2>
           <div style={{display:'flex',gap:6}}>
-            <button onClick={()=>loadResources(orgRoom,networkRoom)} className="b-gho b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="refresh-cw" s={12}/>Refresh</button>
-            {(orgRoom||networkRoom)&&<button onClick={()=>{setResourceDraft({name:'',category:'general',unit:'unit',fungible:true,perishable:false,ttl_days:'',tags:'',permissions:buildDefaultResourcePermissions()});setCreateResourceModal(true)}} className="b-pri b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="plus" s={12}/>New Resource Type</button>}
+            <button onClick={()=>loadResources(orgRoom,networkRoom,rosterRoom)} className="b-gho b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="refresh-cw" s={12}/>Refresh</button>
+            {(orgRoom||networkRoom||rosterRoom)&&<button onClick={()=>{setResourceDraft({name:'',category:'general',unit:'unit',fungible:true,perishable:false,ttl_days:'',tags:'',permissions:buildDefaultResourcePermissions()});setCreateResourceModal(true)}} className="b-pri b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="plus" s={12}/>New Resource Type</button>}
           </div>
         </div>
         <p style={{color:'var(--tx-1)',fontSize:12.5,marginBottom:24,lineHeight:1.6}}>Resource types define what your organization can allocate to {T.client_term_plural.toLowerCase()} — beds, vouchers, funds, services. Each resource has a category, unit of measure, and inventory tracking.</p>
@@ -11679,8 +11735,8 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           <div className="card" style={{textAlign:'center',padding:'40px 20px'}}>
             <div style={{width:48,height:48,borderRadius:'var(--r-lg)',background:'var(--teal-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--teal)',margin:'0 auto 16px'}}><I n="layers" s={24}/></div>
             <h3 style={{fontSize:16,fontWeight:700,marginBottom:8}}>No Resource Types Yet</h3>
-            <p style={{fontSize:12.5,color:'var(--tx-1)',lineHeight:1.6,marginBottom:16}}>Resource types define the services and goods your organization can track and allocate. Create your first resource type to get started, or join a network to inherit shared resource definitions.</p>
-            {(orgRoom||networkRoom)&&<button onClick={()=>{setResourceDraft({name:'',category:'general',unit:'unit',fungible:true,perishable:false,ttl_days:'',tags:'',permissions:buildDefaultResourcePermissions()});setCreateResourceModal(true)}} className="b-pri" style={{display:'flex',alignItems:'center',gap:4,margin:'0 auto'}}><I n="plus" s={13}/>Create Resource Type</button>}
+            <p style={{fontSize:12.5,color:'var(--tx-1)',lineHeight:1.6,marginBottom:16}}>Resource types define the services and goods you can track and allocate. Create a resource type to get started — it will be tagged to you personally{orgRoom?'':' and can be promoted to your organization later'}.</p>
+            {(orgRoom||networkRoom||rosterRoom)&&<button onClick={()=>{setResourceDraft({name:'',category:'general',unit:'unit',fungible:true,perishable:false,ttl_days:'',tags:'',permissions:buildDefaultResourcePermissions()});setCreateResourceModal(true)}} className="b-pri" style={{display:'flex',alignItems:'center',gap:4,margin:'0 auto'}}><I n="plus" s={13}/>Create Resource Type</button>}
           </div>
         :
           <>
@@ -11707,7 +11763,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
                             <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>{rt.unit}{rt.fungible?' · fungible':' · non-fungible'}{rt.perishable?` · expires ${rt.ttl_days}d`:''}</span>
                           </div>
                           <div style={{display:'flex',gap:3,flexShrink:0}}>
-                            <span className={`tag tag-${rt._source==='network'?'green':'blue'}`} style={{fontSize:8}}>{rt._source==='network'?'NETWORK':'ORG'}</span>
+                            <span className={`tag tag-${rt._source==='network'?'green':rt._source==='personal'?'gold':'blue'}`} style={{fontSize:8}}>{rt._source==='network'?'NETWORK':rt._source==='personal'?'PERSONAL':'ORG'}</span>
                           </div>
                         </div>
 
@@ -11747,7 +11803,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
                           </div>}
                           {!inv&&isController&&<button onClick={()=>{setRestockModal(relation);setRestockQty('');setRestockNote('')}} className="b-gho b-xs" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:3,marginTop:4}}><I n="plus" s={9}/>Add Initial Stock</button>}
                         </div>
-                        : orgRoom&&isController&&<button onClick={()=>handleEstablishRelation(rt.id)} className="b-gho b-xs" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:4,marginTop:4}}><I n="link" s={10}/>Establish Relation</button>}
+                        : (orgRoom||rosterRoom)&&isController&&<button onClick={()=>handleEstablishRelation(rt.id)} className="b-gho b-xs" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:4,marginTop:4}}><I n="link" s={10}/>Establish Relation</button>}
+
+                        {/* Promote personal resource to organization */}
+                        {rt._source==='personal'&&orgRoom&&<button onClick={()=>handlePromoteResource(rt)} className="b-gho b-xs" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:4,marginTop:4}}><I n="arrow-up" s={10}/>Promote to Organization</button>}
 
                         {/* Permissions button — visible to controllers */}
                         {isController&&<button onClick={()=>openPermModal(rt)} className="b-gho b-xs" style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:4,marginTop:6}}><I n="shield" s={10}/>Permissions</button>}
