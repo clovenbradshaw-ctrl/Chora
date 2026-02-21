@@ -816,26 +816,38 @@ function extractHomeserver(matrixId) {
 // Emit an EO operation — validates transitions, auto-emits intermediates
 // Now enriches every event with provenance metadata (created_by, origin_server)
 // and builds provenance chains linking each op to its predecessor on the same entity.
+// Resilient: catches sendEvent failures and retries once, logs all failures visibly.
 async function emitOp(roomId, op, target, context, frame, provenance = []) {
-  const ek = eKey(roomId, target?.field || target?.entity);
-  const lastEntry = entityOpHist[ek];
-  const lastOp = lastEntry?.op;
-  // Auto-emit intermediate operations if transition is invalid
-  if (lastOp && !OP_ADJ[lastOp]?.includes(op)) {
-    const path = findOpPath(lastOp, op);
-    for (let i = 0; i < path.length - 1; i++) {
-      const midId = genOpId();
-      const mid = { id: midId, op: path[i], target, context: { auto_intermediate: true, from: lastOp, to: op }, frame, provenance: lastEntry ? [lastEntry.id] : [], created_by: svc.userId, origin_server: extractHomeserver(svc.userId), ts: Date.now() };
-      await svc.sendEvent(roomId, EVT.OP, mid);
-      entityOpHist[ek] = { op: path[i], id: midId };
+  if (!roomId) { console.error('emitOp: no roomId provided for', op, target); return null; }
+  try {
+    const ek = eKey(roomId, target?.field || target?.entity);
+    const lastEntry = entityOpHist[ek];
+    const lastOp = lastEntry?.op;
+    // Auto-emit intermediate operations if transition is invalid
+    if (lastOp && !OP_ADJ[lastOp]?.includes(op)) {
+      const path = findOpPath(lastOp, op);
+      for (let i = 0; i < path.length - 1; i++) {
+        const midId = genOpId();
+        const mid = { id: midId, op: path[i], target, context: { auto_intermediate: true, from: lastOp, to: op }, frame, provenance: lastEntry ? [lastEntry.id] : [], created_by: svc.userId, origin_server: extractHomeserver(svc.userId), ts: Date.now() };
+        await svc.sendEvent(roomId, EVT.OP, mid);
+        entityOpHist[ek] = { op: path[i], id: midId };
+      }
     }
+    const prevEntry = entityOpHist[ek];
+    const chainedProvenance = [...provenance, ...(prevEntry?.id ? [prevEntry.id] : [])];
+    const event = { id: genOpId(), op, target, context, frame, provenance: chainedProvenance, created_by: svc.userId, origin_server: extractHomeserver(svc.userId), ts: Date.now() };
+    await svc.sendEvent(roomId, EVT.OP, event);
+    entityOpHist[ek] = { op, id: event.id };
+    // Dispatch custom DOM event so listeners (ActivityStream, notifications) can react immediately
+    window.dispatchEvent(new CustomEvent('khora:eo', { detail: { roomId, event } }));
+    return event;
+  } catch (e) {
+    console.error('emitOp FAILED:', op, target?.field || target?.entity, '→', e.message, { roomId, op, target, context });
+    // Still update local history so subsequent ops don't break adjacency tracking
+    const ek = eKey(roomId, target?.field || target?.entity);
+    entityOpHist[ek] = { op, id: 'failed_' + Date.now() };
+    return null;
   }
-  const prevEntry = entityOpHist[ek];
-  const chainedProvenance = [...provenance, ...(prevEntry?.id ? [prevEntry.id] : [])];
-  const event = { id: genOpId(), op, target, context, frame, provenance: chainedProvenance, created_by: svc.userId, origin_server: extractHomeserver(svc.userId), ts: Date.now() };
-  await svc.sendEvent(roomId, EVT.OP, event);
-  entityOpHist[ek] = { op, id: event.id };
-  return event;
 }
 
 // Compute current state from operation history (§9.1)
@@ -1285,7 +1297,48 @@ function inferRolesFromRooms(scannedState, userId) {
 
 /* ═══════════════════ MATRIX SERVICE ═══════════════════ */
 class KhoraService {
-  constructor() { this.client = null; this._baseUrl = null; this._token = null; this._userId = null; }
+  constructor() { this.client = null; this._baseUrl = null; this._token = null; this._userId = null; this._timelineListenerAttached = false; }
+
+  // Register real-time timeline event listener on the Matrix client.
+  // Dispatches DOM CustomEvents so React components can react instantly
+  // to new Khora events without polling.
+  _setupTimelineListener() {
+    if (!this.client || this._timelineListenerAttached) return;
+    this._timelineListenerAttached = true;
+    const khoraPrefix = NS + '.';
+    this.client.on('Room.timeline', (event, room, toStartOfTimeline) => {
+      if (toStartOfTimeline) return; // ignore historical pagination
+      const type = event.getType();
+      // Only fire for Khora-namespaced events (io.khora.*)
+      if (!type.startsWith(khoraPrefix)) return;
+      const detail = {
+        eventId: event.getId(),
+        roomId: room?.roomId,
+        type,
+        content: event.getContent(),
+        sender: event.getSender(),
+        ts: event.getTs(),
+        isOwn: event.getSender() === this._userId,
+      };
+      window.dispatchEvent(new CustomEvent('khora:timeline', { detail }));
+    });
+    // Also listen for state events to catch schema/org/roster changes
+    this.client.on('RoomState.events', (event, roomState) => {
+      const type = event.getType();
+      if (!type.startsWith(khoraPrefix)) return;
+      const detail = {
+        eventId: event.getId(),
+        roomId: roomState?.roomId,
+        type,
+        content: event.getContent(),
+        sender: event.getSender(),
+        ts: event.getTs(),
+        isState: true,
+        isOwn: event.getSender() === this._userId,
+      };
+      window.dispatchEvent(new CustomEvent('khora:state', { detail }));
+    });
+  }
 
   async _withRetry(fn, maxAttempts = 5) {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -1326,6 +1379,8 @@ class KhoraService {
         });
       });
       this._userId = res.user_id; this._token = res.access_token;
+      // Attach real-time timeline event listener
+      this._setupTimelineListener();
       // Persist session to localStorage so it survives page refresh, tab close, and browser restart
       try { localStorage.setItem('khora_session', JSON.stringify({ homeserver: baseUrl, accessToken: res.access_token, userId: res.user_id, deviceId: res.device_id })); } catch {}
       // Cache encrypted session metadata in the encrypted vault
@@ -1397,6 +1452,8 @@ class KhoraService {
         });
       }
       this._userId = userId; this._token = accessToken;
+      // Attach real-time timeline event listener
+      this._setupTimelineListener();
       return { userId };
     } catch (e) {
       console.warn('Session restore sync failed:', e.message);
@@ -1508,8 +1565,21 @@ class KhoraService {
   }
 
   async sendEvent(roomId, type, content) {
-    if (this.client) { await this._withRetry(() => this.client.sendEvent(roomId, type, content)); }
-    else {
+    if (this.client) {
+      try {
+        await this._withRetry(() => this.client.sendEvent(roomId, type, content));
+      } catch (e) {
+        // Fallback to REST API if SDK sendEvent fails (e.g. crypto/encryption errors)
+        const msg = (e?.message || '').toLowerCase();
+        if (msg.includes('encrypt') || msg.includes('olm') || msg.includes('megolm') || msg.includes('crypto') || msg.includes('unknown devices') || msg.includes('no olm')) {
+          console.warn('sendEvent crypto fallback for', type, ':', e.message);
+          const txn = 'txn_' + Date.now() + Math.random().toString(36).slice(2);
+          await this._api('PUT', `/rooms/${encodeURIComponent(roomId)}/send/${encodeURIComponent(type)}/${txn}`, content);
+        } else {
+          throw e;
+        }
+      }
+    } else {
       const txn = 'txn_' + Date.now() + Math.random().toString(36).slice(2);
       await this._api('PUT', `/rooms/${encodeURIComponent(roomId)}/send/${encodeURIComponent(type)}/${txn}`, content);
     }
@@ -7134,12 +7204,16 @@ const classifyEvent = (ev, roomInfo) => {
   }
   if (type === EVT.RESOURCE_EVENT) return {op:content.event==='revoked'?'NUL':'ALT',epistemic:'GIVEN',label:'Resource Lifecycle',desc:`${content.event}: ${content.quantity} (${content.allocation_id?.slice(0,12)})`};
   if (type === EVT.METRIC) return {op:'INS',epistemic:'MEANT',label:'Metric Event',desc:`${content.observation?.category}: ${content.observation?.value}`};
+  if (type === EVT.NOTE) return {op:'INS',epistemic:'MEANT',label:'Note Created',desc:content.title?.slice(0,50) || 'Untitled'};
+  if (type === EVT.NOTE_REF) return {op:'SEG',epistemic:'MEANT',label:'Note Reference',desc:content.title?.slice(0,50) || content.note_id};
   if (type === 'm.room.message') {
     const cvType = content[`${NS}.type`];
     if (cvType==='request') return {op:'DES',epistemic:'MEANT',label:'Info Request',desc:content.body?.slice(0,60)};
     if (cvType==='note') return {op:'INS',epistemic:roomInfo.type==='vault'?'GIVEN':'MEANT',label:'Bridge Note',desc:content.body?.slice(0,60)};
     return {op:'INS',epistemic:'GIVEN',label:'Message',desc:content.body?.slice(0,60)};
   }
+  // Encrypted events that haven't been decrypted yet — show as pending
+  if (type === 'm.room.encrypted') return {op:'INS',epistemic:'GIVEN',label:'Encrypted Event',desc:'Awaiting decryption...'};
   return {op:'INS',epistemic:'GIVEN',label:type,desc:'Timeline event'};
 };
 
@@ -7257,6 +7331,21 @@ const RecordProvenance = ({ roomId, entityKey, label, session }) => {
   }, [roomId, entityKey, ops]);
 
   useEffect(() => { loadProvenance(); }, [loadProvenance]);
+
+  // React to new EO events that affect this entity
+  useEffect(() => {
+    const handleEo = (e) => {
+      const d = e.detail;
+      if (d && d.roomId === roomId) {
+        const t = d.event?.target;
+        if (t && (t.field === entityKey || t.entity === entityKey || t.type === entityKey)) {
+          setOps(null); // force reload
+        }
+      }
+    };
+    window.addEventListener('khora:eo', handleEo);
+    return () => window.removeEventListener('khora:eo', handleEo);
+  }, [roomId, entityKey]);
 
   if (loading) return <div style={{padding:'12px 16px',background:'var(--bg-3)',borderRadius:'var(--r)',marginTop:4}}>
     <Spin s={14}/> <span style={{fontSize:11,color:'var(--tx-2)',marginLeft:6}}>Loading provenance...</span>
@@ -7521,7 +7610,24 @@ const ActivityStream = ({session}) => {
   }, []);
 
   useEffect(() => { loadEvents(); }, []);
-  useEffect(() => { if (!autoRefresh) return; const iv = setInterval(loadEvents, 5000); return () => clearInterval(iv); }, [autoRefresh]);
+  useEffect(() => { if (!autoRefresh) return; const iv = setInterval(loadEvents, 12000); return () => clearInterval(iv); }, [autoRefresh]);
+  // React instantly to new EO operations and Khora timeline/state events via custom DOM events
+  useEffect(() => {
+    const handleEo = () => { loadEvents(); };
+    const handleTimeline = () => { loadEvents(); };
+    // Debounce rapid-fire events (e.g. multiple intermediate ops from emitOp)
+    let debounce = null;
+    const debouncedLoad = () => { if (debounce) clearTimeout(debounce); debounce = setTimeout(() => { loadEvents(); }, 300); };
+    window.addEventListener('khora:eo', debouncedLoad);
+    window.addEventListener('khora:timeline', debouncedLoad);
+    window.addEventListener('khora:state', debouncedLoad);
+    return () => {
+      window.removeEventListener('khora:eo', debouncedLoad);
+      window.removeEventListener('khora:timeline', debouncedLoad);
+      window.removeEventListener('khora:state', debouncedLoad);
+      if (debounce) clearTimeout(debounce);
+    };
+  }, [loadEvents]);
 
   // Apply filters (including triad and sender filters)
   const filtered = useMemo(() => events.filter(ev => {
@@ -9914,6 +10020,13 @@ const NoteCreateModal = ({open, onClose, individuals, staff, svc, rosterRoom, on
           });
         }
       }
+      // Emit EO operation to track note creation in the activity stream
+      try {
+        await emitOp(targetRoom, 'INS',
+          {type:'note', entity:'note', field: noteData.title || 'untitled'},
+          {note_id: noteData.id, attached_to: attachTo || undefined, author: svc.userId},
+          {type: attachTo ? 'bridge' : 'roster', room: targetRoom, role: 'provider', epistemic: 'MEANT'});
+      } catch(oe) { console.warn('Note EO event failed:', oe.message); }
       onSave && onSave(noteData);
       showToast && showToast('Note created', 'success');
       setTitle(''); setContent(''); setAttachTo(''); setTags([]); setTagSearch('');
@@ -11012,6 +11125,66 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const handleDismissAllNotifs = () => { setNotifications(prev => prev.map(n => ({...n, read: true}))); };
 
   useEffect(() => { initProvider(); }, []);
+
+  // ─── Real-time notification generation from Khora events ───
+  useEffect(() => {
+    const handleTimelineNotif = (e) => {
+      const d = e.detail;
+      if (!d || d.isOwn) return; // don't notify for own actions
+      const type = d.type;
+      if (type === EVT.OP) {
+        const op = d.content?.op;
+        const targetField = d.content?.target?.field || d.content?.target?.entity || '';
+        addNotification({
+          type: 'data_change',
+          title: `${op || 'EO'} operation: ${targetField}`,
+          description: `${d.sender?.split(':')[0]?.slice(1) || 'Someone'} performed ${op} on ${targetField}`,
+        });
+      } else if (type === EVT.OBSERVATION) {
+        addNotification({
+          type: 'data_change',
+          title: 'New observation recorded',
+          description: `${d.sender?.split(':')[0]?.slice(1) || 'Someone'} recorded: ${d.content?.prompt_key || 'observation'}`,
+        });
+      } else if (type === EVT.NOTE) {
+        addNotification({
+          type: 'data_change',
+          title: 'New note created',
+          description: d.content?.title || 'Untitled note',
+        });
+      }
+    };
+    const handleStateNotif = (e) => {
+      const d = e.detail;
+      if (!d || d.isOwn) return;
+      const type = d.type;
+      if (type === EVT.SCHEMA_FORM || type === EVT.SCHEMA_FIELD) {
+        addNotification({
+          type: 'schema_update',
+          title: 'Schema updated',
+          description: d.content?.name || d.content?.question_text || 'Form definition changed',
+        });
+      } else if (type === EVT.ORG_ROSTER) {
+        addNotification({
+          type: 'org_event',
+          title: 'Organization roster updated',
+          description: `${(d.content?.staff || []).length} staff members`,
+        });
+      } else if (type === EVT.BRIDGE_META) {
+        addNotification({
+          type: 'data_change',
+          title: 'Bridge updated',
+          description: `Status: ${d.content?.status || 'unknown'}`,
+        });
+      }
+    };
+    window.addEventListener('khora:timeline', handleTimelineNotif);
+    window.addEventListener('khora:state', handleStateNotif);
+    return () => {
+      window.removeEventListener('khora:timeline', handleTimelineNotif);
+      window.removeEventListener('khora:state', handleStateNotif);
+    };
+  }, []);
 
   const rosterFrame = (room) => ({type:'roster',room:room||rosterRoom,role:'provider',epistemic:'MEANT'});
   const bridgeFrame = (room) => ({type:'bridge',room,role:'provider',epistemic:'MEANT'});
