@@ -24,7 +24,11 @@
 <!-- Non-critical: username generator loaded as module (non-blocking) -->
 <script type="module">
 import { uniqueNamesGenerator, adjectives, animals } from 'https://esm.sh/unique-names-generator@4.7.1';
-window.generateUsername = () => uniqueNamesGenerator({ dictionaries: [adjectives, animals], separator: '-', length: 2, style: 'lowerCase' });
+window.generateUsername = () => {
+  const base = uniqueNamesGenerator({ dictionaries: [adjectives, animals], separator: '-', length: 2, style: 'lowerCase' });
+  const num = Math.floor(Math.random() * 9000) + 1000;
+  return base + '-' + num;
+};
 window._nameGenReady = true;
 </script>
 <!-- Embeddings: loaded on-demand only when initEmbeddings() is called -->
@@ -16573,6 +16577,8 @@ const LoginScreen = ({
   const [pass, setPass] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
+  const [extReg, setExtReg] = useState(null); // null or { server, username }
+  const [copied, setCopied] = useState(false);
 
   // Extract host server from username if present (e.g. @user:matrix.org -> matrix.org)
   const userHost = user.includes(':') ? user.split(':').slice(1).join(':') : '';
@@ -16616,7 +16622,9 @@ const LoginScreen = ({
             throw new Error(e.error || `Registration failed (${resp.status}). Try logging in if account exists.`);
           }
         } else {
-          throw new Error(`This server requires extra verification (like email or CAPTCHA) that must be completed on their website. Visit https://${effectiveHs} to create your account, then come back here and use the "Sign In" tab.`);
+          setExtReg({ server: effectiveHs, username: user.replace(/^@/, '').split(':')[0] });
+          setLoading(false);
+          return;
         }
       }
       const s = await svc.login(effectiveHs, user, pass);
