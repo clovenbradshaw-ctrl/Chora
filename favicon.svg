@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#0e1015"/>
+  <path d="M16 4 L28 16 L16 28 L4 16 Z" fill="none" stroke="#c9a352" stroke-width="2"/>
+  <path d="M16 8 L24 16 L16 24 L8 16 Z" fill="#c9a352" opacity="0.15"/>
+  <text x="16" y="21" text-anchor="middle" font-family="Manrope,system-ui,sans-serif" font-weight="700" font-size="14" fill="#c9a352">K</text>
+</svg>
