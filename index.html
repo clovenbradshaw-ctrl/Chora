@@ -17314,9 +17314,11 @@ const PersonalDashboard = ({
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(loadBridgeActivity, 500);
     };
+    window.addEventListener('khora:eo', handler);
     window.addEventListener('khora:timeline', handler);
     window.addEventListener('khora:state', handler);
     return () => {
+      window.removeEventListener('khora:eo', handler);
       window.removeEventListener('khora:timeline', handler);
       window.removeEventListener('khora:state', handler);
     };
@@ -22132,7 +22134,7 @@ const EditableCell = ({
       e.stopPropagation();
       setEditing(true);
     }
-  }, value || /*#__PURE__*/React.createElement("span", {
+  }, draft || /*#__PURE__*/React.createElement("span", {
     style: {
       color: 'var(--tx-3)',
       fontStyle: 'italic'
