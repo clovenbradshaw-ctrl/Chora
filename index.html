@@ -8736,9 +8736,10 @@ const PersonalDashboard = ({session, providers, observations, myResources, vault
   useEffect(() => {
     let debounce = null;
     const handler = () => { if (debounce) clearTimeout(debounce); debounce = setTimeout(loadBridgeActivity, 500); };
+    window.addEventListener('khora:eo', handler);
     window.addEventListener('khora:timeline', handler);
     window.addEventListener('khora:state', handler);
-    return () => { window.removeEventListener('khora:timeline', handler); window.removeEventListener('khora:state', handler); };
+    return () => { window.removeEventListener('khora:eo', handler); window.removeEventListener('khora:timeline', handler); window.removeEventListener('khora:state', handler); };
   }, [loadBridgeActivity]);
 
   // Filtered events
