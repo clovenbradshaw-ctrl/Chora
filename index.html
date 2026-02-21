@@ -10936,13 +10936,23 @@ const ResourcePanel = ({row, allocations, onClose, panelTab, setPanelTab}) => {
 };
 
 /* ─── NoteCreateModal — create a note (attached or unattached) ─── */
-const NoteCreateModal = ({open, onClose, individuals, staff, svc, rosterRoom, onSave, showToast, T}) => {
+const NoteCreateModal = ({open, onClose, individuals, staff, svc, rosterRoom, onSave, showToast, T, initialAttachTo}) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [attachTo, setAttachTo] = useState('');   // bridgeRoomId or ''
   const [tags, setTags] = useState([]);            // [{userId, displayName}]
   const [tagSearch, setTagSearch] = useState('');
   const [tagDd, setTagDd] = useState(false);
+
+  useEffect(() => {
+    if (open) setAttachTo(initialAttachTo || '');
+  }, [open, initialAttachTo]);
+
+  const authorName = (() => {
+    const me = (staff||[]).find(s => s.userId === svc.userId);
+    if (me) return me.display_name || svc.userId?.split(':')[0]?.replace('@','') || 'Unknown';
+    return svc.userId?.split(':')[0]?.replace('@','') || 'Unknown';
+  })();
 
   if (!open) return null;
 
@@ -11009,13 +11019,36 @@ const NoteCreateModal = ({open, onClose, individuals, staff, svc, rosterRoom, on
       <textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="Write your note..." style={{minHeight:100}}/>
     </div>
     <div style={{marginBottom:14}}>
-      <span className="section-label">ATTACH TO {T?.client_term?.toUpperCase() || 'INDIVIDUAL'} (OPTIONAL)</span>
-      <select value={attachTo} onChange={e=>setAttachTo(e.target.value)} style={{width:'100%'}}>
-        <option value="">Standalone (not attached)</option>
-        {(individuals||[]).map(ind => <option key={ind.id} value={ind.id}>{ind.name||ind.id}</option>)}
-      </select>
-      <div style={{fontSize:10,color:'var(--tx-2)',marginTop:4}}>
-        {attachTo ? 'Stored in the individual\'s bridge room — they can see and control this note.' : 'Stored in your roster room — internal to your organization.'}
+      {initialAttachTo ? <>
+        <span className="section-label">ATTACHED TO {T?.client_term?.toUpperCase() || 'INDIVIDUAL'}</span>
+        <div style={{fontSize:14,fontWeight:600,color:'var(--tx-0)',padding:'8px 12px',
+          background:'var(--bg-2)',borderRadius:'var(--r)',border:'1px solid var(--border-0)',marginTop:4}}>
+          {(individuals||[]).find(i => i.id === initialAttachTo)?.name || initialAttachTo}
+        </div>
+        <div style={{fontSize:10,color:'var(--tx-2)',marginTop:4}}>
+          Stored in the individual's bridge room — they can see and control this note.
+        </div>
+      </> : <>
+        <span className="section-label">ATTACH TO {T?.client_term?.toUpperCase() || 'INDIVIDUAL'} (OPTIONAL)</span>
+        <select value={attachTo} onChange={e=>setAttachTo(e.target.value)} style={{width:'100%'}}>
+          <option value="">Standalone (not attached)</option>
+          {(individuals||[]).map(ind => <option key={ind.id} value={ind.id}>{ind.name||ind.id}</option>)}
+        </select>
+        <div style={{fontSize:10,color:'var(--tx-2)',marginTop:4}}>
+          {attachTo ? 'Stored in the individual\'s bridge room — they can see and control this note.' : 'Stored in your roster room — internal to your organization.'}
+        </div>
+      </>}
+    </div>
+    <div style={{marginBottom:14}}>
+      <span className="section-label">AUTHOR</span>
+      <div style={{fontSize:13,color:'var(--tx-1)',padding:'8px 12px',
+        background:'var(--bg-2)',borderRadius:'var(--r)',border:'1px solid var(--border-0)',marginTop:4,
+        display:'flex',alignItems:'center',gap:8}}>
+        <span style={{width:20,height:20,borderRadius:'50%',background:'var(--purple-dim)',color:'var(--purple)',
+          display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,flexShrink:0}}>
+          {authorName[0].toUpperCase()}
+        </span>
+        {authorName}
       </div>
     </div>
     <div style={{marginBottom:18}}>
@@ -15113,6 +15146,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           onSave={handleNoteSave}
           showToast={showToast}
           T={T}
+          initialAttachTo={newNoteAttachTo}
         />
         <Modal open={!!noteDetailModal} onClose={()=>setNoteDetailModal(null)}
           title={noteDetailModal?.title || 'Note'} w={560}>
@@ -15170,6 +15204,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           onSave={handleNoteSave}
           showToast={showToast}
           T={T}
+          initialAttachTo={newNoteAttachTo}
         />
       </>}
 
