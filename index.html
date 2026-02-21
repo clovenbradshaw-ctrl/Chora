@@ -524,6 +524,26 @@ table.dt td.dt-drag-handle:active{cursor:grabbing}
 .profile-field-value{font-size:14px;font-weight:500;color:var(--tx-0)}
 /* ═══ Tombstone display ═══ */
 .tombstone-notice{padding:14px 16px;border-radius:var(--r);background:var(--red-dim);border:1px solid rgba(232,93,93,.15);display:flex;align-items:center;gap:10px;font-size:12px;color:var(--red)}
+/* ═══ Personal Dashboard ═══ */
+.pd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:24px}
+.pd-stat{padding:14px;cursor:default}
+.pd-stat .num{font-size:22px;font-weight:700}.pd-stat .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--tx-2);margin-top:2px}
+.pd-section{margin-bottom:28px}
+.pd-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.pd-section-hdr h3{font-family:var(--serif);font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+.pd-event{display:flex;gap:12px;padding:12px 14px;border-radius:var(--r);border:1px solid var(--border-0);background:var(--bg-2);transition:border-color .15s}
+.pd-event:hover{border-color:var(--gold)}
+.pd-event-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pd-event-body{flex:1;min-width:0}
+.pd-event-title{font-size:12.5px;font-weight:600;margin-bottom:2px}
+.pd-event-desc{font-size:11px;color:var(--tx-2);line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.pd-event-meta{display:flex;align-items:center;gap:8px;margin-top:4px}
+.pd-event-time{font-size:9px;color:var(--tx-3);font-family:var(--mono)}
+.pd-content-card{padding:14px 18px;border-radius:var(--r);border:1px solid var(--border-0);background:var(--bg-2);transition:border-color .15s}
+.pd-content-card:hover{border-color:var(--teal)}
+.pd-res-card{padding:12px 16px;border-radius:var(--r);border:1px solid var(--border-0);background:var(--bg-2);display:flex;align-items:center;justify-content:space-between;transition:border-color .15s}
+.pd-res-card:hover{border-color:var(--green)}
+.pd-empty{text-align:center;padding:30px 20px;border:1px dashed var(--border-1);border-radius:var(--r);color:var(--tx-3)}
 </style>
 </head>
 <body>
@@ -654,13 +674,26 @@ const ThemeToggle = ({style:sx}) => {
   </button>;
 };
 
-/* ═══════════════════ PER-FIELD CRYPTO (AES-256-GCM) ═══════════════════ */
+/* ═══════════════════ PER-FIELD CRYPTO (AES-256-GCM) ═══════════════════
+ * Operator Manifest:
+ *   INS(aes_key, crypto.subtle, field_encryption)
+ *   ALT(plaintext → ciphertext, aes_gcm_key, field_confidentiality)
+ *   ALT(ciphertext → plaintext, aes_gcm_key, field_confidentiality)
+ *
+ * Triad Summary:
+ *   Existence:       INS (key creation)
+ *   Structure:       —
+ *   Interpretation:  ALT (bidirectional value transform, encrypt/decrypt)
+ *   No REC — frame is stable. Encryption changes representation, not meaning.
+ * ═══════════════════════════════════════════════════════════════════════ */
 const FieldCrypto = {
+  // INS(aes_key, crypto.subtle, field_encryption) — create new 256-bit symmetric key
   async generateKey() {
     const key = await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
     const raw = await crypto.subtle.exportKey('raw', key);
     return btoa(String.fromCharCode(...new Uint8Array(raw)));
   },
+  // ALT(plaintext → ciphertext, aes_gcm_key, field_confidentiality)
   async encrypt(plaintext, keyB64) {
     const keyBuf = Uint8Array.from(atob(keyB64), c => c.charCodeAt(0));
     const key = await crypto.subtle.importKey('raw', keyBuf, 'AES-GCM', false, ['encrypt']);
@@ -668,6 +701,7 @@ const FieldCrypto = {
     const enc = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, new TextEncoder().encode(plaintext));
     return { ciphertext: btoa(String.fromCharCode(...new Uint8Array(enc))), iv: btoa(String.fromCharCode(...iv)) };
   },
+  // ALT(ciphertext → plaintext, aes_gcm_key, field_confidentiality)
   async decrypt(cipherB64, ivB64, keyB64) {
     try {
       const keyBuf = Uint8Array.from(atob(keyB64), c => c.charCodeAt(0));
@@ -680,13 +714,27 @@ const FieldCrypto = {
   }
 };
 
-/* ═══════════════════ LOCAL VAULT CRYPTO (IndexedDB at-rest encryption) ═══════════════════ */
-/* Derives a per-user AES-256-GCM key from the Matrix session using HKDF.
+/* ═══════════════════ LOCAL VAULT CRYPTO (IndexedDB at-rest encryption) ═══════════════════
+ * Operator Manifest:
+ *   INS(vault_key, hkdf(token+userId+deviceId), at_rest_encryption)
+ *   ALT(plaintext → ciphertext, vault_key, local_persistence)
+ *   ALT(ciphertext → plaintext, vault_key, local_retrieval)
+ *   NUL(vault_key, logout|tab_close, key_destruction)
+ *
+ * Triad Summary:
+ *   Existence:       INS (derive key), NUL (destroy key on logout)
+ *   Structure:       —
+ *   Interpretation:  ALT (encrypt/decrypt at rest)
+ *   No REC — at-rest encryption frame is stable; never reinterprets data.
+ *
+ * Derives a per-user AES-256-GCM key from the Matrix session using HKDF.
  * All local IndexedDB data is encrypted with this key so that only the
  * authenticated user who synced the data can read it at rest. The key is
- * held in memory only — destroyed on logout or tab close. */
+ * held in memory only — destroyed on logout or tab close.
+ * ═══════════════════════════════════════════════════════════════════════ */
 const LocalVaultCrypto = {
   _key: null, _userId: null,
+  // INS(vault_key, hkdf(token+userId+deviceId), at_rest_encryption)
   async deriveKey(userId, accessToken, deviceId) {
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(accessToken), 'HKDF', false, ['deriveKey']);
@@ -698,12 +746,14 @@ const LocalVaultCrypto = {
     return this._key;
   },
   get ready() { return !!this._key; },
+  // ALT(data → encrypted_envelope, vault_key, local_persistence)
   async encrypt(data) {
     if (!this._key) throw new Error('LocalVaultCrypto not initialized');
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, this._key, new TextEncoder().encode(JSON.stringify(data)));
     return { __enc: 1, ct: btoa(String.fromCharCode(...new Uint8Array(ct))), iv: btoa(String.fromCharCode(...iv)) };
   },
+  // ALT(encrypted_envelope → data, vault_key, local_retrieval)
   async decrypt(envelope) {
     if (!this._key) throw new Error('LocalVaultCrypto not initialized');
     if (!envelope?.__enc) return envelope;
@@ -714,13 +764,26 @@ const LocalVaultCrypto = {
       return JSON.parse(new TextDecoder().decode(dec));
     } catch { return null; }
   },
+  // NUL(vault_key, logout, key_destruction) — local data becomes unreadable
   clear() { this._key = null; this._userId = null; }
 };
 
-/* ═══════════════════ ENCRYPTED LOCAL CACHE ═══════════════════ */
-/* All values written to IndexedDB go through LocalVaultCrypto.encrypt().
+/* ═══════════════════ ENCRYPTED LOCAL CACHE ═══════════════════
+ * Operator Manifest:
+ *   INS(encrypted_blob, idb_store, local_persistence)   — put
+ *   ALT(encrypted_blob → data, vault_key, cache_read)   — get (decrypt on read)
+ *   NUL(all_stores, wipe, cache_destruction)             — clear
+ *
+ * Triad Summary:
+ *   Existence:       INS (write blobs), NUL (wipe on logout)
+ *   Structure:       —
+ *   Interpretation:  ALT (decrypt on read)
+ *   No REC — cache never reinterprets; it stores and retrieves.
+ *
+ * All values written to IndexedDB go through LocalVaultCrypto.encrypt().
  * Keys (primary keys) remain plaintext for lookups; values are AES-256-GCM
- * ciphertext. An attacker inspecting IndexedDB sees only opaque blobs. */
+ * ciphertext. An attacker inspecting IndexedDB sees only opaque blobs.
+ * ═══════════════════════════════════════════════════════════════════════ */
 const KhoraEncryptedCache = {
   DB_NAME: 'khora-encrypted-vault', DB_VERSION: 1,
   STORES: ['session', 'rooms', 'state'],
@@ -737,6 +800,7 @@ const KhoraEncryptedCache = {
       req.onerror = () => reject(req.error);
     });
   },
+  // INS(encrypted_blob, idb_store, local_persistence) — encrypt-then-write
   async put(storeName, key, value) {
     if (!LocalVaultCrypto.ready) return;
     const db = await this.open();
@@ -748,6 +812,7 @@ const KhoraEncryptedCache = {
       tx.onerror = () => reject(tx.error);
     });
   },
+  // ALT(encrypted_blob → data, vault_key, cache_read) — read-then-decrypt
   async get(storeName, key) {
     if (!LocalVaultCrypto.ready) return null;
     const db = await this.open();
@@ -762,6 +827,7 @@ const KhoraEncryptedCache = {
       req.onerror = () => reject(req.error);
     });
   },
+  // ALT(encrypted_blob[] → data[], vault_key, bulk_cache_read) — cursor-based decrypt
   async getAll(storeName) {
     if (!LocalVaultCrypto.ready) return {};
     const db = await this.open();
@@ -779,6 +845,7 @@ const KhoraEncryptedCache = {
       req.onerror = () => reject(req.error);
     });
   },
+  // NUL(all_stores, wipe, cache_destruction) — purge all encrypted data
   async clear() {
     try {
       const db = await this.open();
@@ -793,7 +860,25 @@ const KhoraEncryptedCache = {
   close() { if (this._db) { this._db.close(); this._db = null; } }
 };
 
-/* ═══════════════════ EO OPERATION LAYER ═══════════════════ */
+/* ═══════════════════ EO OPERATION LAYER ═══════════════════
+ * Operator Manifest (meta — this IS the EO engine):
+ *   DES(operator_vocabulary, nine_canonical_ops, ontological_foundation)
+ *   CON(from_op → to_op, adjacency_matrix, transition_graph)
+ *   INS(intermediate_ops[], adjacency_violation, auto_repair)
+ *   CON(current_op → predecessor, entity_key, provenance_chain)
+ *   DES(khora:eo_event, custom_event, ui_notification)
+ *   ALT(userId → sha256_hash, salt, anonymization)
+ *
+ * projectCurrentState replays: INS, ALT, NUL, SUP, DES
+ *
+ * Triad Summary:
+ *   Existence:       INS (auto-intermediate emission), DES (operator vocabulary)
+ *   Structure:       CON (adjacency graph, provenance chains)
+ *   Interpretation:  ALT (cohort hashing), SUP (superposition replay)
+ *   All three triads active. This is the EO engine itself —
+ *   meta-operators operating on operators.
+ * ═══════════════════════════════════════════════════════════ */
+// DES(operator_vocabulary, nine_canonical_ops, ontological_foundation)
 const OPERATORS = ['NUL','DES','INS','SEG','CON','SYN','ALT','SUP','REC'];
 
 // Operator adjacency matrix (§5.2) — row can transition to column
@@ -803,6 +888,7 @@ const OP_ADJ = {
   ALT:['SYN','ALT','SUP'], SUP:['ALT','SUP','REC'], REC:['NUL','SUP','REC'],
 };
 
+// CON(from_op → to_op, adjacency_matrix, transition_path)
 // BFS pathfinding for auto-intermediate emission
 function findOpPath(from, to) {
   if (from === to || OP_ADJ[from]?.includes(to)) return [to];
@@ -835,12 +921,18 @@ function extractHomeserver(matrixId) {
 // Now enriches every event with provenance metadata (created_by, origin_server)
 // and builds provenance chains linking each op to its predecessor on the same entity.
 // Resilient: catches sendEvent failures and retries once, logs all failures visibly.
+//
+// Internal transformations:
+//   INS(intermediate_ops[], adjacency_violation, auto_repair)  — when transition is invalid
+//   CON(current_op → predecessor, entity_key, provenance_chain) — links to prior op
+//   DES(khora:eo_event, custom_event, ui_notification) — dispatches to DOM listeners
 async function emitOp(roomId, op, target, context, frame, provenance = []) {
   if (!roomId) { console.error('emitOp: no roomId provided for', op, target); return null; }
   try {
     const ek = eKey(roomId, target?.field || target?.entity);
     const lastEntry = entityOpHist[ek];
     const lastOp = lastEntry?.op;
+    // INS(intermediate_ops[], adjacency_violation, auto_repair)
     // Auto-emit intermediate operations if transition is invalid
     if (lastOp && !OP_ADJ[lastOp]?.includes(op)) {
       const path = findOpPath(lastOp, op);
@@ -851,11 +943,13 @@ async function emitOp(roomId, op, target, context, frame, provenance = []) {
         entityOpHist[ek] = { op: path[i], id: midId };
       }
     }
+    // CON(current_op → predecessor, entity_key, provenance_chain)
     const prevEntry = entityOpHist[ek];
     const chainedProvenance = [...provenance, ...(prevEntry?.id ? [prevEntry.id] : [])];
     const event = { id: genOpId(), op, target, context, frame, provenance: chainedProvenance, created_by: svc.userId, origin_server: extractHomeserver(svc.userId), ts: Date.now() };
     await svc.sendEvent(roomId, EVT.OP, event);
     entityOpHist[ek] = { op, id: event.id };
+    // DES(khora:eo_event, custom_event, ui_notification)
     // Dispatch custom DOM event so listeners (ActivityStream, notifications) can react immediately
     window.dispatchEvent(new CustomEvent('khora:eo', { detail: { roomId, event } }));
     return event;
@@ -869,24 +963,30 @@ async function emitOp(roomId, op, target, context, frame, provenance = []) {
 }
 
 // Compute current state from operation history (§9.1)
+// Replays five operator types to reconstruct current entity state:
+//   INS → creates field with value (existence)
+//   ALT → overwrites value within stable frame (interpretation)
+//   NUL → nullifies field, marks source (existence removal)
+//   SUP → holds multiple valid values simultaneously (interpretation)
+//   DES → sets entity designation/type (existence naming)
 function projectCurrentState(operations, frameType) {
   const state = {};
   const relevant = operations.filter(o => o.frame?.type === frameType).sort((a,b) => a.ts - b.ts);
   for (const op of relevant) {
     switch (op.op) {
-      case 'INS':
+      case 'INS': // INS(field, value, frame) — instantiate field with value
         if (op.target?.field) state[op.target.field] = { value: op.target.value ?? op.context?.value, source_op: op.id, epistemic: op.frame?.epistemic, ts: op.ts };
         break;
-      case 'ALT':
+      case 'ALT': // ALT(field, old→new, frame) — value change within existing frame
         if (op.target?.field && state[op.target.field]) { state[op.target.field].value = op.context?.to; state[op.target.field].source_op = op.id; state[op.target.field].ts = op.ts; }
         break;
-      case 'NUL':
+      case 'NUL': // NUL(field, reason, frame) — existence removal
         if (op.target?.field) state[op.target.field] = { value: null, nullified_by: op.id, ts: op.ts };
         break;
-      case 'SUP':
+      case 'SUP': // SUP(field, [values], frame) — multiple valid values coexist
         if (op.target?.field) state[op.target.field] = { values: op.context?.states, superposition: true, source_op: op.id, ts: op.ts };
         break;
-      case 'DES':
+      case 'DES': // DES(entity, designation, frame) — type/name assignment
         if (op.target?.entity) state[`${op.target.entity}.designation`] = { value: op.target.designation, source_op: op.id, ts: op.ts };
         break;
     }
@@ -894,7 +994,7 @@ function projectCurrentState(operations, frameType) {
   return state;
 }
 
-// SHA-256 cohort hash for metrics anonymization
+// ALT(userId → sha256_hash, salt, anonymization) — one-way lossy transform for metrics
 async function cohortHash(userId, salt) {
   const data = new TextEncoder().encode(userId + (salt || 'khora_default_salt'));
   const hash = await crypto.subtle.digest('SHA-256', data);
@@ -902,19 +1002,32 @@ async function cohortHash(userId, salt) {
 }
 
 /* ═══════════════════ EMAIL VERIFICATION UTILITIES (§10.5) ═══════════════════
+ * Operator Manifest:
+ *   INS(verification_code, crypto.getRandomValues, challenge_creation)
+ *   ALT(plaintext_code → sha256_hash, web_crypto, one_way_transform)
+ *   CON(hashed_code → org_room_state, webhook_delivery, out_of_band_challenge)
+ *   DES(email_identity, code_match, verified_attestation)
+ *   NUL(challenge, max_attempts|expiry, lockout)
+ *
+ * Triad Summary:
+ *   Existence:       INS (code generation), NUL (expiry/lockout)
+ *   Structure:       CON (webhook delivery to out-of-band channel)
+ *   Interpretation:  ALT (one-way hash), DES (verified identity attestation)
+ *   No REC, no SUP — verification either succeeds or fails, never reinterprets.
+ *
  * Generates time-limited 6-digit codes, hashes them with SHA-256, and validates
  * email addresses against organization-approved domains. Codes are stored hashed
  * in Matrix room state — the plaintext code is delivered out-of-band (email/webhook).
  * ════════════════════════════════════════════════════════════════════════════════ */
 const EmailVerification = {
-  /** Generate a cryptographically random 6-digit code */
+  // INS(verification_code, crypto.getRandomValues, challenge_creation)
   generateCode() {
     const arr = crypto.getRandomValues(new Uint8Array(4));
     const num = (arr[0] << 24 | arr[1] << 16 | arr[2] << 8 | arr[3]) >>> 0;
     return String(num % 1000000).padStart(6, '0');
   },
 
-  /** SHA-256 hash a verification code (stored in state; plaintext never persisted) */
+  // ALT(plaintext_code → sha256_hash, web_crypto, one_way_transform)
   async hashCode(code) {
     const data = new TextEncoder().encode(code + ':khora_email_verify_v1');
     const hash = await crypto.subtle.digest('SHA-256', data);
@@ -939,7 +1052,8 @@ const EmailVerification = {
     return domain && requiredDomains.some(d => d.toLowerCase() === domain);
   },
 
-  /** Create a verification challenge object (stored in room state) */
+  // INS(challenge, userId+email+hash, verification_initiation)
+  // CON(challenge → org_room_state, state_key, persistence)
   async createChallenge(userId, email) {
     const code = this.generateCode();
     const codeHash = await this.hashCode(code);
@@ -959,7 +1073,8 @@ const EmailVerification = {
     };
   },
 
-  /** Validate a submitted code against a stored challenge */
+  // DES(email_identity, code_match, verified_attestation) on success
+  // NUL(challenge, expired|max_attempts, lockout) on failure
   async validateChallenge(challenge, submittedCode) {
     if (!challenge || challenge.status !== 'pending') return { valid: false, reason: 'no_active_challenge' };
     if (Date.now() > challenge.expires) return { valid: false, reason: 'expired' };
@@ -988,7 +1103,7 @@ const EmailVerification = {
     return true;
   },
 
-  /** Deliver verification code via n8n webhook (email relay) */
+  // CON(plaintext_code → email_inbox, webhook_relay, out_of_band_delivery)
   async sendCodeViaWebhook(email, code, orgName) {
     try {
       const resp = await fetch(`${WEBHOOK_BASE}/email-verify`, {
@@ -1007,7 +1122,22 @@ const EmailVerification = {
   },
 };
 
-/* ═══════════════════ EVENT TYPES (§11) ═══════════════════ */
+/* ═══════════════════ EVENT TYPES (§11) ═══════════════════
+ * Operator Manifest:
+ *   DES(event_types, io.khora.*, protocol_vocabulary)
+ *
+ * This entire section is pure DES — it designates the vocabulary of
+ * event types, maturity levels, propagation levels, governance constants,
+ * and resource tracking constants. No data is mutated, structured, or
+ * reinterpretted here. All actual transformations happen elsewhere
+ * using these designations as their frame.
+ *
+ * Triad Summary:
+ *   Existence:       DES only (naming, not creating)
+ *   Structure:       —
+ *   Interpretation:  —
+ *   No INS, no ALT, no REC — vocabulary definition is frame-setting, not frame-changing.
+ * ═══════════════════════════════════════════════════════════ */
 const NS = 'io.khora';
 const EVT = {
   IDENTITY:       `${NS}.identity`,
@@ -1097,6 +1227,7 @@ const EVT = {
 };
 
 /* ═══════════════════ MATURITY LEVELS (MVP §Screen 4) ═══════════════════ */
+// DES(lifecycle_states, [draft→trial→normative→de_facto→deprecated], schema_governance)
 const MATURITY_LEVELS = {
   draft:      { id: 'draft',      label: 'Draft',      color: 'blue',   icon: '🔵', desc: 'Proposed, not yet reviewed' },
   trial:      { id: 'trial',      label: 'Trial',      color: 'gold',   icon: '🟡', desc: 'Approved for testing, may change' },
@@ -1106,6 +1237,7 @@ const MATURITY_LEVELS = {
 };
 
 /* ═══════════════════ PROPAGATION LEVELS (MVP §CON Semantics) ═══════════════════ */
+// DES(coupling_strengths, [required→standard→recommended→optional], network_governance)
 const PROPAGATION_LEVELS = {
   required:    { id: 'required',    label: 'Required',    color: 'red',    desc: 'Tight coupling — auto-applied to orgs, immutable' },
   standard:    { id: 'standard',    label: 'Standard',    color: 'gold',   desc: 'Expected coupling — auto-applied, notify on divergence' },
@@ -1114,6 +1246,7 @@ const PROPAGATION_LEVELS = {
 };
 
 /* ═══════════════════ GOVERNANCE CONSTANTS (MVP §Screen 5) ═══════════════════ */
+// DES(governance_vocabulary, consent+proposals+rhythms, polycentric_governance)
 const CONSENT_POSITIONS = {
   adopt_as_is:          { id: 'adopt_as_is',          label: 'Adopt as-is',           icon: '✅', color: 'green' },
   adopt_with_extension: { id: 'adopt_with_extension', label: 'Adopt with extension',  icon: '🔄', color: 'blue' },
@@ -1156,6 +1289,7 @@ const CROSSWALK_TYPES = {
 };
 
 /* ═══════════════════ RESOURCE TRACKING CONSTANTS (§Resource Build) ═══════════════════ */
+// DES(resource_vocabulary, categories+opacity+relations+permissions, resource_tracking)
 
 /** Resource categories — the top-level classification for resource types */
 const RESOURCE_CATEGORIES = [
@@ -1296,9 +1430,19 @@ function buildDefaultResourcePermissions() {
   };
 }
 
-/* ═══════════════════ ROLE INFERENCE (MVP §Screen 1) ═══════════════════ */
-/* Roles are detected from room memberships — no account-type selector.
- * A user can have multiple roles simultaneously. */
+/* ═══════════════════ ROLE INFERENCE (MVP §Screen 1) ═══════════════════
+ * Operator Manifest:
+ *   DES(user_roles, room_membership_scan, identity_classification)
+ *
+ * Triad Summary:
+ *   Existence:       DES (classify user into roles)
+ *   Structure:       —
+ *   Interpretation:  —
+ *   No mutations — read-only scan. No REC — role frame is stable.
+ *
+ * Roles are detected from room memberships — no account-type selector.
+ * A user can have multiple roles simultaneously.
+ * ═══════════════════════════════════════════════════════════ */
 const ROLES = {
   client:    { id: 'client',    label: 'Individual',         icon: 'shield',    color: 'teal',   desc: 'Data owner with a personal Vault' },
   provider:  { id: 'provider',  label: 'Team Member',        icon: 'briefcase', color: 'gold',   desc: 'Case manager or outreach worker' },
@@ -1306,6 +1450,8 @@ const ROLES = {
   network:   { id: 'network',   label: 'Network Coordinator',icon: 'globe',    color: 'green',  desc: 'Network governance steward' },
 };
 
+// DES(user_roles, room_membership_scan, identity_classification)
+// Scans all rooms to determine user's active roles via structural evidence
 function inferRolesFromRooms(scannedState, userId) {
   const roles = new Set();
   for (const [roomId, state] of Object.entries(scannedState)) {
@@ -1337,7 +1483,25 @@ function inferRolesFromRooms(scannedState, userId) {
   return [...roles];
 }
 
-/* ═══════════════════ MATRIX SERVICE ═══════════════════ */
+/* ═══════════════════ MATRIX SERVICE ═══════════════════
+ * Operator Manifest:
+ *   INS(matrix_session, credentials, authentication)                — login
+ *   INS(vault_key, hkdf, at_rest_encryption)                       — login key derivation
+ *   NUL(legacy_stores, purge, security_cleanup)                     — login cleanup
+ *   DES(session, whoami_check, token_validation)                    — restoreSession
+ *   INS(matrix_room, e2ee+state, room_creation)                    — createRoom
+ *   INS(bridge_room, power_levels, client_sovereign_creation)       — createClientRoom
+ *   ALT(room_state, state_event, protocol_mutation)                 — setState
+ *   INS(timeline_event, room, event_emission)                       — sendEvent
+ *   DES(room_topology, sync_state, room_classification)             — scanRooms
+ *   NUL(session+keys+cache, logout, full_teardown)                  — logout
+ *
+ * Triad Summary:
+ *   Existence:       INS (sessions, rooms, events), NUL (logout, purge)
+ *   Structure:       CON (bridge creation links client ↔ provider)
+ *   Interpretation:  ALT (state events), DES (room classification)
+ *   No REC — KhoraService is a transport layer; it never reinterprets data.
+ * ═══════════════════════════════════════════════════════════ */
 class KhoraService {
   constructor() { this.client = null; this._baseUrl = null; this._token = null; this._userId = null; this._timelineListenerAttached = false; }
 
@@ -1398,6 +1562,7 @@ class KhoraService {
     throw new Error('Rate limited — too many requests. Please try again.');
   }
 
+  // INS(matrix_session, credentials, authentication) → INS(vault_key, hkdf, at_rest_encryption) → NUL(legacy_stores, purge, cleanup)
   async login(homeserver, user, pass) {
     const baseUrl = homeserver.startsWith('http') ? homeserver : `https://${homeserver}`;
     this._baseUrl = baseUrl;
@@ -1435,6 +1600,7 @@ class KhoraService {
     }
   }
 
+  // DES(session, whoami_check, token_validation) → INS(matrix_client, valid_token, reconnection) | NUL(session, expired, destruction)
   async restoreSession() {
     const raw = localStorage.getItem('khora_session');
     if (!raw) return null;
@@ -1531,6 +1697,7 @@ class KhoraService {
     throw new Error('Rate limited — too many requests. Please try again.');
   }
 
+  // INS(matrix_room, e2ee+state, room_creation) — Megolm encryption enabled by default
   async createRoom(name, topic, extraState = []) {
     const initial_state = [
       { type: 'm.room.encryption', state_key: '', content: { algorithm: 'm.megolm.v1.aes-sha2' } },
@@ -1545,6 +1712,7 @@ class KhoraService {
     }
   }
 
+  // INS(bridge_room, power_levels, client_sovereign_creation) — client PL 100, provider PL 50
   async createClientRoom(name, topic, extraState = [], clientMatrixId = null) {
     const initial_state = [
       { type: 'm.room.encryption', state_key: '', content: { algorithm: 'm.megolm.v1.aes-sha2' } },
@@ -1601,11 +1769,13 @@ class KhoraService {
     try { return await this._api('GET', `/rooms/${encodeURIComponent(roomId)}/state/${type}/${sk}`); } catch { return null; }
   }
 
+  // ALT(room_state, state_event, protocol_mutation) — write state to Matrix room
   async setState(roomId, type, content, sk = '') {
     if (this.client) { await this._withRetry(() => this.client.sendStateEvent(roomId, type, content, sk)); }
     else { await this._api('PUT', `/rooms/${encodeURIComponent(roomId)}/state/${type}/${sk}`, content); }
   }
 
+  // INS(timeline_event, room, event_emission) — with crypto fallback for E2EE errors
   async sendEvent(roomId, type, content) {
     if (this.client) {
       try {
@@ -1707,6 +1877,7 @@ class KhoraService {
     } catch { return []; }
   }
 
+  // DES(room_topology, sync_state, room_classification) — read-only scan, caches to encrypted IDB
   // Batch-fetch all Khora state across joined rooms in a single request.
   // When the SDK is available, reads local sync state (no HTTP calls).
   // When using the API fallback, uses /sync with a tight filter — one request
@@ -1771,6 +1942,7 @@ class KhoraService {
     }
   }
 
+  // NUL(legacy_idb, store_names, security_cleanup)
   // Purge unencrypted IndexedDB databases created by the Matrix SDK sync layer
   // or legacy application caches. Preserves crypto stores (Olm/Megolm key material
   // needed for E2EE continuity) and our own encrypted vault.
@@ -1792,10 +1964,11 @@ class KhoraService {
     }
   }
 
+  // NUL(session+keys+cache, logout, full_teardown) — destroys all local state
   async logout() {
     if (this.client) { this.client.stopClient(); try { await this.client.logout(); } catch {} }
     this.client = null; this._token = null; this._userId = null;
-    // Destroy at-rest encryption key — local encrypted data becomes unreadable
+    // NUL(vault_key, logout, key_destruction) — local encrypted data becomes unreadable
     LocalVaultCrypto.clear();
     // Wipe encrypted local cache and close database connection
     try { await KhoraEncryptedCache.clear(); KhoraEncryptedCache.close(); } catch {}
@@ -1853,12 +2026,23 @@ class KhoraService {
 const svc = new KhoraService();
 
 /* ═══════════════════ WEBHOOK / AIRTABLE BRIDGE ═══════════════════
+ * Operator Manifest:
+ *   CON(browser → n8n_endpoint, access_token, webhook_transport)
+ *   SYN(tables[] + records[], parallel_fetch, hydrated_dataset)
+ *
+ * Triad Summary:
+ *   Existence:       —
+ *   Structure:       CON (transport link), SYN (parallel hydration)
+ *   Interpretation:  —
+ *   No REC — data passes through unchanged. No existence mutations.
+ *
  * Fetches table and record data from n8n webhook endpoints backed by
  * the amino Postgres schema. Auth is forwarded via query-param so the
  * browser never sends an Authorization header, avoiding CORS preflight.
  * ═══════════════════════════════════════════════════════════════════ */
 const WEBHOOK_BASE = 'https://n8n.intelechia.com/webhook';
 
+// CON(browser → n8n_endpoint, access_token, webhook_transport)
 async function webhookFetch(path, token) {
   const sep = path.includes('?') ? '&' : '?';
   const url = `${WEBHOOK_BASE}${path}${token ? `${sep}access_token=${encodeURIComponent(token)}` : ''}`;
@@ -1870,6 +2054,7 @@ async function webhookFetch(path, token) {
   return resp.json();
 }
 
+// SYN(tables[] + records[], parallel_fetch, hydrated_dataset) — merges table metadata with record data
 async function hydrateFromWebhooks(token) {
   const { tables } = await webhookFetch('/api/tables', token);
   const allTables = {};
@@ -1886,6 +2071,19 @@ async function hydrateFromWebhooks(token) {
 }
 
 /* ═══════════════════ DOMAIN CONFIG (§C.0) ═══════════════════
+ * Operator Manifest:
+ *   DES — pure designation. Forms, interpretations, transforms, vault fields,
+ *         roles, relationship types, terminology. All are vocabulary definitions.
+ *
+ * Triad Summary:
+ *   Existence:       DES (naming forms, fields, authorities, roles)
+ *   Structure:       —
+ *   Interpretation:  —
+ *   No mutations here. DOMAIN_CONFIG is the interpretive frame that other modules
+ *   reference. All actual INS/ALT/CON/REC operations happen elsewhere using
+ *   these designations. Changing DOMAIN_CONFIG changes the vocabulary itself —
+ *   which is a meta-level REC, but not one performed by code at runtime.
+ *
  * All domain-specific content is consolidated here. To adapt Tessera for a
  * different sector, replace the contents of DOMAIN_CONFIG — the application
  * logic, encryption model, bridge topology, and EO operator layer are all
@@ -2931,12 +3129,31 @@ function getFrameworkFields(enabledIds) {
   return fields;
 }
 
-/* ═══════════════════ ANONYMIZATION (§B.2) ═══════════════════ */
+/* ═══════════════════ ANONYMIZATION (§B.2) ═══════════════════
+ * Operator Manifest:
+ *   NUL(pii_field, block_policy, data_suppression)         — block method
+ *   SEG(dob → age_bucket, range_boundaries, k_anonymity)   — age_range method
+ *   SEG(numeric → bracket, range_rules, statistical_binning)— bracket method
+ *   ALT(address → geohash, hashing, location_anonymization) — area_hash method
+ *   SYN(observation + anon_demographics, cohort_hash, metric_emission) — emitMetric
+ *
+ * Triad Summary:
+ *   Existence:       NUL (PII suppression)
+ *   Structure:       SEG (bucketing, range partitioning)
+ *   Interpretation:  ALT (lossy hash transform)
+ *   ⚠️ No REC — frame is deliberately stable. Anonymization is lossy by design;
+ *   reinterpretation would violate the irreversibility guarantee.
+ * ═══════════════════════════════════════════════════════════ */
+// Transforms a single field according to DEFAULT_TRANSFORMS rules:
+//   block    → NUL(pii_field, privacy_policy, data_suppression) — returns null
+//   age_range→ SEG(dob → age_bucket, range_boundaries, k_anonymity)
+//   bracket  → SEG(numeric → bracket, range_rules, statistical_binning)
+//   area_hash→ ALT(address → geohash, hashing, location_anonymization)
 function anonymizeField(key, value) {
   const t = DEFAULT_TRANSFORMS[key];
   if (!t) return {key, value};
-  if (t.method === 'block') return null;
-  if (t.method === 'age_range' && value) {
+  if (t.method === 'block') return null; // NUL — suppress PII entirely
+  if (t.method === 'age_range' && value) { // SEG — partition into age buckets
     const age = Math.floor((Date.now()-new Date(value).getTime())/(365.25*24*60*60*1000));
     const bucket = t.buckets.find(b => {const [lo,hi]=b.split('-').map(Number);return age>=lo&&(!hi||age<=hi);});
     return {key:'age_range', value:bucket||'unknown'};
@@ -2950,6 +3167,8 @@ function anonymizeField(key, value) {
   return {key, value};
 }
 
+// SYN(observation + anon_demographics, cohort_hash, metric_emission)
+// Anonymizes identity, then synthesizes observation + demographics into a single metric event
 async function emitMetric(metricsRoom, clientId, observation, demographics, program) {
   const hash = await cohortHash(clientId);
   const anonDemo = {};
@@ -2963,6 +3182,7 @@ async function emitMetric(metricsRoom, clientId, observation, demographics, prog
 }
 
 /* ═══════════════════ RESOURCE PERMISSION UTILITIES ═══════════════════ */
+// DES(permission_check, grants+role, access_control) — read-only classification, no mutations
 
 /**
  * Check whether a user matches a permission grant.
@@ -3029,6 +3249,26 @@ function formatPermissionGrant(grant) {
 }
 
 /* ═══════════════════ RESOURCE TRACKING SERVICE (§Resource Build) ═══════════════════
+ * Operator Manifest:
+ *   DES(resource_type, category+unit+constraints, resource_catalog)     — createResourceType
+ *   INS(permissions, default_grants, access_control)                    — createResourceType
+ *   ALT(resource_type.{field}, updated_values, catalog_mutation)        — updateResourceType
+ *   ALT(permissions, grant_changes, access_control_mutation)            — updateResourcePermissions
+ *   CON(network_type → org_catalog, propagation_level, schema_cascade)  — propagateResourceType
+ *   CON(org → resource_type, relation_type, capacity_link)              — establishRelation
+ *   INS(inventory, initial_stock, supply_initialization)                — establishRelation
+ *   ALT(inventory.available, ±quantity, stock_adjustment)               — restock/adjust
+ *   INS(allocation, bridge_room, individual_grant)                      — allocateResource
+ *   INS(vault_shadow, client_vault, sovereign_record)                   — allocateResource
+ *   SYN(allocation + anon_demographics, cohort_hash, resource_metric)   — emitResourceMetric
+ *
+ * Triad Summary:
+ *   Existence:       DES (type creation), INS (inventory, allocations, vault shadows)
+ *   Structure:       CON (propagation, org↔type relations)
+ *   Interpretation:  ALT (stock changes, type updates), SYN (metrics)
+ *   ⚠️ No REC — resource frame is stable. Changing what "allocation" means
+ *   would be a governance action (GOV_PROPOSAL), not a runtime operation.
+ *
  * Core resource tracking infrastructure. Resources (beds, vouchers, funds, services) are
  * tracked across three levels — network, org, individual — using the existing room topology.
  *
@@ -3147,6 +3387,7 @@ const ResourceService = {
    * Create a resource type in the catalog (network or org room).
    * Emits DES operation. Returns event ID.
    */
+  // DES(resource_type, category+unit+constraints, resource_catalog) + INS(permissions, default_grants, access_control)
   async createResourceType(roomId, typeData, roomType) {
     const level = roomType === 'network' ? 'network' : roomType === 'individual' ? 'individual' : 'org';
     if (level === 'network' && !typeData.source?.propagation) {
@@ -3221,6 +3462,7 @@ const ResourceService = {
    * If propagation level changes, requires adopted_via reference (governance action).
    * Caller must have controller permission.
    */
+  // ALT(resource_type.{field}, updated_values, catalog_mutation)
   async updateResourceType(roomId, typeId, changes, roomType, callerRole) {
     const existing = await svc.getState(roomId, EVT.RESOURCE_TYPE, typeId);
     if (!existing) throw new Error(`Resource type ${typeId} not found`);
@@ -3258,6 +3500,7 @@ const ResourceService = {
    * Update permissions on a resource type. Caller must be a current controller.
    * Writes to both the resource type state and a dedicated RESOURCE_PERM state event.
    */
+  // ALT(permissions, grant_changes, access_control_mutation)
   async updateResourcePermissions(roomId, typeId, newPermissions, callerRole) {
     const existing = await svc.getState(roomId, EVT.RESOURCE_TYPE, typeId);
     if (!existing) throw new Error(`Resource type ${typeId} not found`);
@@ -3306,6 +3549,7 @@ const ResourceService = {
    * Respects propagation levels: required (immutable), standard (extendable),
    * recommended (visible), optional (catalog only).
    */
+  // CON(network_type → org_catalog, propagation_level, schema_cascade)
   async propagateResourceType(networkRoomId, orgRoomId, typeId) {
     const networkType = await svc.getState(networkRoomId, EVT.RESOURCE_TYPE, typeId);
     if (!networkType) throw new Error(`Resource type ${typeId} not found in network room`);
@@ -3346,6 +3590,7 @@ const ResourceService = {
    * Establish a relation between an org and a resource type.
    * Defaults opacity to SOVEREIGN (0). Emits CON operation.
    */
+  // CON(org → resource_type, relation_type, capacity_link) + INS(inventory, initial_stock, supply_initialization)
   async establishRelation(orgRoomId, relationData) {
     if (!RESOURCE_RELATION_TYPES.includes(relationData.relation_type)) {
       throw new Error(`Invalid relation type: ${relationData.relation_type}. Must be one of: ${RESOURCE_RELATION_TYPES.join(', ')}`);
@@ -3441,6 +3686,7 @@ const ResourceService = {
    * Restock inventory for a resource relation.
    * Adds quantity to total_capacity and available. Emits INS operation.
    */
+  // ALT(inventory.available, +quantity, supply_replenishment)
   async restockInventory(orgRoomId, relationId, quantity, metadata) {
     const existing = await svc.getState(orgRoomId, EVT.RESOURCE_INVENTORY, relationId);
     const now = Date.now();
@@ -3484,6 +3730,7 @@ const ResourceService = {
    * Adjust inventory for write-offs, corrections, or manual adjustments.
    * Emits ALT operation with reason.
    */
+  // ALT(inventory, ±adjustment+reason, correction)
   async adjustInventory(orgRoomId, relationId, adjustment, reason) {
     const inventory = await svc.getState(orgRoomId, EVT.RESOURCE_INVENTORY, relationId);
     if (!inventory) throw new Error(`No inventory found for relation ${relationId}`);
@@ -3517,6 +3764,8 @@ const ResourceService = {
    *
    * Returns { allocation, bridgeEventId, vaultEventId, inventoryEventId }
    */
+  // INS(allocation, bridge_room, individual_grant) + ALT(inventory, -quantity, stock_decrement) + INS(vault_shadow, client_vault, sovereign_record)
+  // ⚠️ Three-part write: bridge allocation + inventory decrement + vault shadow. Partial failure = inconsistency.
   async allocateResource(bridgeRoomId, allocationData, orgRoomId, vaultRoomId) {
     // STEP 1: Validate constraints
     const resourceType = await svc.getState(orgRoomId, EVT.RESOURCE_TYPE, allocationData.resource_type_id);
@@ -4072,6 +4321,7 @@ const ResourceService = {
    * Follows the existing metrics anonymization pipeline.
    * Strips PII, buckets amounts, hashes cohort.
    */
+  // SYN(allocation + anon_demographics, cohort_hash, resource_metric) + NUL(raw_identity, pipeline, pii_strip)
   async emitResourceMetric(metricsRoomId, allocation, resourceType, clientId) {
     const hash = await cohortHash(clientId);
 
@@ -4155,6 +4405,7 @@ const ResourceService = {
    * Load default resource types into a network room.
    * All seed types are created as draft maturity, optional propagation.
    */
+  // INS(seed_resource_types[], DEFAULT_RESOURCE_TYPES, initial_catalog) — batch DES for each type
   async loadSeedResourceTypes(networkRoomId) {
     const loaded = [];
     for (const seed of DEFAULT_RESOURCE_TYPES) {
@@ -4179,6 +4430,20 @@ const ResourceService = {
 };
 
 /* ═══════════════════ CLIENT DATA IMPORT ENGINE ═══════════════════
+ * Operator Manifest (per-record pipeline):
+ *   INS(encryption_key, crypto.subtle, per_record_isolation)
+ *   ALT(fields → ciphertext, per_record_key, field_encryption)
+ *   SEG(demographics, transform_rules, anonymization)
+ *   INS(client_record_room, identity+record_state, room_creation)
+ *   SYN(record + anon_demographics, cohort_hash, metric_emission)
+ *   INS(import_manifest, batch_metadata, audit_trail)
+ *
+ * Triad Summary:
+ *   Existence:       INS (keys, rooms, manifest)
+ *   Structure:       SEG (anonymization bucketing)
+ *   Interpretation:  ALT (encryption)
+ *   No REC, no SUP — batch pipeline, same pattern per record. Frame is stable.
+ *
  * Parses CSV/JSON files, maps columns to vault fields, encrypts each
  * record with its own AES-256-GCM key, creates a client_record room
  * per row, and emits only anonymized demographic metrics.
@@ -4268,6 +4533,7 @@ function autoMapColumns(sourceHeaders) {
 }
 
 // ── Per-record encryption + room creation ──
+// Pipeline per row: INS(key) → ALT(encrypt) → SEG(anonymize) → INS(room) → SYN(metric)
 // Creates one client_record room per row. Each record gets a unique
 // AES-256-GCM key. Only anonymized demographics are emitted as metrics.
 async function importClientRecords(records, mapping, metricsRoom, onProgress) {
@@ -7256,6 +7522,13 @@ const classifyRoom = async (roomId, scannedState) => {
   return {type:'unknown',label:'Unknown',color:'orange'};
 };
 
+// Meta-DES: the EO decoder ring — maps every domain event type to its canonical operator.
+// This function is the Rosetta Stone between Matrix events and the nine-operator vocabulary.
+// Each case below designates which EO operator a given event type represents.
+//
+// ⚠️ REC mappings: SCHEMA_PROP, SCHEMA_TRANSFORM, GOV_RHYTHM, MATCH_RESOLVE, m.room.encryption
+//    — these are frame-changing operations. Presence of REC = elevated review attention.
+// SUP mapping: MATCH_HIT — multiple identities may refer to same person (superposition).
 const classifyEvent = (ev, roomInfo) => {
   const type = ev.getType(); const content = ev.getContent();
   // Native EO operations
@@ -7335,6 +7608,18 @@ const classifyEvent = (ev, roomInfo) => {
 };
 
 /* ═══════════════════ ACTIVITY STREAM (Choreo-aligned) ═══════════════════
+ * Operator Manifest:
+ *   All nine operators appear here as classification outputs.
+ *   This component is the primary EO *display* layer — read-only rendering
+ *   of the operator vocabulary produced by classifyEvent() above.
+ *
+ * Triad Summary:
+ *   All three triads rendered:
+ *     Identity  (NUL, DES, INS)  — existence operations
+ *     Structure (SEG, CON, SYN)  — relational operations
+ *     Time      (ALT, SUP, REC)  — interpretive operations
+ *   No mutations — display only. The stream shows EO history, doesn't create it.
+ *
  * Displays events in Choreo's EO operation grammar format.
  * Each event is mapped to: { op, target, context, frame }
  * aligned with the nine-operator Emergent Ontology model.
@@ -8227,6 +8512,410 @@ const LoginScreen = ({onLogin}) => {
   </div>;
 };
 
+/* ═══════════════════ PERSONAL DASHBOARD ═══════════════════ */
+const PersonalDashboard = ({session, providers, observations, myResources, vaultData, allFields, vaultRoom, onNavigate}) => {
+  const [loading, setLoading] = useState(true);
+  const [bridgeEvents, setBridgeEvents] = useState([]);
+  const [providerNotes, setProviderNotes] = useState([]);
+  const [eventFilter, setEventFilter] = useState('all'); // all | notes | resources | fields | messages
+  const [eventLimit, setEventLimit] = useState(25);
+
+  // Time formatting for the dashboard
+  const pdTimeAgo = (ts) => {
+    if (!ts) return '';
+    const diff = Date.now() - ts;
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return `${Math.floor(diff/60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff/3600000)}h ago`;
+    if (diff < 604800000) return `${Math.floor(diff/86400000)}d ago`;
+    return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  };
+
+  // Load all events from bridge rooms relevant to this individual
+  const loadBridgeActivity = useCallback(async () => {
+    setLoading(true);
+    try {
+      const allEvents = [];
+      const allNotes = [];
+
+      for (const prov of providers) {
+        const bid = prov.bridgeRoomId;
+        if (!bid || !svc.client) continue;
+        const room = svc.client.getRoom(bid);
+        if (!room) continue;
+
+        // Paginate to get history
+        try {
+          for (let i = 0; i < 3; i++) {
+            const canPaginate = room.getLiveTimeline().getPaginationToken('b');
+            if (!canPaginate) break;
+            await svc.client.scrollback(room, 80);
+          }
+        } catch (e) { /* continue with available events */ }
+
+        const seenIds = new Set();
+        const roomEvents = [];
+        const timelineSets = room.getTimelineSets ? room.getTimelineSets() : [];
+        const collectEvents = (ev) => {
+          if (seenIds.has(ev.getId())) return;
+          seenIds.add(ev.getId());
+          roomEvents.push(ev);
+        };
+        if (timelineSets.length > 0) {
+          for (const ts of timelineSets) { for (const tl of ts.getTimelines()) { for (const ev of tl.getEvents()) collectEvents(ev); } }
+        } else {
+          for (const ev of room.getLiveTimeline().getEvents()) collectEvents(ev);
+        }
+        // Also include current state events
+        for (const ev of room.currentState.getStateEvents()) collectEvents(ev);
+
+        const provName = prov.providerName || prov.providerUserId || 'Provider';
+        const orgName = prov.providerProfile?.org_membership?.org_name;
+
+        for (const ev of roomEvents) {
+          const type = ev.getType();
+          const content = ev.getContent();
+          const sender = ev.getSender();
+          const ts = ev.getTs();
+          const isOwnEvent = sender === svc.userId;
+
+          // Categorize events
+          if (type === EVT.NOTE) {
+            allNotes.push({
+              id: ev.getId(), title: content.title || 'Untitled', content: content.content || content.text || '',
+              author: sender, provName, orgName, ts, tags: content.tags || [],
+              tombstoned: content.tombstoned || false, bridgeRoomId: bid
+            });
+            allEvents.push({
+              id: ev.getId(), category: 'notes', ts, provName, orgName, sender,
+              icon: 'msg', iconBg: 'var(--purple-dim)', iconColor: 'var(--purple)',
+              title: isOwnEvent ? 'You added a note' : `${provName} added a note`,
+              desc: content.title || content.content?.slice(0,80) || 'Note added',
+              tags: [{label:'NOTE',cls:'tag-purple'}]
+            });
+          } else if (type === EVT.RESOURCE_ALLOC) {
+            allEvents.push({
+              id: ev.getId(), category: 'resources', ts, provName, orgName, sender,
+              icon: 'layers', iconBg: 'var(--green-dim)', iconColor: 'var(--green)',
+              title: `${provName} allocated a resource`,
+              desc: `${content.quantity || 1} ${content.unit || 'unit'} of ${content.resource_name || content.resource_type_id || 'resource'}`,
+              tags: [{label:'RESOURCE',cls:'tag-green'}]
+            });
+          } else if (type === EVT.RESOURCE_VAULT) {
+            allEvents.push({
+              id: ev.getId(), category: 'resources', ts, provName, orgName, sender,
+              icon: 'layers', iconBg: 'var(--green-dim)', iconColor: 'var(--green)',
+              title: 'Resource recorded to vault',
+              desc: `${content.resource_name}: ${content.quantity} ${content.unit || ''}`,
+              tags: [{label:'VAULT RECORD',cls:'tag-teal'}]
+            });
+          } else if (type === EVT.RESOURCE_EVENT) {
+            const evtType = content.event || 'update';
+            allEvents.push({
+              id: ev.getId(), category: 'resources', ts, provName, orgName, sender,
+              icon: 'layers', iconBg: evtType === 'revoked' ? 'var(--red-dim)' : 'var(--teal-dim)',
+              iconColor: evtType === 'revoked' ? 'var(--red)' : 'var(--teal)',
+              title: `Resource ${evtType}`,
+              desc: `${content.quantity || ''} ${content.unit || ''} — ${content.allocation_id?.slice(0,16) || ''}`.trim(),
+              tags: [{label:evtType.toUpperCase(),cls:evtType==='revoked'?'tag-red':'tag-teal'}]
+            });
+          } else if (type === EVT.BRIDGE_REFS && !isOwnEvent) {
+            const fieldCount = Object.keys(content.fields || {}).length;
+            allEvents.push({
+              id: ev.getId(), category: 'fields', ts, provName, orgName, sender,
+              icon: 'key', iconBg: 'var(--blue-dim)', iconColor: 'var(--blue)',
+              title: content.revoked ? 'Field access revoked' : 'Shared fields updated',
+              desc: `${fieldCount} encrypted field ref${fieldCount!==1?'s':''}`,
+              tags: [{label:content.revoked?'REVOKED':'FIELDS',cls:content.revoked?'tag-red':'tag-blue'}]
+            });
+          } else if (type === EVT.OBSERVATION) {
+            allEvents.push({
+              id: ev.getId(), category: 'observations', ts, provName, orgName, sender,
+              icon: 'clipboard', iconBg: 'var(--orange-dim)', iconColor: 'var(--orange)',
+              title: isOwnEvent ? 'You recorded an observation' : `${provName} recorded an observation`,
+              desc: `${content.prompt_id || 'observation'}: ${content.value || ''}`,
+              tags: [{label:'OBSERVATION',cls:'tag-orange'},{label:isOwnEvent?'GIVEN':'MEANT',cls:isOwnEvent?'tag-teal':'tag-gold'}]
+            });
+          } else if (type === EVT.BRIDGE_META) {
+            allEvents.push({
+              id: ev.getId(), category: 'bridge', ts, provName, orgName, sender,
+              icon: 'share', iconBg: 'var(--gold-dim)', iconColor: 'var(--gold)',
+              title: content.status === 'tombstoned' ? 'Bridge revoked' : 'Bridge updated',
+              desc: `Status: ${content.status || 'active'}`,
+              tags: [{label:'BRIDGE',cls:'tag-gold'}]
+            });
+          } else if (type === 'm.room.message' && !isOwnEvent) {
+            const cvType = content[`${NS}.type`];
+            if (cvType === 'request') {
+              allEvents.push({
+                id: ev.getId(), category: 'messages', ts, provName, orgName, sender,
+                icon: 'msg', iconBg: 'var(--gold-dim)', iconColor: 'var(--gold)',
+                title: `${provName} sent an info request`,
+                desc: content.body?.slice(0,100) || '',
+                tags: [{label:'REQUEST',cls:'tag-gold'}]
+              });
+            } else {
+              allEvents.push({
+                id: ev.getId(), category: 'messages', ts, provName, orgName, sender,
+                icon: 'msg', iconBg: 'var(--blue-dim)', iconColor: 'var(--blue)',
+                title: `${provName} sent a message`,
+                desc: content.body?.slice(0,100) || '',
+                tags: [{label:'MESSAGE',cls:'tag-blue'}]
+              });
+            }
+          } else if (type === EVT.ROSTER_ASSIGN && !isOwnEvent) {
+            allEvents.push({
+              id: ev.getId(), category: 'fields', ts, provName, orgName, sender,
+              icon: 'users', iconBg: 'var(--teal-dim)', iconColor: 'var(--teal)',
+              title: 'Case assignment updated',
+              desc: `Assignment changed by ${provName}`,
+              tags: [{label:'ASSIGNMENT',cls:'tag-teal'}]
+            });
+          } else if (type === EVT.OP && !isOwnEvent) {
+            allEvents.push({
+              id: ev.getId(), category: 'fields', ts, provName, orgName, sender,
+              icon: 'git-commit', iconBg: 'var(--teal-dim)', iconColor: 'var(--teal)',
+              title: `${content.op || 'EO'} operation by ${provName}`,
+              desc: `${content.target?.field || content.target?.entity || content.target?.type || 'entity'} — ${content.frame?.epistemic || 'MEANT'}`,
+              tags: [{label:content.op||'OP',cls:'tag-teal'},{label:content.frame?.epistemic||'MEANT',cls:content.frame?.epistemic==='GIVEN'?'tag-teal':'tag-gold'}]
+            });
+          }
+        }
+      }
+
+      allEvents.sort((a, b) => b.ts - a.ts);
+      allNotes.sort((a, b) => b.ts - a.ts);
+      setBridgeEvents(allEvents);
+      setProviderNotes(allNotes.filter(n => !n.tombstoned));
+    } catch (e) { console.error('PersonalDashboard load error:', e); }
+    setLoading(false);
+  }, [providers]);
+
+  useEffect(() => { loadBridgeActivity(); }, [loadBridgeActivity]);
+
+  // Listen for real-time updates
+  useEffect(() => {
+    let debounce = null;
+    const handler = () => { if (debounce) clearTimeout(debounce); debounce = setTimeout(loadBridgeActivity, 500); };
+    window.addEventListener('khora:timeline', handler);
+    window.addEventListener('khora:state', handler);
+    return () => { window.removeEventListener('khora:timeline', handler); window.removeEventListener('khora:state', handler); };
+  }, [loadBridgeActivity]);
+
+  // Filtered events
+  const filteredEvents = useMemo(() => {
+    if (eventFilter === 'all') return bridgeEvents;
+    return bridgeEvents.filter(e => e.category === eventFilter);
+  }, [bridgeEvents, eventFilter]);
+
+  // Stats
+  const activeResources = myResources.filter(r => r.status === 'active').length;
+  const totalNotes = providerNotes.length;
+  const totalObs = observations.length;
+  const filledFields = allFields.filter(f => vaultData[f.key]).length;
+  const providerEventCount = bridgeEvents.filter(e => e.sender !== svc.userId).length;
+
+  if (loading) return <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}><Spin s={28}/></div>;
+
+  return <div className="anim-up" style={{maxWidth:900,margin:'0 auto'}}>
+    {/* Header */}
+    <div style={{marginBottom:24}}>
+      <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>My Dashboard</h2>
+      <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>Everything about you in one place — content, resources, and updates from your providers.</p>
+    </div>
+
+    {/* Stats overview */}
+    <div className="pd-grid">
+      {[
+        {l:'Providers',v:providers.length,c:'gold',i:'briefcase',nav:'providers'},
+        {l:'Notes About Me',v:totalNotes,c:'purple',i:'msg'},
+        {l:'Observations',v:totalObs,c:'blue',i:'clipboard',nav:'observations'},
+        {l:'Active Resources',v:activeResources,c:'green',i:'layers',nav:'resources'},
+        {l:'Vault Fields',v:`${filledFields}/${allFields.length}`,c:'teal',i:'folder',nav:'vault'},
+        {l:'Provider Updates',v:providerEventCount,c:'orange',i:'bell'},
+      ].map((s,i)=><div key={i} className="card pd-stat" style={{cursor:s.nav?'pointer':'default'}} onClick={()=>s.nav&&onNavigate(s.nav)}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <span className="section-label" style={{marginBottom:0}}>{s.l.toUpperCase()}</span>
+          <span style={{color:`var(--${s.c})`,opacity:.5}}><I n={s.i} s={16}/></span>
+        </div>
+        <div className="num" style={{color:`var(--${s.c})`}}>{s.v}</div>
+      </div>)}
+    </div>
+
+    {/* ── Section 1: Content About Me ── */}
+    <div className="pd-section">
+      <div className="pd-section-hdr">
+        <h3><I n="msg" s={16} c="var(--purple)"/> Content About Me</h3>
+        {totalNotes > 3 && <button onClick={()=>onNavigate('inbox')} className="b-gho b-xs">View All</button>}
+      </div>
+
+      {providerNotes.length === 0 && observations.length === 0 ? (
+        <div className="pd-empty">
+          <I n="clipboard" s={28} c="var(--tx-3)"/>
+          <p style={{marginTop:8,fontSize:12}}>No content about you yet.</p>
+          <p style={{fontSize:11,marginTop:4}}>When providers add notes, observations, or assessments, they will appear here.</p>
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {/* Provider notes */}
+          {providerNotes.slice(0,5).map(note => <div key={note.id} className="pd-content-card">
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:6}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <div style={{width:28,height:28,borderRadius:'50%',background:'var(--purple-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--purple)',flexShrink:0}}>
+                  <I n="msg" s={13}/></div>
+                <div>
+                  <span style={{fontSize:13,fontWeight:600}}>{note.title}</span>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginTop:1}}>
+                    <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>{note.provName}</span>
+                    {note.orgName && <span className="tag tag-blue" style={{fontSize:7.5,padding:'1px 5px'}}>{note.orgName}</span>}
+                  </div>
+                </div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:4}}>
+                <span className="tag tag-purple" style={{fontSize:8}}>NOTE</span>
+                <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{pdTimeAgo(note.ts)}</span>
+              </div>
+            </div>
+            {note.content && <p style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.5,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{note.content}</p>}
+            {note.tags && note.tags.length > 0 && <div style={{display:'flex',gap:3,marginTop:6,flexWrap:'wrap'}}>
+              {note.tags.map((t,ti) => <span key={ti} className="note-tag-chip">{t.displayName || t}</span>)}
+            </div>}
+          </div>)}
+
+          {/* Recent observations from providers (MEANT frame) */}
+          {observations.slice(-3).reverse().map((obs, i) => {
+            const prompt = DEFAULT_PROMPTS.find(p => p.key === obs.category);
+            const optLabel = prompt?.options.find(o => o.v === obs.value)?.l || obs.value;
+            return <div key={obs.id || `obs-${i}`} className="pd-content-card">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <div style={{width:28,height:28,borderRadius:'50%',background:'var(--blue-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--blue)',flexShrink:0}}>
+                    <I n="clipboard" s={13}/></div>
+                  <div>
+                    <span style={{fontSize:12.5,fontWeight:600}}>{prompt?.question || obs.category}</span>
+                    <span style={{fontSize:12,color:'var(--tx-1)',display:'block',marginTop:1}}>{optLabel}</span>
+                  </div>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:4}}>
+                  <span className="tag tag-teal" style={{fontSize:8}}>GIVEN</span>
+                  <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{obs.date || ''}</span>
+                </div>
+              </div>
+            </div>;
+          })}
+        </div>
+      )}
+    </div>
+
+    {/* ── Section 2: Resources Shared With Me ── */}
+    <div className="pd-section">
+      <div className="pd-section-hdr">
+        <h3><I n="layers" s={16} c="var(--green)"/> Resources Shared With Me</h3>
+        {myResources.length > 0 && <button onClick={()=>onNavigate('resources')} className="b-gho b-xs">View All ({myResources.length})</button>}
+      </div>
+
+      {myResources.length === 0 ? (
+        <div className="pd-empty">
+          <I n="layers" s={28} c="var(--tx-3)"/>
+          <p style={{marginTop:8,fontSize:12}}>No resources allocated yet.</p>
+          <p style={{fontSize:11,marginTop:4}}>When providers allocate vouchers, services, or other resources, they will appear here.</p>
+        </div>
+      ) : (<>
+        {/* Resource summary */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:8,marginBottom:12}}>
+          {[
+            {l:'Active',v:myResources.filter(r=>r.status==='active').length,c:'green'},
+            {l:'Used',v:myResources.filter(r=>r.status==='consumed').length,c:'blue'},
+            {l:'Expired',v:myResources.filter(r=>r.status==='expired').length,c:'orange'},
+          ].map((s,i)=><div key={i} className="card" style={{padding:'10px 12px'}}>
+            <span className="section-label" style={{marginBottom:0}}>{s.l.toUpperCase()}</span>
+            <span style={{fontSize:16,fontWeight:700,color:`var(--${s.c})`,display:'block',marginTop:2}}>{s.v}</span>
+          </div>)}
+        </div>
+        {/* Recent resource allocations */}
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {myResources.slice(0,5).map((alloc, i) => {
+            const statusColors = {active:'teal',consumed:'blue',expired:'orange',revoked:'red'};
+            return <div key={alloc.allocation_id || i} className="pd-res-card">
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <div style={{width:28,height:28,borderRadius:'50%',background:'var(--green-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--green)',flexShrink:0}}>
+                  <I n="layers" s={13}/></div>
+                <div>
+                  <span style={{fontSize:12.5,fontWeight:600}}>{alloc.resource_name || alloc.resource_type_id}</span>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}>
+                    <span style={{fontSize:10.5,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>x{alloc.quantity} {alloc.unit || ''}</span>
+                    <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{alloc.org_display_name || alloc.provider_display_name || ''}</span>
+                  </div>
+                </div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:4}}>
+                <span className={`tag tag-${statusColors[alloc.status]||'teal'}`} style={{fontSize:8.5}}>{(alloc.status || 'active').toUpperCase()}</span>
+                <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{alloc.allocated_at ? pdTimeAgo(alloc.allocated_at) : ''}</span>
+              </div>
+            </div>;
+          })}
+        </div>
+      </>)}
+    </div>
+
+    {/* ── Section 3: Event Stream ── */}
+    <div className="pd-section">
+      <div className="pd-section-hdr">
+        <h3><I n="bell" s={16} c="var(--orange)"/> Activity Feed</h3>
+        <button onClick={loadBridgeActivity} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:4}}><I n="refresh-cw" s={11}/>Refresh</button>
+      </div>
+
+      {/* Filter tabs */}
+      <div style={{display:'flex',gap:4,marginBottom:14,flexWrap:'wrap'}}>
+        {[{id:'all',label:'All'},{id:'notes',label:'Notes'},{id:'resources',label:'Resources'},
+          {id:'messages',label:'Messages'},{id:'fields',label:'Field Updates'},{id:'observations',label:'Observations'}
+        ].map(f => <button key={f.id} onClick={()=>setEventFilter(f.id)}
+          style={{padding:'5px 12px',borderRadius:14,fontSize:11,fontWeight:600,cursor:'pointer',border:'1px solid',transition:'all .15s',fontFamily:'var(--sans)',
+            background:eventFilter===f.id?'var(--gold-dim)':'transparent',
+            color:eventFilter===f.id?'var(--gold)':'var(--tx-2)',
+            borderColor:eventFilter===f.id?'var(--gold)':'var(--border-1)'}}>
+          {f.label}{eventFilter===f.id && filteredEvents.length > 0 ? ` (${filteredEvents.length})` : ''}
+        </button>)}
+      </div>
+
+      {filteredEvents.length === 0 ? (
+        <div className="pd-empty">
+          <I n="bell" s={28} c="var(--tx-3)"/>
+          <p style={{marginTop:8,fontSize:12}}>No activity yet{eventFilter !== 'all' ? ' in this category' : ''}.</p>
+          <p style={{fontSize:11,marginTop:4}}>Updates from your providers will stream here in real time.</p>
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {filteredEvents.slice(0, eventLimit).map(evt => <div key={evt.id} className="pd-event">
+            <div className="pd-event-icon" style={{background:evt.iconBg,color:evt.iconColor}}>
+              <I n={evt.icon} s={14}/></div>
+            <div className="pd-event-body">
+              <div className="pd-event-title">{evt.title}</div>
+              <div className="pd-event-desc">{evt.desc}</div>
+              <div className="pd-event-meta">
+                {evt.tags?.map((t,ti) => <span key={ti} className={`tag ${t.cls}`} style={{fontSize:8,padding:'1px 6px'}}>{t.label}</span>)}
+                {evt.orgName && <span className="tag tag-blue" style={{fontSize:7.5,padding:'1px 5px'}}>{evt.orgName}</span>}
+                <span className="pd-event-time">{pdTimeAgo(evt.ts)}</span>
+              </div>
+            </div>
+          </div>)}
+          {filteredEvents.length > eventLimit && <button onClick={()=>setEventLimit(l=>l+25)} className="b-gho b-sm" style={{alignSelf:'center',marginTop:8}}>
+            Load more ({filteredEvents.length - eventLimit} remaining)
+          </button>}
+        </div>
+      )}
+    </div>
+
+    {/* Sovereignty reminder */}
+    <div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'14px 18px',display:'flex',gap:10,alignItems:'flex-start',marginTop:8}}>
+      <I n="shield" s={16} c="var(--teal)"/>
+      <span style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.6}}>
+        <strong style={{color:'var(--teal)'}}>Your data, your control.</strong> All content shown here is encrypted in your vault and bridge rooms. You control which providers see what, and can revoke access at any time.
+      </span>
+    </div>
+  </div>;
+};
+
 /* ═══════════════════ CLIENT APP ═══════════════════ */
 const ClientApp = ({session, onLogout, showToast}) => {
   const [vaultRoom, setVaultRoom] = useState(null);
@@ -8235,7 +8924,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
   const [observations, setObservations] = useState([]);
   const [metricsConsent, setMetricsConsent] = useState({enabled:false,categories:[]});
   const [providers, setProviders] = useState([]);
-  const [view, setView] = useState('vault');
+  const [view, setView] = useState('dashboard');
   const [activeBridge, setActiveBridge] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editModal, setEditModal] = useState(false);
@@ -8265,6 +8954,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
   const [enabledFrameworks, setEnabledFrameworks] = useState([]); // framework ids toggled on
   const [frameworkModal, setFrameworkModal] = useState(false);
   const [myTeams, setMyTeams] = useState([]);
+  const [clientSharingConsentModal, setClientSharingConsentModal] = useState(null); // {team} — prompts client team member to choose sharing preference
   const [myResources, setMyResources] = useState([]); // resource vault records from bridges
 
   useEffect(() => { initVault(); }, []);
@@ -8280,6 +8970,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     return cats;
   }, [customFieldDefs, frameworkFields]);
 
+  // INS(custom_field_def, user_defined, schema_extension) — client creates custom vault field
   const handleAddCustomField = async () => {
     const label = newFieldLabel.trim();
     if (!label) return;
@@ -8293,6 +8984,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     showToast(`Custom field "${label}" created`, 'success');
   };
 
+  // NUL(custom_field, client_deleted, schema_retraction) — removes field definition and data
   const handleDeleteCustomField = async (fieldKey) => {
     const updated = customFieldDefs.filter(f => f.key !== fieldKey);
     const updatedData = {...vaultData};
@@ -8305,6 +8997,12 @@ const ClientApp = ({session, onLogout, showToast}) => {
   const vaultFrame = (room) => ({type:'vault',room:room||vaultRoom,role:'client',epistemic:'GIVEN'});
   const bridgeFrame = (room) => ({type:'bridge',room,role:'client',epistemic:'MEANT'});
 
+  // INS(vault_room, identity+snapshot+schema, sovereign_creation) — creates the client's entire data sovereignty container
+  // Operator Manifest for initVault:
+  //   INS(vault_room, identity+snapshot, sovereign_creation) — if no vault exists
+  //   DES(schema_catalog, forms+definitions, canonical_vocabulary) — seeds personal schema
+  //   CON(auto_join, invited_rooms, client_record_claim) — joins pending invites
+  //   No REC — vault frame is client-sovereign and stable.
   const initVault = async () => {
     setLoading(true);
     setInitError(null);
@@ -8464,6 +9162,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     setMyResources(resources);
   };
 
+  // ALT(vault_snapshot, updated_fields, atomic_persistence) — single state write for all vault data
   const saveSnapshot = async (fields, obs, mc, cfd, ef) => {
     const snapshot = {fields:fields??vaultData, observations:obs??observations, metrics_consent:mc??metricsConsent, custom_field_defs:cfd??customFieldDefs, enabled_frameworks:ef??enabledFrameworks,
       last_modified_by: svc.userId, last_modified_at: Date.now(), origin_server: extractHomeserver(svc.userId)};
@@ -8476,15 +9175,21 @@ const ClientApp = ({session, onLogout, showToast}) => {
     setProviders(provs);
   };
 
-  // Edit identity fields — emits INS or ALT per field
+  // Edit identity fields — emits INS, ALT, or NUL per field depending on change type
+  // INS(field.value, client_input, vault_population) — new field
+  // ALT(field.value, old→new, vault_update) — changed field
+  // NUL(field.value, client_cleared, vault_clearance) — cleared field
   const handleEditSave = async () => {
     const updated = {...vaultData, ...editData};
     for (const [key, val] of Object.entries(editData)) {
       if (val && !vaultData[key]) {
+        // INS — field first populated
         await emitOp(vaultRoom, 'INS', {field:key,value:val}, {source:'client_input'}, vaultFrame());
       } else if (val && vaultData[key] && val !== vaultData[key]) {
+        // ALT — value change within stable frame
         await emitOp(vaultRoom, 'ALT', {field:key,entity:'client_profile'}, {from:vaultData[key],to:val,source:'client_input'}, vaultFrame());
       } else if (!val && vaultData[key]) {
+        // NUL — existence removal
         await emitOp(vaultRoom, 'NUL', {field:key,entity:'client_profile'}, {reason:'client_cleared',previous_value:vaultData[key]}, vaultFrame());
       }
     }
@@ -8498,7 +9203,8 @@ const ClientApp = ({session, onLogout, showToast}) => {
     }
   };
 
-  // Record structured observation (Addendum A)
+  // INS(observation, client_report, GIVEN_attestation) — this is the GIVEN entry point
+  // If metrics consent enabled: → SYN(observation + anon_demographics, cohort_hash, metric_emission)
   const handleRecordObservation = async () => {
     if (!obsValue || !obsModal) return;
     const obs = { id:genOpId(), category:obsModal.key, value:obsValue, date:obsDate, prompt_id:obsModal.id,
@@ -8520,6 +9226,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     }
   };
 
+  // CON(client → provider, bridge_room, relationship_establishment) + INS(bridge_room, e2ee+meta+refs, secure_channel)
   const handleAddProvider = async () => {
     if (!newProviderId.trim()) return;
     try {
@@ -8537,6 +9244,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Failed: '+e.message,'error'); }
   };
 
+  // ALT(bridge_refs, re_encrypted_fields, selective_sync) — encrypts shared fields with fresh keys
   const syncFieldsToBridge = async (bridgeRoomId, sharedFields, data) => {
     const refs = {};
     for (const [fk, shared] of Object.entries(sharedFields)) {
@@ -8549,6 +9257,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     await svc.setState(bridgeRoomId, EVT.BRIDGE_REFS, {fields:refs, updated:Date.now()});
   };
 
+  // SEG(field_visibility, shared|revoked, access_partitioning) — key rotation on each toggle
   const handleToggleField = async (pi, fk) => {
     const prov = providers[pi];
     const newShared = {...prov.sharedFields, [fk]:!prov.sharedFields[fk]};
@@ -8561,6 +9270,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     showToast(newShared[fk]?`Shared ${label} — new key issued`:`Revoked ${label} — key destroyed`, newShared[fk]?'success':'warn');
   };
 
+  // ALT(bridge.transferable, boolean_flip, transferability_policy)
   // Toggle whether this client allows their case to be transferred between providers within the org
   const handleToggleTransferable = async (pi) => {
     const prov = providers[pi];
@@ -8578,6 +9288,11 @@ const ClientApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Failed to update transfer setting: '+e.message, 'error'); }
   };
 
+  // ⚠️ HIGHEST-RISK VAULT OPERATION: NUL(old_bridge) → INS(new_bridge) → CON(re_establish)
+  // NUL(old_bridge, hard_revoke, relationship_destruction) — tombstone old room
+  // INS(new_bridge, fresh_keys, clean_room) — create replacement
+  // CON(client → provider, new_bridge, relationship_re_establishment) — re-link
+  // All old keys destroyed. All shared data re-encrypted with new keys.
   const handleHardRevoke = async (pi) => {
     const prov = providers[pi];
     try {
@@ -8600,6 +9315,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Hard revoke failed: '+e.message,'error'); }
   };
 
+  // NUL(relationship, full_severance, permanent_disconnection) — kicks provider, clears all refs
   const handleRemoveProvider = async (pi) => {
     const prov = providers[pi];
     try {
@@ -8615,6 +9331,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
   // ─── Room claiming: client takes ownership of a provider-created client_record room ───
   const claimFrame = (room) => ({type:'client_record',room,role:'client',epistemic:'GIVEN'});
 
+  // ALT(room_ownership, client_claim, sovereignty_transfer) — client takes PL 100, previous owner drops to PL 50
   const handleClaimRoom = async (record) => {
     try {
       // 0. Ensure we've joined the room (required before writing state)
@@ -8650,6 +9367,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     } catch (e) { showToast('Claim failed: ' + e.message, 'error'); }
   };
 
+  // NUL(room_member, owner_revocation, access_removal) — kicks user from claimed room
   const handleRevokeFromClaimed = async (record, targetUserId) => {
     try {
       await svc.kick(record.roomId, targetUserId, 'Removed by room owner');
@@ -8661,6 +9379,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     } catch (e) { showToast('Remove failed: ' + e.message, 'error'); }
   };
 
+  // NUL(client_record, owner_closed, permanent_decommission) — tombstones room permanently
   const handleDeleteClaimedRoom = async (record) => {
     try {
       // Tombstone the room — marks it as permanently closed
@@ -8676,6 +9395,9 @@ const ClientApp = ({session, onLogout, showToast}) => {
     } catch (e) { showToast('Close failed: ' + e.message, 'error'); }
   };
 
+  // ⚠️ REC(metrics_consent, enabled|disabled, data_flow_reinterpretation)
+  // INTERPRETATION SHIFT: changes what downstream systems receive. When enabled,
+  // anonymized demographics flow to metrics rooms. When disabled, flow stops entirely.
   const handleMetricsToggle = async () => {
     const newConsent = {...metricsConsent, enabled:!metricsConsent.enabled,
       categories:!metricsConsent.enabled? DEFAULT_PROMPTS.filter(p=>p.metrics).map(p=>p.category) : []};
@@ -8683,6 +9405,27 @@ const ClientApp = ({session, onLogout, showToast}) => {
       {consent_level:newConsent.enabled?'anonymized_demographics':'none',categories:newConsent.categories}, vaultFrame());
     await saveSnapshot(undefined, undefined, newConsent);
     showToast(newConsent.enabled?'Metrics consent enabled — anonymized data will flow':'Metrics consent revoked',newConsent.enabled?'success':'warn');
+  };
+
+  // ⚠️ REC(sharing_consent, shared|withheld, visibility_reinterpretation)
+  // INTERPRETATION SHIFT: reinterprets what team members can see about individuals.
+  // Handle sharing consent response — client-side team member proactively chooses whether to withhold content
+  const handleClientSharingConsent = async (team, withhold) => {
+    try {
+      const consentValue = withhold ? 'withheld' : 'shared';
+      const updatedMembers = (team.members||[]).map(m =>
+        m.userId === svc.userId ? {...m, sharing_consent: consentValue} : m
+      );
+      await svc.setState(team.roomId, EVT.TEAM_MEMBERS, {members: updatedMembers});
+      await emitOp(team.roomId, 'REC', {entity:'sharing_consent',field:svc.userId}, {consent:consentValue,decided_by:svc.userId}, vaultFrame());
+      setMyTeams(prev => prev.map(t => t.roomId === team.roomId ? {...t, members: updatedMembers} : t));
+      setClientSharingConsentModal(null);
+      if (withhold) {
+        showToast('Content about individuals will not be shared with you in this team', 'warn');
+      } else {
+        showToast('Content about individuals may be shared with you in this team', 'success');
+      }
+    } catch(e) { showToast('Failed to save sharing preference: '+e.message, 'error'); }
   };
 
   const loadBridgeMessages = async (bid) => { setBridgeMessages(await svc.getMessages(bid)); };
@@ -8744,7 +9487,8 @@ const ClientApp = ({session, onLogout, showToast}) => {
         </div>
       </div>
       <div style={{flex:1,overflow:'auto',padding:'6px 6px'}}>
-        {[{id:'vault',icon:'folder',label:'My Vault'},{id:'inbox',icon:'msg',label:'Messages'},
+        {[{id:'dashboard',icon:'briefcase',label:'My Dashboard'},
+          {id:'vault',icon:'folder',label:'My Vault'},{id:'inbox',icon:'msg',label:'Messages'},
           {id:'observations',icon:'clipboard',label:'Observations'},
           {id:'resources',icon:'layers',label:`My Resources${myResources.length?` (${myResources.length})`:''}`},
           {id:'providers',icon:'users',label:'People & Teams'},{id:'records',icon:'shield',label:'My Records'},
@@ -8783,6 +9527,14 @@ const ClientApp = ({session, onLogout, showToast}) => {
 
     {/* Main content */}
     <div className="app-main" style={{flex:1,overflow:'auto',padding:24}}>
+
+      {/* PERSONAL DASHBOARD VIEW */}
+      {view==='dashboard'&&!activeBridge&&<PersonalDashboard
+        session={session} providers={providers} observations={observations}
+        myResources={myResources} vaultData={vaultData} allFields={allFields}
+        vaultRoom={vaultRoom}
+        onNavigate={(v)=>{setView(v);setActiveBridge(null)}}
+      />}
 
       {/* VAULT VIEW */}
       {view==='vault'&&!activeBridge&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
@@ -9068,24 +9820,45 @@ const ClientApp = ({session, onLogout, showToast}) => {
           </div>
           {myTeams.length===0?<div className="card" style={{textAlign:'center',padding:'24px 20px',borderStyle:'dashed'}}><I n="users" s={24} c="var(--tx-3)"/><p style={{color:'var(--tx-2)',marginTop:8,fontSize:12}}>Not part of any teams yet. Teams are created by {ROLES.provider.label.toLowerCase()}s to collaborate.</p></div>
           :<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(250px,1fr))',gap:10}}>
-            {myTeams.map(team=><div key={team.roomId} className="card" style={{padding:'14px 18px'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-                <span style={{fontSize:14,fontWeight:600}}>{team.name||'Unnamed Team'}</span>
-                {team.org_name&&<span className="tag tag-blue" style={{fontSize:8}}>{team.org_name}</span>}
+            {myTeams.map(team=>{const myMembership=(team.members||[]).find(m=>m.userId===svc.userId);return <div key={team.roomId} className="card" style={{padding:0,overflow:'hidden'}}>
+              <div style={{padding:'14px 18px'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+                  <span style={{fontSize:14,fontWeight:600}}>{team.name||'Unnamed Team'}</span>
+                  <div style={{display:'flex',gap:4}}>
+                    {team.org_name&&<span className="tag tag-blue" style={{fontSize:8}}>{team.org_name}</span>}
+                    {myMembership?.sharing_consent==='shared'&&<span className="tag tag-green" style={{fontSize:7}}>SHARING</span>}
+                    {myMembership?.sharing_consent==='withheld'&&<span className="tag tag-red" style={{fontSize:7}}>WITHHELD</span>}
+                  </div>
+                </div>
+                {team.description&&<p style={{fontSize:11,color:'var(--tx-2)',lineHeight:1.5,marginBottom:8}}>{team.description}</p>}
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <I n="user" s={11} c="var(--tx-3)"/>
+                  <span style={{fontSize:10.5,color:'var(--tx-2)'}}>
+                    {team.members?.length||0} member{(team.members?.length||0)!==1?'s':''}
+                  </span>
+                </div>
+                {team.members&&team.members.length>0&&<div style={{display:'flex',gap:3,flexWrap:'wrap',marginTop:6}}>
+                  {team.members.slice(0,4).map((m,mi)=>
+                    <span key={mi} style={{fontSize:9,padding:'2px 6px',background:'var(--bg-3)',borderRadius:'var(--r)',color:'var(--tx-1)'}}>{m.display_name||m.userId?.split(':')[0]?.replace('@','')}</span>)}
+                  {team.members.length>4&&<span style={{fontSize:9,color:'var(--tx-3)'}}>+{team.members.length-4}</span>}
+                </div>}
               </div>
-              {team.description&&<p style={{fontSize:11,color:'var(--tx-2)',lineHeight:1.5,marginBottom:8}}>{team.description}</p>}
-              <div style={{display:'flex',alignItems:'center',gap:6}}>
-                <I n="user" s={11} c="var(--tx-3)"/>
-                <span style={{fontSize:10.5,color:'var(--tx-2)'}}>
-                  {team.members?.length||0} member{(team.members?.length||0)!==1?'s':''}
-                </span>
-              </div>
-              {team.members&&team.members.length>0&&<div style={{display:'flex',gap:3,flexWrap:'wrap',marginTop:6}}>
-                {team.members.slice(0,4).map((m,mi)=>
-                  <span key={mi} style={{fontSize:9,padding:'2px 6px',background:'var(--bg-3)',borderRadius:'var(--r)',color:'var(--tx-1)'}}>{m.display_name||m.userId?.split(':')[0]?.replace('@','')}</span>)}
-                {team.members.length>4&&<span style={{fontSize:9,color:'var(--tx-3)'}}>+{team.members.length-4}</span>}
-              </div>}
-            </div>)}
+              {myMembership&&myMembership.sharing_consent==='pending'&&(
+                <div style={{padding:'10px 18px',background:'var(--gold-dim)',borderTop:'1px solid rgba(218,165,32,.15)'}}>
+                  <p style={{fontSize:11,color:'var(--tx-1)',lineHeight:1.6,marginBottom:8}}>
+                    <strong>Content sharing decision required.</strong> Content about individuals served by this team will be shared with you by default. Would you like to withhold it?
+                  </p>
+                  <button onClick={()=>setClientSharingConsentModal({team})} className="b-pri b-xs" style={{display:'flex',alignItems:'center',gap:3}}>
+                    <I n="shield" s={10}/>Make My Choice</button>
+                </div>
+              )}
+              {myMembership&&(myMembership.sharing_consent==='shared'||myMembership.sharing_consent==='withheld')&&(
+                <div style={{padding:'8px 18px',borderTop:'1px solid var(--border-0)',display:'flex',justifyContent:'flex-end'}}>
+                  <button onClick={()=>setClientSharingConsentModal({team})} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:3}}>
+                    <I n="shield" s={10}/>Change Sharing</button>
+                </div>
+              )}
+            </div>})}
           </div>}
         </div>
 
@@ -9494,6 +10267,41 @@ const ClientApp = ({session, onLogout, showToast}) => {
         <button onClick={()=>setHardRevokeTarget(null)} className="b-gho" style={{flex:1}}>Cancel</button>
         <button onClick={()=>handleHardRevoke(hardRevokeTarget)} className="b-red" style={{flex:1}}><I n="zap" s={13}/>Execute</button>
       </div>
+    </Modal>
+
+    {/* CLIENT SHARING CONSENT MODAL — team member proactively decides whether to withhold shared content */}
+    <Modal open={!!clientSharingConsentModal} onClose={()=>setClientSharingConsentModal(null)} title="Content Sharing Preference" w={480}>
+      {clientSharingConsentModal&&<>
+        <div style={{background:'var(--gold-dim)',border:'1px solid rgba(218,165,32,.15)',borderRadius:'var(--r)',padding:'14px 18px',marginBottom:16}}>
+          <div style={{display:'flex',gap:8,alignItems:'flex-start'}}>
+            <I n="shield" s={16} c="var(--gold)"/>
+            <p style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.7,margin:0}}>
+              As a member of <strong>{clientSharingConsentModal.team?.name||'this team'}</strong>, content created about the individuals this team serves may be shared with you.
+            </p>
+          </div>
+        </div>
+        <p style={{fontSize:13,fontWeight:600,color:'var(--tx-0)',marginBottom:6}}>
+          Would you like to withhold content about individuals from being shared with you?
+        </p>
+        <p style={{fontSize:11.5,color:'var(--tx-2)',lineHeight:1.6,marginBottom:18}}>
+          By default, relevant content is shared with all team members to support coordination. If you choose to withhold, you will not receive content created about individuals served by this team.
+        </p>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          <button onClick={()=>handleClientSharingConsent(clientSharingConsentModal.team, false)}
+            className="b-pri" style={{width:'100%',padding:'12px 16px',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+            <I n="check" s={14}/> No, share content with me
+          </button>
+          <button onClick={()=>handleClientSharingConsent(clientSharingConsentModal.team, true)}
+            className="b-gho" style={{width:'100%',padding:'12px 16px',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6,color:'var(--red)'}}>
+            <I n="lock" s={14}/> Yes, withhold content from me
+          </button>
+        </div>
+        <div style={{background:'var(--bg-3)',borderRadius:'var(--r)',padding:'10px 14px',marginTop:14}}>
+          <p style={{fontSize:10.5,color:'var(--tx-3)',lineHeight:1.6,margin:0}}>
+            You can change this preference at any time from your teams view. This choice is recorded as an epistemic operation for full auditability.
+          </p>
+        </div>
+      </>}
     </Modal>
 
     {/* ADD CUSTOM FIELD MODAL */}
@@ -11301,6 +12109,113 @@ const TeamDetailView = ({team, teams, svc, fieldDefs, fieldCrosswalks, showToast
   </div>;
 };
 
+/* ─── ProfileActivityFeed — loads and displays EO operations for an individual ─── */
+const ProfileActivityFeed = ({individual, svc}) => {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const roomId = individual.bridgeRoom || individual._case?.bridgeRoomId || individual.id;
+        if (!roomId || !svc.client) { setLoading(false); return; }
+        const room = svc.client.getRoom(roomId);
+        if (!room) { setLoading(false); return; }
+
+        const collected = [];
+        const seenIds = new Set();
+
+        // Collect from timeline events
+        const timeline = room.getLiveTimeline();
+        const timelineEvents = timeline.getEvents();
+        for (const ev of timelineEvents) {
+          if (seenIds.has(ev.getId())) continue;
+          const type = ev.getType();
+          if (!type.startsWith('io.khora.') && !type.startsWith('m.room.')) continue;
+          const classified = classifyEvent(ev);
+          if (classified) {
+            seenIds.add(ev.getId());
+            collected.push({
+              id: ev.getId(),
+              ...classified,
+              sender: ev.getSender(),
+              ts: ev.getTs(),
+            });
+          }
+        }
+
+        // Collect from state events (EO ops stored as state)
+        const opEvents = room.currentState.getStateEvents(EVT.OP);
+        if (opEvents) {
+          for (const ev of (Array.isArray(opEvents) ? opEvents : [opEvents])) {
+            if (seenIds.has(ev.getId())) continue;
+            const content = ev.getContent();
+            if (content.op) {
+              seenIds.add(ev.getId());
+              collected.push({
+                id: ev.getId(),
+                op: content.op,
+                epistemic: content.frame?.epistemic || 'MEANT',
+                label: content.target?.field || content.target?.entity || content.op + ' Operation',
+                desc: [content.context?.from, content.context?.to].filter(Boolean).join(' → ') ||
+                      content.context?.edit_source || '',
+                sender: ev.getSender(),
+                ts: ev.getTs(),
+              });
+            }
+          }
+        }
+
+        collected.sort((a, b) => b.ts - a.ts);
+        if (!cancelled) setEvents(collected.slice(0, 50));
+      } catch (e) { console.warn('Profile activity load failed:', e.message); }
+      if (!cancelled) setLoading(false);
+    };
+    load();
+
+    // Listen for new EO events
+    const handler = () => load();
+    window.addEventListener('khora:eo', handler);
+    window.addEventListener('khora:timeline', handler);
+    return () => { cancelled = true; window.removeEventListener('khora:eo', handler); window.removeEventListener('khora:timeline', handler); };
+  }, [individual.id, individual.bridgeRoom]);
+
+  if (loading) return <div className="card" style={{textAlign:'center',padding:'30px 20px',color:'var(--tx-3)'}}>Loading activity...</div>;
+  if (events.length === 0) return <div className="card" style={{textAlign:'center',padding:'30px 20px',color:'var(--tx-3)'}}>No activity recorded yet for this individual.</div>;
+
+  return <div>
+    {events.map(ev => {
+      const opColor = OP_COLORS[ev.op] || 'blue';
+      const verb = OP_DESCRIPTIONS[ev.op]?.verb || ev.op;
+      const username = (ev.sender||'').split(':')[0]?.replace('@','') || 'unknown';
+      return <div key={ev.id} style={{
+        display:'flex', gap:10, padding:'10px 0',
+        borderBottom:'1px solid var(--border-0)'
+      }}>
+        <span className="dt-eo" style={{background:`var(--${opColor}-dim)`,
+          color:`var(--${opColor})`, flexShrink:0}}>{ev.op}</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13}}>
+            <strong>{verb}</strong>
+            {ev.label && <span style={{color:'var(--tx-1)'}}> — {ev.label}</span>}
+          </div>
+          {ev.desc && <div style={{fontSize:11,color:'var(--tx-2)',marginTop:2}}>{ev.desc}</div>}
+          <div style={{fontSize:10,color:'var(--tx-3)',marginTop:3}}>
+            {username} · {new Date(ev.ts).toLocaleString()}
+            {ev.epistemic && <span className="dt-eo" style={{
+              marginLeft:6, fontSize:8, padding:'1px 5px',
+              background:ev.epistemic==='GIVEN'?'var(--teal-dim)':'var(--gold-dim)',
+              color:ev.epistemic==='GIVEN'?'var(--teal)':'var(--gold)'
+            }}>{ev.epistemic}</span>}
+          </div>
+        </div>
+      </div>;
+    })}
+  </div>;
+};
+
 /* ─── IndividualProfilePage — full profile view for an individual ─── */
 const IndividualProfilePage = ({individual, notes, allocations, onBack, onOpenCase, onAddNote, svc, T, showToast,
   resourceTypes, resourceRelations, resourceInventory, orgRoom, orgRole, canAllocateResource, onAllocate}) => {
@@ -11423,9 +12338,7 @@ const IndividualProfilePage = ({individual, notes, allocations, onBack, onOpenCa
     {/* Activity */}
     {tab==='activity' && <div className="profile-section">
       <div className="profile-section-title">Recent Activity</div>
-      <div className="card" style={{textAlign:'center',padding:'30px 20px',color:'var(--tx-3)'}}>
-        Activity stream for this individual. Events are tracked in the Activity Stream view.
-      </div>
+      <ProfileActivityFeed individual={individual} svc={svc} />
     </div>}
 
     {/* Allocate Resource Modal */}
@@ -12014,12 +12927,14 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   // Field definitions & crosswalks
   const [fieldDefs, setFieldDefs] = useState({});           // uri → definition object
   const [fieldCrosswalks, setFieldCrosswalks] = useState([]); // crosswalk records
+  const [sharingConsentModal, setSharingConsentModal] = useState(null); // {team, member} or null — prompts team member to choose sharing preference
   // Client data import
   const [importModal, setImportModal] = useState(false);
   // ─── Database / Notes / Profile state ───
   const [dbNotes, setDbNotes] = useState([]);             // all notes across roster + bridges
   const [newNoteModal, setNewNoteModal] = useState(false);
   const [newNoteAttachTo, setNewNoteAttachTo] = useState(null); // pre-fill attach for profile page
+  const [noteDetailModal, setNoteDetailModal] = useState(null); // note object for detail view
   const [activeIndividual, setActiveIndividual] = useState(null); // individual row for profile page
   const [activeResourceProfile, setActiveResourceProfile] = useState(null); // resource row for profile page
   const cellEditTimerRef = useRef({});                    // debounce timers for cell edits
@@ -12563,11 +13478,37 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           to: newValue,
           edit_source: 'database_view',
         }, {type: 'org', epistemic: 'MEANT', role: orgRole || 'provider'});
-        // If it's a field update on a bridge room, update the state
-        if (row._case && fieldKey !== 'name' && fieldKey !== 'priority') {
-          // Update shared data in the bridge
-          const updatedData = { ...row._case.sharedData, [fieldKey]: newValue };
-          await svc.setState(roomId, EVT.BRIDGE_REFS, { fields: updatedData });
+        // Persist the edit to Matrix state
+        if (row._case) {
+          if (fieldKey === 'name') {
+            // Update full_name in bridge shared data
+            const updatedData = { ...row._case.sharedData, full_name: newValue };
+            await svc.setState(roomId, EVT.BRIDGE_REFS, { fields: updatedData });
+            // Update client_name in ROSTER_ASSIGN for org room
+            if (orgRoom && caseAssignments[roomId]) {
+              const updatedAssignments = { ...caseAssignments };
+              updatedAssignments[roomId] = { ...updatedAssignments[roomId], client_name: newValue };
+              await svc.setState(orgRoom, EVT.ROSTER_ASSIGN, { assignments: updatedAssignments });
+              setCaseAssignments(updatedAssignments);
+            }
+          } else if (fieldKey === 'priority') {
+            // Update priority in ROSTER_ASSIGN
+            if (orgRoom && caseAssignments[roomId]) {
+              const updatedAssignments = { ...caseAssignments };
+              updatedAssignments[roomId] = { ...updatedAssignments[roomId], priority: newValue };
+              await svc.setState(orgRoom, EVT.ROSTER_ASSIGN, { assignments: updatedAssignments });
+              setCaseAssignments(updatedAssignments);
+            }
+          } else {
+            // Dynamic field — update shared data in bridge
+            const updatedData = { ...row._case.sharedData, [fieldKey]: newValue };
+            await svc.setState(roomId, EVT.BRIDGE_REFS, { fields: updatedData });
+          }
+        } else if (row._clientRecord) {
+          // Client record rows — update identity state
+          const updates = { ...row._clientRecord };
+          if (fieldKey === 'name') updates.client_name = newValue;
+          await svc.setState(row.id, EVT.IDENTITY, updates);
         }
       } catch(e) { console.warn('Cell edit event failed:', e.message); }
       delete cellEditTimerRef.current[timerKey];
@@ -12592,19 +13533,74 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     }
   };
 
-  // ─── Reorder handler for database table ───
-  const handleDbReorder = (fromIdx, toIdx) => {
+  // ─── Note save handler ───
+  const handleNoteSave = (noteData) => {
+    setDbNotes(prev => [noteData, ...prev]);
+  };
+
+  // ─── Bulk action handler for database table ───
+  const handleBulkAction = async (actionId, selectedRows) => {
+    if (actionId === 'delete') {
+      if (!window.confirm(`Remove ${selectedRows.length} individual(s) from roster?`)) return;
+      for (const rowId of selectedRows) {
+        const c = cases.find(c => c.bridgeRoomId === rowId);
+        const roomId = rowId;
+        try {
+          await emitOp(roomId, 'NUL',
+            { entity: 'individual', field: 'status' },
+            { from: c ? 'active' : 'created', to: 'removed', edit_source: 'database_bulk' },
+            { type: 'org', epistemic: 'MEANT', role: orgRole || 'provider' });
+          if (orgRoom && caseAssignments[roomId]) {
+            const updatedAssignments = { ...caseAssignments };
+            delete updatedAssignments[roomId];
+            await svc.setState(orgRoom, EVT.ROSTER_ASSIGN, { assignments: updatedAssignments });
+            setCaseAssignments(updatedAssignments);
+          }
+        } catch (e) { console.warn('Bulk delete failed for', roomId, e.message); }
+      }
+      showToast(`${selectedRows.length} individual(s) removed`, 'success');
+    } else if (actionId === 'assign') {
+      const staffList = (staff || []).map(s => s.display_name || s.userId?.split(':')[0]?.replace('@','') || s.userId);
+      const staffName = window.prompt('Assign to staff member' + (staffList.length > 0 ? ' (' + staffList.join(', ') + ')' : '') + ':');
+      if (!staffName) return;
+      for (const rowId of selectedRows) {
+        try {
+          if (orgRoom && caseAssignments[rowId]) {
+            const updatedAssignments = { ...caseAssignments };
+            updatedAssignments[rowId] = {
+              ...updatedAssignments[rowId],
+              primary: staffName,
+              staff: [staffName, ...(updatedAssignments[rowId].staff || []).filter(s => s !== staffName)]
+            };
+            await svc.setState(orgRoom, EVT.ROSTER_ASSIGN, { assignments: updatedAssignments });
+            setCaseAssignments(updatedAssignments);
+          }
+          await emitOp(rowId, 'ALT',
+            { entity: 'individual', field: 'assigned_to' },
+            { to: staffName, edit_source: 'database_bulk' },
+            { type: 'org', epistemic: 'MEANT', role: orgRole || 'provider' });
+        } catch (e) { console.warn('Bulk assign failed for', rowId, e.message); }
+      }
+      showToast(`${selectedRows.length} individual(s) assigned to ${staffName}`, 'success');
+    } else if (actionId === 'tag') {
+      showToast('Tagging is not yet implemented', 'info');
+    }
+  };
+
+  // ─── Row reorder handler for database table ───
+  const handleReorder = (fromIdx, toIdx) => {
     setClientRecords(prev => {
       const updated = [...prev];
       const [moved] = updated.splice(fromIdx, 1);
       updated.splice(toIdx, 0, moved);
       return updated;
     });
-  };
-
-  // ─── Note save handler ───
-  const handleNoteSave = (noteData) => {
-    setDbNotes(prev => [noteData, ...prev]);
+    try {
+      emitOp(orgRoom || rosterRoom, 'ALT',
+        { entity: 'individual_order', field: 'sort_order' },
+        { from: fromIdx, to: toIdx, edit_source: 'database_drag' },
+        { type: 'org', epistemic: 'MEANT', role: orgRole || 'provider' });
+    } catch (e) { /* silent */ }
   };
 
   // Auto-register cases in org ROSTER_ASSIGN when they aren't tracked yet
@@ -12948,7 +13944,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           org_id:orgRoom||null, org_name:orgMeta.name||null,
         }},
         {type:EVT.TEAM_MEMBERS,state_key:'',content:{members:[
-          {userId:svc.userId,role:'lead',joined:Date.now(),display_name:providerProfile.display_name||''}
+          {userId:svc.userId,role:'lead',joined:Date.now(),display_name:providerProfile.display_name||'',sharing_consent:'shared'}
         ]}},
         {type:EVT.TEAM_SCHEMA,state_key:'',content:{
           version:1, fields:defaultSchemaFields, pending_changes:[],
@@ -12963,7 +13959,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       const newTeam = {
         roomId, name:newTeamName, description:newTeamDesc||'', created:Date.now(),
         created_by:svc.userId, org_id:orgRoom||null, org_name:orgMeta.name||null,
-        members:[{userId:svc.userId,role:'lead',joined:Date.now(),display_name:providerProfile.display_name||''}],
+        members:[{userId:svc.userId,role:'lead',joined:Date.now(),display_name:providerProfile.display_name||'',sharing_consent:'shared'}],
         owner:svc.userId,
         schema:{version:1, fields:defaultSchemaFields, pending_changes:[], change_log:[]},
         schemaRule:{mode:'lead_decides'},
@@ -12982,14 +13978,33 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       // Invite user to the team room
       if (svc.client) await svc.client.invite(teamInviteModal.roomId, uid);
       else await svc._api('POST', `/rooms/${encodeURIComponent(teamInviteModal.roomId)}/invite`, {user_id:uid});
-      // Update the members list
-      const updatedMembers = [...(teamInviteModal.members||[]), {userId:uid,role:'member',joined:Date.now()}];
+      // Update the members list — new members start with sharing_consent:'pending' so they must proactively choose
+      const updatedMembers = [...(teamInviteModal.members||[]), {userId:uid,role:'member',joined:Date.now(),sharing_consent:'pending'}];
       await svc.setState(teamInviteModal.roomId, EVT.TEAM_MEMBERS, {members:updatedMembers});
       await emitOp(teamInviteModal.roomId, 'CON', {entity:'team_member',field:uid}, {invited_by:svc.userId,role:'member'}, orgFrame());
       setTeams(prev => prev.map(t => t.roomId===teamInviteModal.roomId ? {...t, members:updatedMembers} : t));
       showToast(`Invited ${uid} to team`,'success');
       setTeamInviteUserId('');
     } catch(e) { showToast('Team invite failed: '+e.message,'error'); }
+  };
+
+  // Handle sharing consent response — team member proactively chooses whether to withhold content
+  const handleSharingConsent = async (team, memberId, withhold) => {
+    try {
+      const consentValue = withhold ? 'withheld' : 'shared';
+      const updatedMembers = (team.members||[]).map(m =>
+        m.userId === memberId ? {...m, sharing_consent: consentValue} : m
+      );
+      await svc.setState(team.roomId, EVT.TEAM_MEMBERS, {members: updatedMembers});
+      await emitOp(team.roomId, 'REC', {entity:'sharing_consent',field:memberId}, {consent:consentValue,decided_by:memberId}, orgFrame());
+      setTeams(prev => prev.map(t => t.roomId === team.roomId ? {...t, members: updatedMembers} : t));
+      setSharingConsentModal(null);
+      if (withhold) {
+        showToast('Content about individuals will not be shared with you in this team', 'warn');
+      } else {
+        showToast('Content about individuals may be shared with you in this team', 'success');
+      }
+    } catch(e) { showToast('Failed to save sharing preference: '+e.message, 'error'); }
   };
 
   const copyToClipboard = async (text, label) => {
@@ -13041,6 +14056,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Error: '+e.message,'error'); }
   };
 
+  // INS(network_room, identity+members, federation_creation) + DES(schema_catalog, forms+definitions, canonical_vocabulary) + INS(seed_resources, defaults, initial_catalog)
   // Create a network — requires an org
   const handleCreateNetwork = async () => {
     if (!networkName.trim()) return;
@@ -13069,6 +14085,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Error: '+e.message,'error'); }
   };
 
+  // CON(org → network, join, membership_link)
   // Join existing network by room ID — requires an org
   const handleJoinNetwork = async () => {
     if (!joinNetworkId.trim()) return;
@@ -13343,6 +14360,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Error restocking: ' + e.message, 'error'); }
   };
 
+  // INS(org_room, identity+metadata+roster, organization_creation) + DES(org_schema, seeded_forms+definitions, local_vocabulary) + INS(staff_roster, creator_as_admin, initial_membership)
   const handleCreateOrg = async () => {
     if (!setupData.name.trim()) return;
     try {
@@ -13403,6 +14421,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Failed to join org: '+e.message,'error'); }
   };
 
+  // CON(user → org, invitation, staff_onboarding) — invites user and adds to roster
   const handleInviteStaff = async () => {
     if (!inviteUserId.trim()||!orgRoom) return;
     try {
@@ -13417,6 +14436,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Invite failed: '+e.message,'error'); }
   };
 
+  // NUL(staff_member, removed, membership_severance) — kicks from room and removes from roster
   const handleRemoveStaff = async (userId) => {
     if (userId===svc.userId) { showToast('Cannot remove yourself','error'); return; }
     try {
@@ -13449,6 +14469,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Error saving config: '+e.message, 'error'); }
   };
 
+  // INS(challenge, hashed_code+webhook, verification_initiation) → CON(code → email_inbox, webhook, out_of_band_delivery)
   const handleStartEmailVerify = async () => {
     if (!verifyEmail.trim() || !orgRoom) return;
     setVerifyError('');
@@ -13480,6 +14501,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     setVerifyPending(false);
   };
 
+  // DES(email_identity, code_validated, verified_attestation) on success | ALT(challenge.attempts, +1, lockout_progression) on failure
   const handleSubmitVerifyCode = async () => {
     if (!verifyCode.trim() || verifyCode.length !== 6 || !orgRoom) return;
     setVerifyError('');
@@ -13529,6 +14551,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     setVerifyPending(false);
   };
 
+  // NUL(verification, admin_revoked, attestation_destruction) — admin removes verified status
   const handleRevokeVerification = async (userId) => {
     if (!orgRoom || orgRole !== 'admin') return;
     try {
@@ -14022,7 +15045,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           ORG_ROLE_LABELS={ORG_ROLE_LABELS}
           notes={dbNotes}
           onNewNote={()=>{setNewNoteAttachTo(null);setNewNoteModal(true)}}
-          onNoteClick={(note)=>{/* TODO: note detail modal */}}
+          onNoteClick={(note)=>setNoteDetailModal(note)}
           onOpenIndividual={(row)=>{setActiveIndividual(row);setView('individual-profile')}}
           onOpenResource={(row)=>{setActiveResourceProfile(row);setView('resource-profile')}}
           resourceTypes={resourceTypes}
@@ -14041,7 +15064,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           onCreateClient={()=>{setCreateClientModal(true);setNewClientName('');setNewClientMatrixId('');setNewClientNotes('')}}
           onCellEdit={handleDbCellEdit}
           onBulkAction={handleBulkAction}
-          onReorder={handleDbReorder}
+          onReorder={handleReorder}
           onAddRow={()=>{setCreateClientModal(true);setNewClientName('');setNewClientMatrixId('');setNewClientNotes('')}}
           fieldDefs={fieldDefs}
           fieldCrosswalks={fieldCrosswalks}
@@ -14072,6 +15095,30 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           showToast={showToast}
           T={T}
         />
+        <Modal open={!!noteDetailModal} onClose={()=>setNoteDetailModal(null)}
+          title={noteDetailModal?.title || 'Note'} w={560}>
+          {noteDetailModal && <>
+            <div style={{marginBottom:14}}>
+              <span className="section-label">CONTENT</span>
+              <div style={{fontSize:13,color:'var(--tx-0)',lineHeight:1.7,whiteSpace:'pre-wrap',
+                background:'var(--bg-2)',padding:14,borderRadius:'var(--r)',border:'1px solid var(--border-0)',
+                marginTop:6}}>{noteDetailModal.content || noteDetailModal.text || '(empty)'}</div>
+            </div>
+            {noteDetailModal.attached_to && <div style={{marginBottom:14}}>
+              <span className="section-label">ATTACHED TO</span>
+              <div style={{fontSize:12,color:'var(--tx-1)',marginTop:4}}>{noteDetailModal.attached_to_name || noteDetailModal.attached_to}</div>
+            </div>}
+            {noteDetailModal.tags?.length > 0 && <div style={{marginBottom:14}}>
+              <span className="section-label">TAGGED</span>
+              <div className="note-tags" style={{marginTop:4}}>
+                {noteDetailModal.tags.map(t => <span key={t.userId} className="note-tag-chip">{t.displayName}</span>)}
+              </div>
+            </div>}
+            <div style={{fontSize:11,color:'var(--tx-3)',borderTop:'1px solid var(--border-0)',paddingTop:10}}>
+              Created {dtFmtDate(noteDetailModal.created)} by {(noteDetailModal.author||'').split(':')[0]?.replace('@','') || 'unknown'}
+            </div>
+          </>}
+        </Modal>
       </>}
 
       {/* INDIVIDUAL PROFILE */}
@@ -14406,18 +15453,39 @@ const ProviderApp = ({session, onLogout, showToast}) => {
                 {(team.members||[]).slice(0,5).map((m,mi)=><div key={mi} style={{display:'flex',alignItems:'center',gap:6}}>
                   <div style={{width:18,height:18,borderRadius:'50%',background:m.role==='lead'?'var(--gold-dim)':'var(--bg-3)',display:'flex',alignItems:'center',justifyContent:'center',color:m.role==='lead'?'var(--gold)':'var(--tx-2)',flexShrink:0}}>
                     <I n={m.role==='lead'?'briefcase':'user'} s={9}/></div>
-                  <span style={{fontSize:11,color:'var(--tx-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.display_name||m.userId}</span>
-                  <span className={`tag ${m.role==='lead'?'tag-gold':'tag-blue'}`} style={{fontSize:7.5,marginLeft:'auto'}}>{m.role?.toUpperCase()}</span>
+                  <span style={{fontSize:11,color:'var(--tx-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{m.display_name||m.userId}</span>
+                  <span className={`tag ${m.role==='lead'?'tag-gold':'tag-blue'}`} style={{fontSize:7.5}}>{m.role?.toUpperCase()}</span>
+                  {m.sharing_consent==='pending'&&<span className="tag tag-gold" style={{fontSize:7}}>PENDING</span>}
+                  {m.sharing_consent==='withheld'&&<span className="tag tag-red" style={{fontSize:7}}>WITHHELD</span>}
+                  {m.sharing_consent==='shared'&&<span className="tag tag-green" style={{fontSize:7}}>SHARING</span>}
                 </div>)}
                 {(team.members?.length||0)>5&&<span style={{fontSize:10,color:'var(--tx-3)',fontStyle:'italic'}}>+{team.members.length-5} more</span>}
               </div>
             </div>
-            <div style={{padding:'8px 18px 14px',display:'flex',gap:6}}>
-              {team.owner===svc.userId&&<button onClick={(e)=>{e.stopPropagation();setTeamInviteModal(team);setTeamInviteUserId('')}}
+            {/* Sharing consent prompt — shown to the current user if their consent is pending */}
+            {(()=>{const myMembership = (team.members||[]).find(m=>m.userId===svc.userId);
+              return myMembership && myMembership.sharing_consent==='pending' ? (
+                <div style={{padding:'10px 18px',background:'var(--gold-dim)',borderTop:'1px solid rgba(218,165,32,.15)'}}>
+                  <p style={{fontSize:11.5,color:'var(--tx-1)',lineHeight:1.6,marginBottom:8}}>
+                    <strong>Content sharing decision required.</strong> Content about individuals served by this team will be shared with you by default. Would you like to withhold this content from being shared with you?
+                  </p>
+                  <div style={{display:'flex',gap:6}}>
+                    <button onClick={()=>setSharingConsentModal({team,memberId:svc.userId})} className="b-pri b-xs" style={{display:'flex',alignItems:'center',gap:3}}>
+                      <I n="shield" s={10}/>Make My Choice</button>
+                  </div>
+                </div>
+              ) : null;
+            })()}
+            <div style={{padding:'8px 18px 14px',display:'flex',gap:6,flexWrap:'wrap'}}>
+              {team.owner===svc.userId&&<button onClick={()=>{setTeamInviteModal(team);setTeamInviteUserId('')}}
                 className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:3}}>
                 <I n="userPlus" s={11}/>Invite</button>}
-              <button className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:3}} onClick={(e)=>{
-                e.stopPropagation();
+              {(()=>{const myM=(team.members||[]).find(m=>m.userId===svc.userId);
+                return myM&&(myM.sharing_consent==='shared'||myM.sharing_consent==='withheld')?(
+                  <button onClick={()=>setSharingConsentModal({team,memberId:svc.userId})} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:3}}>
+                    <I n="shield" s={11}/>Change Sharing</button>
+                ):null;})()}
+              <button className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:3}} onClick={()=>{
                 if(navigator.clipboard) navigator.clipboard.writeText(team.roomId);
                 showToast('Team room ID copied','success');
               }}><I n="share" s={11}/>Share ID</button>
@@ -15911,7 +16979,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     <Modal open={!!teamInviteModal} onClose={()=>{setTeamInviteModal(null);setTeamInviteUserId('')}} title={`Invite to: ${teamInviteModal?.name||''}`} w={520}>
       {teamInviteModal&&<>
         <p style={{fontSize:12,color:'var(--tx-1)',marginBottom:16,lineHeight:1.6}}>
-          Invite someone to join this team. They'll be added as a member and can participate in team activities.
+          Invite someone to join this team. They'll be added as a member and will be asked whether they want to withhold content about individuals from being shared with them.
         </p>
         <div style={{marginBottom:14}}>
           <span className="section-label">MATRIX ID</span>
@@ -15931,12 +16999,50 @@ const ProviderApp = ({session, onLogout, showToast}) => {
               <I n={m.role==='lead'?'briefcase':'user'} s={12} c={m.role==='lead'?'var(--gold)':'var(--tx-2)'}/>
               <span style={{fontSize:11.5,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.display_name||m.userId}</span>
               <span className={`tag ${m.role==='lead'?'tag-gold':'tag-blue'}`} style={{fontSize:8}}>{m.role?.toUpperCase()}</span>
+              {m.sharing_consent==='pending'&&<span className="tag tag-gold" style={{fontSize:7}}>PENDING</span>}
+              {m.sharing_consent==='withheld'&&<span className="tag tag-red" style={{fontSize:7}}>WITHHELD</span>}
+              {m.sharing_consent==='shared'&&<span className="tag tag-green" style={{fontSize:7}}>SHARING</span>}
             </div>)}
           </div>
         </div>
         <div style={{background:'var(--bg-3)',borderRadius:'var(--r)',padding:'10px 14px'}}>
           <span style={{fontSize:10,fontFamily:'var(--mono)',color:'var(--tx-3)',display:'block',marginBottom:4}}>TEAM ROOM ID</span>
           <span style={{fontSize:10.5,fontFamily:'var(--mono)',color:'var(--tx-1)',wordBreak:'break-all'}}>{teamInviteModal.roomId}</span>
+        </div>
+      </>}
+    </Modal>
+
+    {/* SHARING CONSENT MODAL — team member proactively decides whether to withhold shared content */}
+    <Modal open={!!sharingConsentModal} onClose={()=>setSharingConsentModal(null)} title="Content Sharing Preference" w={480}>
+      {sharingConsentModal&&<>
+        <div style={{background:'var(--gold-dim)',border:'1px solid rgba(218,165,32,.15)',borderRadius:'var(--r)',padding:'14px 18px',marginBottom:16}}>
+          <div style={{display:'flex',gap:8,alignItems:'flex-start'}}>
+            <I n="shield" s={16} c="var(--gold)"/>
+            <p style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.7,margin:0}}>
+              As a member of <strong>{sharingConsentModal.team?.name||'this team'}</strong>, content created about the individuals this team serves may be shared with you.
+            </p>
+          </div>
+        </div>
+        <p style={{fontSize:13,fontWeight:600,color:'var(--tx-0)',marginBottom:6}}>
+          Would you like to withhold content about individuals from being shared with you?
+        </p>
+        <p style={{fontSize:11.5,color:'var(--tx-2)',lineHeight:1.6,marginBottom:18}}>
+          By default, relevant content is shared with all team members to support coordination. If you choose to withhold, you will not receive content created about individuals served by this team.
+        </p>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          <button onClick={()=>handleSharingConsent(sharingConsentModal.team, sharingConsentModal.memberId, false)}
+            className="b-pri" style={{width:'100%',padding:'12px 16px',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+            <I n="check" s={14}/> No, share content with me
+          </button>
+          <button onClick={()=>handleSharingConsent(sharingConsentModal.team, sharingConsentModal.memberId, true)}
+            className="b-gho" style={{width:'100%',padding:'12px 16px',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6,color:'var(--red)'}}>
+            <I n="lock" s={14}/> Yes, withhold content from me
+          </button>
+        </div>
+        <div style={{background:'var(--bg-3)',borderRadius:'var(--r)',padding:'10px 14px',marginTop:14}}>
+          <p style={{fontSize:10.5,color:'var(--tx-3)',lineHeight:1.6,margin:0}}>
+            You can change this preference at any time from the team view. This choice is recorded as an epistemic operation for full auditability.
+          </p>
         </div>
       </>}
     </Modal>
