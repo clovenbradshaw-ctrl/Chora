@@ -507,6 +507,26 @@ table.dt td.dt-drag-handle:active{cursor:grabbing}
 .profile-field-value{font-size:14px;font-weight:500;color:var(--tx-0)}
 /* ═══ Tombstone display ═══ */
 .tombstone-notice{padding:14px 16px;border-radius:var(--r);background:var(--red-dim);border:1px solid rgba(232,93,93,.15);display:flex;align-items:center;gap:10px;font-size:12px;color:var(--red)}
+/* ═══ Personal Dashboard ═══ */
+.pd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:24px}
+.pd-stat{padding:14px;cursor:default}
+.pd-stat .num{font-size:22px;font-weight:700}.pd-stat .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--tx-2);margin-top:2px}
+.pd-section{margin-bottom:28px}
+.pd-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.pd-section-hdr h3{font-family:var(--serif);font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+.pd-event{display:flex;gap:12px;padding:12px 14px;border-radius:var(--r);border:1px solid var(--border-0);background:var(--bg-2);transition:border-color .15s}
+.pd-event:hover{border-color:var(--gold)}
+.pd-event-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pd-event-body{flex:1;min-width:0}
+.pd-event-title{font-size:12.5px;font-weight:600;margin-bottom:2px}
+.pd-event-desc{font-size:11px;color:var(--tx-2);line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.pd-event-meta{display:flex;align-items:center;gap:8px;margin-top:4px}
+.pd-event-time{font-size:9px;color:var(--tx-3);font-family:var(--mono)}
+.pd-content-card{padding:14px 18px;border-radius:var(--r);border:1px solid var(--border-0);background:var(--bg-2);transition:border-color .15s}
+.pd-content-card:hover{border-color:var(--teal)}
+.pd-res-card{padding:12px 16px;border-radius:var(--r);border:1px solid var(--border-0);background:var(--bg-2);display:flex;align-items:center;justify-content:space-between;transition:border-color .15s}
+.pd-res-card:hover{border-color:var(--green)}
+.pd-empty{text-align:center;padding:30px 20px;border:1px dashed var(--border-1);border-radius:var(--r);color:var(--tx-3)}
 </style>
 </head>
 <body>
@@ -8111,6 +8131,410 @@ const LoginScreen = ({onLogin}) => {
   </div>;
 };
 
+/* ═══════════════════ PERSONAL DASHBOARD ═══════════════════ */
+const PersonalDashboard = ({session, providers, observations, myResources, vaultData, allFields, vaultRoom, onNavigate}) => {
+  const [loading, setLoading] = useState(true);
+  const [bridgeEvents, setBridgeEvents] = useState([]);
+  const [providerNotes, setProviderNotes] = useState([]);
+  const [eventFilter, setEventFilter] = useState('all'); // all | notes | resources | fields | messages
+  const [eventLimit, setEventLimit] = useState(25);
+
+  // Time formatting for the dashboard
+  const pdTimeAgo = (ts) => {
+    if (!ts) return '';
+    const diff = Date.now() - ts;
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return `${Math.floor(diff/60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff/3600000)}h ago`;
+    if (diff < 604800000) return `${Math.floor(diff/86400000)}d ago`;
+    return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  };
+
+  // Load all events from bridge rooms relevant to this individual
+  const loadBridgeActivity = useCallback(async () => {
+    setLoading(true);
+    try {
+      const allEvents = [];
+      const allNotes = [];
+
+      for (const prov of providers) {
+        const bid = prov.bridgeRoomId;
+        if (!bid || !svc.client) continue;
+        const room = svc.client.getRoom(bid);
+        if (!room) continue;
+
+        // Paginate to get history
+        try {
+          for (let i = 0; i < 3; i++) {
+            const canPaginate = room.getLiveTimeline().getPaginationToken('b');
+            if (!canPaginate) break;
+            await svc.client.scrollback(room, 80);
+          }
+        } catch (e) { /* continue with available events */ }
+
+        const seenIds = new Set();
+        const roomEvents = [];
+        const timelineSets = room.getTimelineSets ? room.getTimelineSets() : [];
+        const collectEvents = (ev) => {
+          if (seenIds.has(ev.getId())) return;
+          seenIds.add(ev.getId());
+          roomEvents.push(ev);
+        };
+        if (timelineSets.length > 0) {
+          for (const ts of timelineSets) { for (const tl of ts.getTimelines()) { for (const ev of tl.getEvents()) collectEvents(ev); } }
+        } else {
+          for (const ev of room.getLiveTimeline().getEvents()) collectEvents(ev);
+        }
+        // Also include current state events
+        for (const ev of room.currentState.getStateEvents()) collectEvents(ev);
+
+        const provName = prov.providerName || prov.providerUserId || 'Provider';
+        const orgName = prov.providerProfile?.org_membership?.org_name;
+
+        for (const ev of roomEvents) {
+          const type = ev.getType();
+          const content = ev.getContent();
+          const sender = ev.getSender();
+          const ts = ev.getTs();
+          const isOwnEvent = sender === svc.userId;
+
+          // Categorize events
+          if (type === EVT.NOTE) {
+            allNotes.push({
+              id: ev.getId(), title: content.title || 'Untitled', content: content.content || content.text || '',
+              author: sender, provName, orgName, ts, tags: content.tags || [],
+              tombstoned: content.tombstoned || false, bridgeRoomId: bid
+            });
+            allEvents.push({
+              id: ev.getId(), category: 'notes', ts, provName, orgName, sender,
+              icon: 'msg', iconBg: 'var(--purple-dim)', iconColor: 'var(--purple)',
+              title: isOwnEvent ? 'You added a note' : `${provName} added a note`,
+              desc: content.title || content.content?.slice(0,80) || 'Note added',
+              tags: [{label:'NOTE',cls:'tag-purple'}]
+            });
+          } else if (type === EVT.RESOURCE_ALLOC) {
+            allEvents.push({
+              id: ev.getId(), category: 'resources', ts, provName, orgName, sender,
+              icon: 'layers', iconBg: 'var(--green-dim)', iconColor: 'var(--green)',
+              title: `${provName} allocated a resource`,
+              desc: `${content.quantity || 1} ${content.unit || 'unit'} of ${content.resource_name || content.resource_type_id || 'resource'}`,
+              tags: [{label:'RESOURCE',cls:'tag-green'}]
+            });
+          } else if (type === EVT.RESOURCE_VAULT) {
+            allEvents.push({
+              id: ev.getId(), category: 'resources', ts, provName, orgName, sender,
+              icon: 'layers', iconBg: 'var(--green-dim)', iconColor: 'var(--green)',
+              title: 'Resource recorded to vault',
+              desc: `${content.resource_name}: ${content.quantity} ${content.unit || ''}`,
+              tags: [{label:'VAULT RECORD',cls:'tag-teal'}]
+            });
+          } else if (type === EVT.RESOURCE_EVENT) {
+            const evtType = content.event || 'update';
+            allEvents.push({
+              id: ev.getId(), category: 'resources', ts, provName, orgName, sender,
+              icon: 'layers', iconBg: evtType === 'revoked' ? 'var(--red-dim)' : 'var(--teal-dim)',
+              iconColor: evtType === 'revoked' ? 'var(--red)' : 'var(--teal)',
+              title: `Resource ${evtType}`,
+              desc: `${content.quantity || ''} ${content.unit || ''} — ${content.allocation_id?.slice(0,16) || ''}`.trim(),
+              tags: [{label:evtType.toUpperCase(),cls:evtType==='revoked'?'tag-red':'tag-teal'}]
+            });
+          } else if (type === EVT.BRIDGE_REFS && !isOwnEvent) {
+            const fieldCount = Object.keys(content.fields || {}).length;
+            allEvents.push({
+              id: ev.getId(), category: 'fields', ts, provName, orgName, sender,
+              icon: 'key', iconBg: 'var(--blue-dim)', iconColor: 'var(--blue)',
+              title: content.revoked ? 'Field access revoked' : 'Shared fields updated',
+              desc: `${fieldCount} encrypted field ref${fieldCount!==1?'s':''}`,
+              tags: [{label:content.revoked?'REVOKED':'FIELDS',cls:content.revoked?'tag-red':'tag-blue'}]
+            });
+          } else if (type === EVT.OBSERVATION) {
+            allEvents.push({
+              id: ev.getId(), category: 'observations', ts, provName, orgName, sender,
+              icon: 'clipboard', iconBg: 'var(--orange-dim)', iconColor: 'var(--orange)',
+              title: isOwnEvent ? 'You recorded an observation' : `${provName} recorded an observation`,
+              desc: `${content.prompt_id || 'observation'}: ${content.value || ''}`,
+              tags: [{label:'OBSERVATION',cls:'tag-orange'},{label:isOwnEvent?'GIVEN':'MEANT',cls:isOwnEvent?'tag-teal':'tag-gold'}]
+            });
+          } else if (type === EVT.BRIDGE_META) {
+            allEvents.push({
+              id: ev.getId(), category: 'bridge', ts, provName, orgName, sender,
+              icon: 'share', iconBg: 'var(--gold-dim)', iconColor: 'var(--gold)',
+              title: content.status === 'tombstoned' ? 'Bridge revoked' : 'Bridge updated',
+              desc: `Status: ${content.status || 'active'}`,
+              tags: [{label:'BRIDGE',cls:'tag-gold'}]
+            });
+          } else if (type === 'm.room.message' && !isOwnEvent) {
+            const cvType = content[`${NS}.type`];
+            if (cvType === 'request') {
+              allEvents.push({
+                id: ev.getId(), category: 'messages', ts, provName, orgName, sender,
+                icon: 'msg', iconBg: 'var(--gold-dim)', iconColor: 'var(--gold)',
+                title: `${provName} sent an info request`,
+                desc: content.body?.slice(0,100) || '',
+                tags: [{label:'REQUEST',cls:'tag-gold'}]
+              });
+            } else {
+              allEvents.push({
+                id: ev.getId(), category: 'messages', ts, provName, orgName, sender,
+                icon: 'msg', iconBg: 'var(--blue-dim)', iconColor: 'var(--blue)',
+                title: `${provName} sent a message`,
+                desc: content.body?.slice(0,100) || '',
+                tags: [{label:'MESSAGE',cls:'tag-blue'}]
+              });
+            }
+          } else if (type === EVT.ROSTER_ASSIGN && !isOwnEvent) {
+            allEvents.push({
+              id: ev.getId(), category: 'fields', ts, provName, orgName, sender,
+              icon: 'users', iconBg: 'var(--teal-dim)', iconColor: 'var(--teal)',
+              title: 'Case assignment updated',
+              desc: `Assignment changed by ${provName}`,
+              tags: [{label:'ASSIGNMENT',cls:'tag-teal'}]
+            });
+          } else if (type === EVT.OP && !isOwnEvent) {
+            allEvents.push({
+              id: ev.getId(), category: 'fields', ts, provName, orgName, sender,
+              icon: 'git-commit', iconBg: 'var(--teal-dim)', iconColor: 'var(--teal)',
+              title: `${content.op || 'EO'} operation by ${provName}`,
+              desc: `${content.target?.field || content.target?.entity || content.target?.type || 'entity'} — ${content.frame?.epistemic || 'MEANT'}`,
+              tags: [{label:content.op||'OP',cls:'tag-teal'},{label:content.frame?.epistemic||'MEANT',cls:content.frame?.epistemic==='GIVEN'?'tag-teal':'tag-gold'}]
+            });
+          }
+        }
+      }
+
+      allEvents.sort((a, b) => b.ts - a.ts);
+      allNotes.sort((a, b) => b.ts - a.ts);
+      setBridgeEvents(allEvents);
+      setProviderNotes(allNotes.filter(n => !n.tombstoned));
+    } catch (e) { console.error('PersonalDashboard load error:', e); }
+    setLoading(false);
+  }, [providers]);
+
+  useEffect(() => { loadBridgeActivity(); }, [loadBridgeActivity]);
+
+  // Listen for real-time updates
+  useEffect(() => {
+    let debounce = null;
+    const handler = () => { if (debounce) clearTimeout(debounce); debounce = setTimeout(loadBridgeActivity, 500); };
+    window.addEventListener('khora:timeline', handler);
+    window.addEventListener('khora:state', handler);
+    return () => { window.removeEventListener('khora:timeline', handler); window.removeEventListener('khora:state', handler); };
+  }, [loadBridgeActivity]);
+
+  // Filtered events
+  const filteredEvents = useMemo(() => {
+    if (eventFilter === 'all') return bridgeEvents;
+    return bridgeEvents.filter(e => e.category === eventFilter);
+  }, [bridgeEvents, eventFilter]);
+
+  // Stats
+  const activeResources = myResources.filter(r => r.status === 'active').length;
+  const totalNotes = providerNotes.length;
+  const totalObs = observations.length;
+  const filledFields = allFields.filter(f => vaultData[f.key]).length;
+  const providerEventCount = bridgeEvents.filter(e => e.sender !== svc.userId).length;
+
+  if (loading) return <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}><Spin s={28}/></div>;
+
+  return <div className="anim-up" style={{maxWidth:900,margin:'0 auto'}}>
+    {/* Header */}
+    <div style={{marginBottom:24}}>
+      <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>My Dashboard</h2>
+      <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:4}}>Everything about you in one place — content, resources, and updates from your providers.</p>
+    </div>
+
+    {/* Stats overview */}
+    <div className="pd-grid">
+      {[
+        {l:'Providers',v:providers.length,c:'gold',i:'briefcase',nav:'providers'},
+        {l:'Notes About Me',v:totalNotes,c:'purple',i:'msg'},
+        {l:'Observations',v:totalObs,c:'blue',i:'clipboard',nav:'observations'},
+        {l:'Active Resources',v:activeResources,c:'green',i:'layers',nav:'resources'},
+        {l:'Vault Fields',v:`${filledFields}/${allFields.length}`,c:'teal',i:'folder',nav:'vault'},
+        {l:'Provider Updates',v:providerEventCount,c:'orange',i:'bell'},
+      ].map((s,i)=><div key={i} className="card pd-stat" style={{cursor:s.nav?'pointer':'default'}} onClick={()=>s.nav&&onNavigate(s.nav)}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <span className="section-label" style={{marginBottom:0}}>{s.l.toUpperCase()}</span>
+          <span style={{color:`var(--${s.c})`,opacity:.5}}><I n={s.i} s={16}/></span>
+        </div>
+        <div className="num" style={{color:`var(--${s.c})`}}>{s.v}</div>
+      </div>)}
+    </div>
+
+    {/* ── Section 1: Content About Me ── */}
+    <div className="pd-section">
+      <div className="pd-section-hdr">
+        <h3><I n="msg" s={16} c="var(--purple)"/> Content About Me</h3>
+        {totalNotes > 3 && <button onClick={()=>onNavigate('inbox')} className="b-gho b-xs">View All</button>}
+      </div>
+
+      {providerNotes.length === 0 && observations.length === 0 ? (
+        <div className="pd-empty">
+          <I n="clipboard" s={28} c="var(--tx-3)"/>
+          <p style={{marginTop:8,fontSize:12}}>No content about you yet.</p>
+          <p style={{fontSize:11,marginTop:4}}>When providers add notes, observations, or assessments, they will appear here.</p>
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {/* Provider notes */}
+          {providerNotes.slice(0,5).map(note => <div key={note.id} className="pd-content-card">
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:6}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <div style={{width:28,height:28,borderRadius:'50%',background:'var(--purple-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--purple)',flexShrink:0}}>
+                  <I n="msg" s={13}/></div>
+                <div>
+                  <span style={{fontSize:13,fontWeight:600}}>{note.title}</span>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginTop:1}}>
+                    <span style={{fontSize:10,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>{note.provName}</span>
+                    {note.orgName && <span className="tag tag-blue" style={{fontSize:7.5,padding:'1px 5px'}}>{note.orgName}</span>}
+                  </div>
+                </div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:4}}>
+                <span className="tag tag-purple" style={{fontSize:8}}>NOTE</span>
+                <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{pdTimeAgo(note.ts)}</span>
+              </div>
+            </div>
+            {note.content && <p style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.5,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{note.content}</p>}
+            {note.tags && note.tags.length > 0 && <div style={{display:'flex',gap:3,marginTop:6,flexWrap:'wrap'}}>
+              {note.tags.map((t,ti) => <span key={ti} className="note-tag-chip">{t.displayName || t}</span>)}
+            </div>}
+          </div>)}
+
+          {/* Recent observations from providers (MEANT frame) */}
+          {observations.slice(-3).reverse().map((obs, i) => {
+            const prompt = DEFAULT_PROMPTS.find(p => p.key === obs.category);
+            const optLabel = prompt?.options.find(o => o.v === obs.value)?.l || obs.value;
+            return <div key={obs.id || `obs-${i}`} className="pd-content-card">
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <div style={{width:28,height:28,borderRadius:'50%',background:'var(--blue-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--blue)',flexShrink:0}}>
+                    <I n="clipboard" s={13}/></div>
+                  <div>
+                    <span style={{fontSize:12.5,fontWeight:600}}>{prompt?.question || obs.category}</span>
+                    <span style={{fontSize:12,color:'var(--tx-1)',display:'block',marginTop:1}}>{optLabel}</span>
+                  </div>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:4}}>
+                  <span className="tag tag-teal" style={{fontSize:8}}>GIVEN</span>
+                  <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{obs.date || ''}</span>
+                </div>
+              </div>
+            </div>;
+          })}
+        </div>
+      )}
+    </div>
+
+    {/* ── Section 2: Resources Shared With Me ── */}
+    <div className="pd-section">
+      <div className="pd-section-hdr">
+        <h3><I n="layers" s={16} c="var(--green)"/> Resources Shared With Me</h3>
+        {myResources.length > 0 && <button onClick={()=>onNavigate('resources')} className="b-gho b-xs">View All ({myResources.length})</button>}
+      </div>
+
+      {myResources.length === 0 ? (
+        <div className="pd-empty">
+          <I n="layers" s={28} c="var(--tx-3)"/>
+          <p style={{marginTop:8,fontSize:12}}>No resources allocated yet.</p>
+          <p style={{fontSize:11,marginTop:4}}>When providers allocate vouchers, services, or other resources, they will appear here.</p>
+        </div>
+      ) : (<>
+        {/* Resource summary */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:8,marginBottom:12}}>
+          {[
+            {l:'Active',v:myResources.filter(r=>r.status==='active').length,c:'green'},
+            {l:'Used',v:myResources.filter(r=>r.status==='consumed').length,c:'blue'},
+            {l:'Expired',v:myResources.filter(r=>r.status==='expired').length,c:'orange'},
+          ].map((s,i)=><div key={i} className="card" style={{padding:'10px 12px'}}>
+            <span className="section-label" style={{marginBottom:0}}>{s.l.toUpperCase()}</span>
+            <span style={{fontSize:16,fontWeight:700,color:`var(--${s.c})`,display:'block',marginTop:2}}>{s.v}</span>
+          </div>)}
+        </div>
+        {/* Recent resource allocations */}
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {myResources.slice(0,5).map((alloc, i) => {
+            const statusColors = {active:'teal',consumed:'blue',expired:'orange',revoked:'red'};
+            return <div key={alloc.allocation_id || i} className="pd-res-card">
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <div style={{width:28,height:28,borderRadius:'50%',background:'var(--green-dim)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--green)',flexShrink:0}}>
+                  <I n="layers" s={13}/></div>
+                <div>
+                  <span style={{fontSize:12.5,fontWeight:600}}>{alloc.resource_name || alloc.resource_type_id}</span>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginTop:2}}>
+                    <span style={{fontSize:10.5,color:'var(--tx-2)',fontFamily:'var(--mono)'}}>x{alloc.quantity} {alloc.unit || ''}</span>
+                    <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{alloc.org_display_name || alloc.provider_display_name || ''}</span>
+                  </div>
+                </div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:4}}>
+                <span className={`tag tag-${statusColors[alloc.status]||'teal'}`} style={{fontSize:8.5}}>{(alloc.status || 'active').toUpperCase()}</span>
+                <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{alloc.allocated_at ? pdTimeAgo(alloc.allocated_at) : ''}</span>
+              </div>
+            </div>;
+          })}
+        </div>
+      </>)}
+    </div>
+
+    {/* ── Section 3: Event Stream ── */}
+    <div className="pd-section">
+      <div className="pd-section-hdr">
+        <h3><I n="bell" s={16} c="var(--orange)"/> Activity Feed</h3>
+        <button onClick={loadBridgeActivity} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:4}}><I n="refresh-cw" s={11}/>Refresh</button>
+      </div>
+
+      {/* Filter tabs */}
+      <div style={{display:'flex',gap:4,marginBottom:14,flexWrap:'wrap'}}>
+        {[{id:'all',label:'All'},{id:'notes',label:'Notes'},{id:'resources',label:'Resources'},
+          {id:'messages',label:'Messages'},{id:'fields',label:'Field Updates'},{id:'observations',label:'Observations'}
+        ].map(f => <button key={f.id} onClick={()=>setEventFilter(f.id)}
+          style={{padding:'5px 12px',borderRadius:14,fontSize:11,fontWeight:600,cursor:'pointer',border:'1px solid',transition:'all .15s',fontFamily:'var(--sans)',
+            background:eventFilter===f.id?'var(--gold-dim)':'transparent',
+            color:eventFilter===f.id?'var(--gold)':'var(--tx-2)',
+            borderColor:eventFilter===f.id?'var(--gold)':'var(--border-1)'}}>
+          {f.label}{eventFilter===f.id && filteredEvents.length > 0 ? ` (${filteredEvents.length})` : ''}
+        </button>)}
+      </div>
+
+      {filteredEvents.length === 0 ? (
+        <div className="pd-empty">
+          <I n="bell" s={28} c="var(--tx-3)"/>
+          <p style={{marginTop:8,fontSize:12}}>No activity yet{eventFilter !== 'all' ? ' in this category' : ''}.</p>
+          <p style={{fontSize:11,marginTop:4}}>Updates from your providers will stream here in real time.</p>
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {filteredEvents.slice(0, eventLimit).map(evt => <div key={evt.id} className="pd-event">
+            <div className="pd-event-icon" style={{background:evt.iconBg,color:evt.iconColor}}>
+              <I n={evt.icon} s={14}/></div>
+            <div className="pd-event-body">
+              <div className="pd-event-title">{evt.title}</div>
+              <div className="pd-event-desc">{evt.desc}</div>
+              <div className="pd-event-meta">
+                {evt.tags?.map((t,ti) => <span key={ti} className={`tag ${t.cls}`} style={{fontSize:8,padding:'1px 6px'}}>{t.label}</span>)}
+                {evt.orgName && <span className="tag tag-blue" style={{fontSize:7.5,padding:'1px 5px'}}>{evt.orgName}</span>}
+                <span className="pd-event-time">{pdTimeAgo(evt.ts)}</span>
+              </div>
+            </div>
+          </div>)}
+          {filteredEvents.length > eventLimit && <button onClick={()=>setEventLimit(l=>l+25)} className="b-gho b-sm" style={{alignSelf:'center',marginTop:8}}>
+            Load more ({filteredEvents.length - eventLimit} remaining)
+          </button>}
+        </div>
+      )}
+    </div>
+
+    {/* Sovereignty reminder */}
+    <div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'14px 18px',display:'flex',gap:10,alignItems:'flex-start',marginTop:8}}>
+      <I n="shield" s={16} c="var(--teal)"/>
+      <span style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.6}}>
+        <strong style={{color:'var(--teal)'}}>Your data, your control.</strong> All content shown here is encrypted in your vault and bridge rooms. You control which providers see what, and can revoke access at any time.
+      </span>
+    </div>
+  </div>;
+};
+
 /* ═══════════════════ CLIENT APP ═══════════════════ */
 const ClientApp = ({session, onLogout, showToast}) => {
   const [vaultRoom, setVaultRoom] = useState(null);
@@ -8119,7 +8543,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
   const [observations, setObservations] = useState([]);
   const [metricsConsent, setMetricsConsent] = useState({enabled:false,categories:[]});
   const [providers, setProviders] = useState([]);
-  const [view, setView] = useState('vault');
+  const [view, setView] = useState('dashboard');
   const [activeBridge, setActiveBridge] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editModal, setEditModal] = useState(false);
@@ -8628,7 +9052,8 @@ const ClientApp = ({session, onLogout, showToast}) => {
         </div>
       </div>
       <div style={{flex:1,overflow:'auto',padding:'6px 6px'}}>
-        {[{id:'vault',icon:'folder',label:'My Vault'},{id:'inbox',icon:'msg',label:'Messages'},
+        {[{id:'dashboard',icon:'briefcase',label:'My Dashboard'},
+          {id:'vault',icon:'folder',label:'My Vault'},{id:'inbox',icon:'msg',label:'Messages'},
           {id:'observations',icon:'clipboard',label:'Observations'},
           {id:'resources',icon:'layers',label:`My Resources${myResources.length?` (${myResources.length})`:''}`},
           {id:'providers',icon:'users',label:'People & Teams'},{id:'records',icon:'shield',label:'My Records'},
@@ -8667,6 +9092,14 @@ const ClientApp = ({session, onLogout, showToast}) => {
 
     {/* Main content */}
     <div className="app-main" style={{flex:1,overflow:'auto',padding:24}}>
+
+      {/* PERSONAL DASHBOARD VIEW */}
+      {view==='dashboard'&&!activeBridge&&<PersonalDashboard
+        session={session} providers={providers} observations={observations}
+        myResources={myResources} vaultData={vaultData} allFields={allFields}
+        vaultRoom={vaultRoom}
+        onNavigate={(v)=>{setView(v);setActiveBridge(null)}}
+      />}
 
       {/* VAULT VIEW */}
       {view==='vault'&&!activeBridge&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
