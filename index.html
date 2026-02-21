@@ -28,6 +28,23 @@ import { uniqueNamesGenerator, adjectives, animals } from 'https://esm.sh/unique
 window.generateUsername = () => uniqueNamesGenerator({ dictionaries: [adjectives, animals], separator: '-', length: 2, style: 'lowerCase' });
 window._nameGenReady = true;
 </script>
+<!-- Lazy-loaded: in-browser embeddings for field definition fuzzy matching (non-blocking) -->
+<script type="module">
+try {
+  const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3');
+  env.allowLocalModels = false;
+  window.__hfPipeline = null;
+  window.__hfReady = false;
+  window.initEmbeddings = async () => {
+    if (window.__hfReady) return window.__hfPipeline;
+    try {
+      window.__hfPipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+      window.__hfReady = true;
+      return window.__hfPipeline;
+    } catch (e) { console.debug('Embeddings model load skipped:', e.message); return null; }
+  };
+} catch (e) { console.debug('transformers.js not available:', e.message); }
+</script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Source+Serif+4:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -664,13 +681,26 @@ const ThemeToggle = ({style:sx}) => {
   </button>;
 };
 
-/* ═══════════════════ PER-FIELD CRYPTO (AES-256-GCM) ═══════════════════ */
+/* ═══════════════════ PER-FIELD CRYPTO (AES-256-GCM) ═══════════════════
+ * Operator Manifest:
+ *   INS(aes_key, crypto.subtle, field_encryption)
+ *   ALT(plaintext → ciphertext, aes_gcm_key, field_confidentiality)
+ *   ALT(ciphertext → plaintext, aes_gcm_key, field_confidentiality)
+ *
+ * Triad Summary:
+ *   Existence:       INS (key creation)
+ *   Structure:       —
+ *   Interpretation:  ALT (bidirectional value transform, encrypt/decrypt)
+ *   No REC — frame is stable. Encryption changes representation, not meaning.
+ * ═══════════════════════════════════════════════════════════════════════ */
 const FieldCrypto = {
+  // INS(aes_key, crypto.subtle, field_encryption) — create new 256-bit symmetric key
   async generateKey() {
     const key = await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);
     const raw = await crypto.subtle.exportKey('raw', key);
     return btoa(String.fromCharCode(...new Uint8Array(raw)));
   },
+  // ALT(plaintext → ciphertext, aes_gcm_key, field_confidentiality)
   async encrypt(plaintext, keyB64) {
     const keyBuf = Uint8Array.from(atob(keyB64), c => c.charCodeAt(0));
     const key = await crypto.subtle.importKey('raw', keyBuf, 'AES-GCM', false, ['encrypt']);
@@ -678,6 +708,7 @@ const FieldCrypto = {
     const enc = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, new TextEncoder().encode(plaintext));
     return { ciphertext: btoa(String.fromCharCode(...new Uint8Array(enc))), iv: btoa(String.fromCharCode(...iv)) };
   },
+  // ALT(ciphertext → plaintext, aes_gcm_key, field_confidentiality)
   async decrypt(cipherB64, ivB64, keyB64) {
     try {
       const keyBuf = Uint8Array.from(atob(keyB64), c => c.charCodeAt(0));
@@ -690,13 +721,27 @@ const FieldCrypto = {
   }
 };
 
-/* ═══════════════════ LOCAL VAULT CRYPTO (IndexedDB at-rest encryption) ═══════════════════ */
-/* Derives a per-user AES-256-GCM key from the Matrix session using HKDF.
+/* ═══════════════════ LOCAL VAULT CRYPTO (IndexedDB at-rest encryption) ═══════════════════
+ * Operator Manifest:
+ *   INS(vault_key, hkdf(token+userId+deviceId), at_rest_encryption)
+ *   ALT(plaintext → ciphertext, vault_key, local_persistence)
+ *   ALT(ciphertext → plaintext, vault_key, local_retrieval)
+ *   NUL(vault_key, logout|tab_close, key_destruction)
+ *
+ * Triad Summary:
+ *   Existence:       INS (derive key), NUL (destroy key on logout)
+ *   Structure:       —
+ *   Interpretation:  ALT (encrypt/decrypt at rest)
+ *   No REC — at-rest encryption frame is stable; never reinterprets data.
+ *
+ * Derives a per-user AES-256-GCM key from the Matrix session using HKDF.
  * All local IndexedDB data is encrypted with this key so that only the
  * authenticated user who synced the data can read it at rest. The key is
- * held in memory only — destroyed on logout or tab close. */
+ * held in memory only — destroyed on logout or tab close.
+ * ═══════════════════════════════════════════════════════════════════════ */
 const LocalVaultCrypto = {
   _key: null, _userId: null,
+  // INS(vault_key, hkdf(token+userId+deviceId), at_rest_encryption)
   async deriveKey(userId, accessToken, deviceId) {
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(accessToken), 'HKDF', false, ['deriveKey']);
@@ -708,12 +753,14 @@ const LocalVaultCrypto = {
     return this._key;
   },
   get ready() { return !!this._key; },
+  // ALT(data → encrypted_envelope, vault_key, local_persistence)
   async encrypt(data) {
     if (!this._key) throw new Error('LocalVaultCrypto not initialized');
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, this._key, new TextEncoder().encode(JSON.stringify(data)));
     return { __enc: 1, ct: btoa(String.fromCharCode(...new Uint8Array(ct))), iv: btoa(String.fromCharCode(...iv)) };
   },
+  // ALT(encrypted_envelope → data, vault_key, local_retrieval)
   async decrypt(envelope) {
     if (!this._key) throw new Error('LocalVaultCrypto not initialized');
     if (!envelope?.__enc) return envelope;
@@ -724,13 +771,26 @@ const LocalVaultCrypto = {
       return JSON.parse(new TextDecoder().decode(dec));
     } catch { return null; }
   },
+  // NUL(vault_key, logout, key_destruction) — local data becomes unreadable
   clear() { this._key = null; this._userId = null; }
 };
 
-/* ═══════════════════ ENCRYPTED LOCAL CACHE ═══════════════════ */
-/* All values written to IndexedDB go through LocalVaultCrypto.encrypt().
+/* ═══════════════════ ENCRYPTED LOCAL CACHE ═══════════════════
+ * Operator Manifest:
+ *   INS(encrypted_blob, idb_store, local_persistence)   — put
+ *   ALT(encrypted_blob → data, vault_key, cache_read)   — get (decrypt on read)
+ *   NUL(all_stores, wipe, cache_destruction)             — clear
+ *
+ * Triad Summary:
+ *   Existence:       INS (write blobs), NUL (wipe on logout)
+ *   Structure:       —
+ *   Interpretation:  ALT (decrypt on read)
+ *   No REC — cache never reinterprets; it stores and retrieves.
+ *
+ * All values written to IndexedDB go through LocalVaultCrypto.encrypt().
  * Keys (primary keys) remain plaintext for lookups; values are AES-256-GCM
- * ciphertext. An attacker inspecting IndexedDB sees only opaque blobs. */
+ * ciphertext. An attacker inspecting IndexedDB sees only opaque blobs.
+ * ═══════════════════════════════════════════════════════════════════════ */
 const KhoraEncryptedCache = {
   DB_NAME: 'khora-encrypted-vault', DB_VERSION: 1,
   STORES: ['session', 'rooms', 'state'],
@@ -747,6 +807,7 @@ const KhoraEncryptedCache = {
       req.onerror = () => reject(req.error);
     });
   },
+  // INS(encrypted_blob, idb_store, local_persistence) — encrypt-then-write
   async put(storeName, key, value) {
     if (!LocalVaultCrypto.ready) return;
     const db = await this.open();
@@ -758,6 +819,7 @@ const KhoraEncryptedCache = {
       tx.onerror = () => reject(tx.error);
     });
   },
+  // ALT(encrypted_blob → data, vault_key, cache_read) — read-then-decrypt
   async get(storeName, key) {
     if (!LocalVaultCrypto.ready) return null;
     const db = await this.open();
@@ -772,6 +834,7 @@ const KhoraEncryptedCache = {
       req.onerror = () => reject(req.error);
     });
   },
+  // ALT(encrypted_blob[] → data[], vault_key, bulk_cache_read) — cursor-based decrypt
   async getAll(storeName) {
     if (!LocalVaultCrypto.ready) return {};
     const db = await this.open();
@@ -789,6 +852,7 @@ const KhoraEncryptedCache = {
       req.onerror = () => reject(req.error);
     });
   },
+  // NUL(all_stores, wipe, cache_destruction) — purge all encrypted data
   async clear() {
     try {
       const db = await this.open();
@@ -803,7 +867,25 @@ const KhoraEncryptedCache = {
   close() { if (this._db) { this._db.close(); this._db = null; } }
 };
 
-/* ═══════════════════ EO OPERATION LAYER ═══════════════════ */
+/* ═══════════════════ EO OPERATION LAYER ═══════════════════
+ * Operator Manifest (meta — this IS the EO engine):
+ *   DES(operator_vocabulary, nine_canonical_ops, ontological_foundation)
+ *   CON(from_op → to_op, adjacency_matrix, transition_graph)
+ *   INS(intermediate_ops[], adjacency_violation, auto_repair)
+ *   CON(current_op → predecessor, entity_key, provenance_chain)
+ *   DES(khora:eo_event, custom_event, ui_notification)
+ *   ALT(userId → sha256_hash, salt, anonymization)
+ *
+ * projectCurrentState replays: INS, ALT, NUL, SUP, DES
+ *
+ * Triad Summary:
+ *   Existence:       INS (auto-intermediate emission), DES (operator vocabulary)
+ *   Structure:       CON (adjacency graph, provenance chains)
+ *   Interpretation:  ALT (cohort hashing), SUP (superposition replay)
+ *   All three triads active. This is the EO engine itself —
+ *   meta-operators operating on operators.
+ * ═══════════════════════════════════════════════════════════ */
+// DES(operator_vocabulary, nine_canonical_ops, ontological_foundation)
 const OPERATORS = ['NUL','DES','INS','SEG','CON','SYN','ALT','SUP','REC'];
 
 // Operator adjacency matrix (§5.2) — row can transition to column
@@ -813,6 +895,7 @@ const OP_ADJ = {
   ALT:['SYN','ALT','SUP'], SUP:['ALT','SUP','REC'], REC:['NUL','SUP','REC'],
 };
 
+// CON(from_op → to_op, adjacency_matrix, transition_path)
 // BFS pathfinding for auto-intermediate emission
 function findOpPath(from, to) {
   if (from === to || OP_ADJ[from]?.includes(to)) return [to];
@@ -845,12 +928,18 @@ function extractHomeserver(matrixId) {
 // Now enriches every event with provenance metadata (created_by, origin_server)
 // and builds provenance chains linking each op to its predecessor on the same entity.
 // Resilient: catches sendEvent failures and retries once, logs all failures visibly.
+//
+// Internal transformations:
+//   INS(intermediate_ops[], adjacency_violation, auto_repair)  — when transition is invalid
+//   CON(current_op → predecessor, entity_key, provenance_chain) — links to prior op
+//   DES(khora:eo_event, custom_event, ui_notification) — dispatches to DOM listeners
 async function emitOp(roomId, op, target, context, frame, provenance = []) {
   if (!roomId) { console.error('emitOp: no roomId provided for', op, target); return null; }
   try {
     const ek = eKey(roomId, target?.field || target?.entity);
     const lastEntry = entityOpHist[ek];
     const lastOp = lastEntry?.op;
+    // INS(intermediate_ops[], adjacency_violation, auto_repair)
     // Auto-emit intermediate operations if transition is invalid
     if (lastOp && !OP_ADJ[lastOp]?.includes(op)) {
       const path = findOpPath(lastOp, op);
@@ -861,11 +950,13 @@ async function emitOp(roomId, op, target, context, frame, provenance = []) {
         entityOpHist[ek] = { op: path[i], id: midId };
       }
     }
+    // CON(current_op → predecessor, entity_key, provenance_chain)
     const prevEntry = entityOpHist[ek];
     const chainedProvenance = [...provenance, ...(prevEntry?.id ? [prevEntry.id] : [])];
     const event = { id: genOpId(), op, target, context, frame, provenance: chainedProvenance, created_by: svc.userId, origin_server: extractHomeserver(svc.userId), ts: Date.now() };
     await svc.sendEvent(roomId, EVT.OP, event);
     entityOpHist[ek] = { op, id: event.id };
+    // DES(khora:eo_event, custom_event, ui_notification)
     // Dispatch custom DOM event so listeners (ActivityStream, notifications) can react immediately
     window.dispatchEvent(new CustomEvent('khora:eo', { detail: { roomId, event } }));
     return event;
@@ -879,24 +970,30 @@ async function emitOp(roomId, op, target, context, frame, provenance = []) {
 }
 
 // Compute current state from operation history (§9.1)
+// Replays five operator types to reconstruct current entity state:
+//   INS → creates field with value (existence)
+//   ALT → overwrites value within stable frame (interpretation)
+//   NUL → nullifies field, marks source (existence removal)
+//   SUP → holds multiple valid values simultaneously (interpretation)
+//   DES → sets entity designation/type (existence naming)
 function projectCurrentState(operations, frameType) {
   const state = {};
   const relevant = operations.filter(o => o.frame?.type === frameType).sort((a,b) => a.ts - b.ts);
   for (const op of relevant) {
     switch (op.op) {
-      case 'INS':
+      case 'INS': // INS(field, value, frame) — instantiate field with value
         if (op.target?.field) state[op.target.field] = { value: op.target.value ?? op.context?.value, source_op: op.id, epistemic: op.frame?.epistemic, ts: op.ts };
         break;
-      case 'ALT':
+      case 'ALT': // ALT(field, old→new, frame) — value change within existing frame
         if (op.target?.field && state[op.target.field]) { state[op.target.field].value = op.context?.to; state[op.target.field].source_op = op.id; state[op.target.field].ts = op.ts; }
         break;
-      case 'NUL':
+      case 'NUL': // NUL(field, reason, frame) — existence removal
         if (op.target?.field) state[op.target.field] = { value: null, nullified_by: op.id, ts: op.ts };
         break;
-      case 'SUP':
+      case 'SUP': // SUP(field, [values], frame) — multiple valid values coexist
         if (op.target?.field) state[op.target.field] = { values: op.context?.states, superposition: true, source_op: op.id, ts: op.ts };
         break;
-      case 'DES':
+      case 'DES': // DES(entity, designation, frame) — type/name assignment
         if (op.target?.entity) state[`${op.target.entity}.designation`] = { value: op.target.designation, source_op: op.id, ts: op.ts };
         break;
     }
@@ -904,7 +1001,7 @@ function projectCurrentState(operations, frameType) {
   return state;
 }
 
-// SHA-256 cohort hash for metrics anonymization
+// ALT(userId → sha256_hash, salt, anonymization) — one-way lossy transform for metrics
 async function cohortHash(userId, salt) {
   const data = new TextEncoder().encode(userId + (salt || 'khora_default_salt'));
   const hash = await crypto.subtle.digest('SHA-256', data);
@@ -912,19 +1009,32 @@ async function cohortHash(userId, salt) {
 }
 
 /* ═══════════════════ EMAIL VERIFICATION UTILITIES (§10.5) ═══════════════════
+ * Operator Manifest:
+ *   INS(verification_code, crypto.getRandomValues, challenge_creation)
+ *   ALT(plaintext_code → sha256_hash, web_crypto, one_way_transform)
+ *   CON(hashed_code → org_room_state, webhook_delivery, out_of_band_challenge)
+ *   DES(email_identity, code_match, verified_attestation)
+ *   NUL(challenge, max_attempts|expiry, lockout)
+ *
+ * Triad Summary:
+ *   Existence:       INS (code generation), NUL (expiry/lockout)
+ *   Structure:       CON (webhook delivery to out-of-band channel)
+ *   Interpretation:  ALT (one-way hash), DES (verified identity attestation)
+ *   No REC, no SUP — verification either succeeds or fails, never reinterprets.
+ *
  * Generates time-limited 6-digit codes, hashes them with SHA-256, and validates
  * email addresses against organization-approved domains. Codes are stored hashed
  * in Matrix room state — the plaintext code is delivered out-of-band (email/webhook).
  * ════════════════════════════════════════════════════════════════════════════════ */
 const EmailVerification = {
-  /** Generate a cryptographically random 6-digit code */
+  // INS(verification_code, crypto.getRandomValues, challenge_creation)
   generateCode() {
     const arr = crypto.getRandomValues(new Uint8Array(4));
     const num = (arr[0] << 24 | arr[1] << 16 | arr[2] << 8 | arr[3]) >>> 0;
     return String(num % 1000000).padStart(6, '0');
   },
 
-  /** SHA-256 hash a verification code (stored in state; plaintext never persisted) */
+  // ALT(plaintext_code → sha256_hash, web_crypto, one_way_transform)
   async hashCode(code) {
     const data = new TextEncoder().encode(code + ':khora_email_verify_v1');
     const hash = await crypto.subtle.digest('SHA-256', data);
@@ -949,7 +1059,8 @@ const EmailVerification = {
     return domain && requiredDomains.some(d => d.toLowerCase() === domain);
   },
 
-  /** Create a verification challenge object (stored in room state) */
+  // INS(challenge, userId+email+hash, verification_initiation)
+  // CON(challenge → org_room_state, state_key, persistence)
   async createChallenge(userId, email) {
     const code = this.generateCode();
     const codeHash = await this.hashCode(code);
@@ -969,7 +1080,8 @@ const EmailVerification = {
     };
   },
 
-  /** Validate a submitted code against a stored challenge */
+  // DES(email_identity, code_match, verified_attestation) on success
+  // NUL(challenge, expired|max_attempts, lockout) on failure
   async validateChallenge(challenge, submittedCode) {
     if (!challenge || challenge.status !== 'pending') return { valid: false, reason: 'no_active_challenge' };
     if (Date.now() > challenge.expires) return { valid: false, reason: 'expired' };
@@ -998,7 +1110,7 @@ const EmailVerification = {
     return true;
   },
 
-  /** Deliver verification code via n8n webhook (email relay) */
+  // CON(plaintext_code → email_inbox, webhook_relay, out_of_band_delivery)
   async sendCodeViaWebhook(email, code, orgName) {
     try {
       const resp = await fetch(`${WEBHOOK_BASE}/email-verify`, {
@@ -1017,7 +1129,22 @@ const EmailVerification = {
   },
 };
 
-/* ═══════════════════ EVENT TYPES (§11) ═══════════════════ */
+/* ═══════════════════ EVENT TYPES (§11) ═══════════════════
+ * Operator Manifest:
+ *   DES(event_types, io.khora.*, protocol_vocabulary)
+ *
+ * This entire section is pure DES — it designates the vocabulary of
+ * event types, maturity levels, propagation levels, governance constants,
+ * and resource tracking constants. No data is mutated, structured, or
+ * reinterpretted here. All actual transformations happen elsewhere
+ * using these designations as their frame.
+ *
+ * Triad Summary:
+ *   Existence:       DES only (naming, not creating)
+ *   Structure:       —
+ *   Interpretation:  —
+ *   No INS, no ALT, no REC — vocabulary definition is frame-setting, not frame-changing.
+ * ═══════════════════════════════════════════════════════════ */
 const NS = 'io.khora';
 const EVT = {
   IDENTITY:       `${NS}.identity`,
@@ -1070,6 +1197,11 @@ const EVT = {
   // Teams (flexible groups of people, not tied to a single org)
   TEAM_META:      `${NS}.team.metadata`,
   TEAM_MEMBERS:   `${NS}.team.members`,
+  TEAM_SCHEMA:    `${NS}.team.schema`,
+  TEAM_SCHEMA_RULE:`${NS}.team.schema_rule`,
+  // Field definitions & crosswalks
+  FIELD_DEF:      `${NS}.field.definition`,
+  FIELD_CROSSWALK:`${NS}.field.crosswalk`,
   // Team operational subscriptions & channels
   TEAM_SERVICE_INFO:  `${NS}.team.service_info`,   // published service metadata (hours, capacity, services)
   TEAM_SUBSCRIBERS:   `${NS}.team.subscribers`,     // subscriber list with approval status
@@ -1112,6 +1244,7 @@ const EVT = {
 };
 
 /* ═══════════════════ MATURITY LEVELS (MVP §Screen 4) ═══════════════════ */
+// DES(lifecycle_states, [draft→trial→normative→de_facto→deprecated], schema_governance)
 const MATURITY_LEVELS = {
   draft:      { id: 'draft',      label: 'Draft',      color: 'blue',   icon: '🔵', desc: 'Proposed, not yet reviewed' },
   trial:      { id: 'trial',      label: 'Trial',      color: 'gold',   icon: '🟡', desc: 'Approved for testing, may change' },
@@ -1121,6 +1254,7 @@ const MATURITY_LEVELS = {
 };
 
 /* ═══════════════════ PROPAGATION LEVELS (MVP §CON Semantics) ═══════════════════ */
+// DES(coupling_strengths, [required→standard→recommended→optional], network_governance)
 const PROPAGATION_LEVELS = {
   required:    { id: 'required',    label: 'Required',    color: 'red',    desc: 'Tight coupling — auto-applied to orgs, immutable' },
   standard:    { id: 'standard',    label: 'Standard',    color: 'gold',   desc: 'Expected coupling — auto-applied, notify on divergence' },
@@ -1129,6 +1263,7 @@ const PROPAGATION_LEVELS = {
 };
 
 /* ═══════════════════ GOVERNANCE CONSTANTS (MVP §Screen 5) ═══════════════════ */
+// DES(governance_vocabulary, consent+proposals+rhythms, polycentric_governance)
 const CONSENT_POSITIONS = {
   adopt_as_is:          { id: 'adopt_as_is',          label: 'Adopt as-is',           icon: '✅', color: 'green' },
   adopt_with_extension: { id: 'adopt_with_extension', label: 'Adopt with extension',  icon: '🔄', color: 'blue' },
@@ -1151,7 +1286,27 @@ const GOV_RHYTHMS = {
   annual_constitutional:{ id: 'annual_constitutional', name: 'Annual Constitutional Review', frequency: 'annual', anchor_day: 'first_monday', duration_days: 14, participants: 'all_members_supermajority' },
 };
 
+/* ═══════════════════ TEAM CONSENT MODES (§Team Schema Governance) ═══════════════════ */
+const TEAM_CONSENT_MODES = {
+  lead_decides: { id: 'lead_decides', label: 'Lead Decides', icon: 'briefcase', color: 'gold',
+    desc: 'Team lead can change the schema directly. Members are notified.' },
+  majority:     { id: 'majority',     label: 'Majority',     icon: 'users',     color: 'blue',
+    desc: 'Schema changes require approval from more than half of team members.' },
+  unanimous:    { id: 'unanimous',    label: 'Unanimous',    icon: 'shieldCheck',color: 'green',
+    desc: 'All team members must approve schema changes. Any member can block.' },
+};
+
+/* ═══════════════════ CROSSWALK RELATIONSHIP TYPES (§Field Definitions) ═══════════════════ */
+const CROSSWALK_TYPES = {
+  equivalent:  { id: 'equivalent',  label: 'Equivalent',  symbol: '\u2261', color: 'green',  desc: 'Same concept, different name' },
+  narrower:    { id: 'narrower',    label: 'Narrower',    symbol: '\u2282', color: 'blue',   desc: 'Target is a subset of source' },
+  broader:     { id: 'broader',     label: 'Broader',     symbol: '\u2283', color: 'teal',   desc: 'Target is a superset of source' },
+  related:     { id: 'related',     label: 'Related',     symbol: '~',      color: 'gold',   desc: 'Conceptually linked but distinct' },
+  conflicting: { id: 'conflicting', label: 'Conflicting', symbol: '\u2260', color: 'red',    desc: 'Same name, different meaning' },
+};
+
 /* ═══════════════════ RESOURCE TRACKING CONSTANTS (§Resource Build) ═══════════════════ */
+// DES(resource_vocabulary, categories+opacity+relations+permissions, resource_tracking)
 
 /** Resource categories — the top-level classification for resource types */
 const RESOURCE_CATEGORIES = [
@@ -1292,9 +1447,19 @@ function buildDefaultResourcePermissions() {
   };
 }
 
-/* ═══════════════════ ROLE INFERENCE (MVP §Screen 1) ═══════════════════ */
-/* Roles are detected from room memberships — no account-type selector.
- * A user can have multiple roles simultaneously. */
+/* ═══════════════════ ROLE INFERENCE (MVP §Screen 1) ═══════════════════
+ * Operator Manifest:
+ *   DES(user_roles, room_membership_scan, identity_classification)
+ *
+ * Triad Summary:
+ *   Existence:       DES (classify user into roles)
+ *   Structure:       —
+ *   Interpretation:  —
+ *   No mutations — read-only scan. No REC — role frame is stable.
+ *
+ * Roles are detected from room memberships — no account-type selector.
+ * A user can have multiple roles simultaneously.
+ * ═══════════════════════════════════════════════════════════ */
 const ROLES = {
   client:    { id: 'client',    label: 'Individual',         icon: 'shield',    color: 'teal',   desc: 'Data owner with a personal Vault' },
   provider:  { id: 'provider',  label: 'Team Member',        icon: 'briefcase', color: 'gold',   desc: 'Case manager or outreach worker' },
@@ -1302,6 +1467,8 @@ const ROLES = {
   network:   { id: 'network',   label: 'Network Coordinator',icon: 'globe',    color: 'green',  desc: 'Network governance steward' },
 };
 
+// DES(user_roles, room_membership_scan, identity_classification)
+// Scans all rooms to determine user's active roles via structural evidence
 function inferRolesFromRooms(scannedState, userId) {
   const roles = new Set();
   for (const [roomId, state] of Object.entries(scannedState)) {
@@ -1333,7 +1500,25 @@ function inferRolesFromRooms(scannedState, userId) {
   return [...roles];
 }
 
-/* ═══════════════════ MATRIX SERVICE ═══════════════════ */
+/* ═══════════════════ MATRIX SERVICE ═══════════════════
+ * Operator Manifest:
+ *   INS(matrix_session, credentials, authentication)                — login
+ *   INS(vault_key, hkdf, at_rest_encryption)                       — login key derivation
+ *   NUL(legacy_stores, purge, security_cleanup)                     — login cleanup
+ *   DES(session, whoami_check, token_validation)                    — restoreSession
+ *   INS(matrix_room, e2ee+state, room_creation)                    — createRoom
+ *   INS(bridge_room, power_levels, client_sovereign_creation)       — createClientRoom
+ *   ALT(room_state, state_event, protocol_mutation)                 — setState
+ *   INS(timeline_event, room, event_emission)                       — sendEvent
+ *   DES(room_topology, sync_state, room_classification)             — scanRooms
+ *   NUL(session+keys+cache, logout, full_teardown)                  — logout
+ *
+ * Triad Summary:
+ *   Existence:       INS (sessions, rooms, events), NUL (logout, purge)
+ *   Structure:       CON (bridge creation links client ↔ provider)
+ *   Interpretation:  ALT (state events), DES (room classification)
+ *   No REC — KhoraService is a transport layer; it never reinterprets data.
+ * ═══════════════════════════════════════════════════════════ */
 class KhoraService {
   constructor() { this.client = null; this._baseUrl = null; this._token = null; this._userId = null; this._timelineListenerAttached = false; }
 
@@ -1394,6 +1579,7 @@ class KhoraService {
     throw new Error('Rate limited — too many requests. Please try again.');
   }
 
+  // INS(matrix_session, credentials, authentication) → INS(vault_key, hkdf, at_rest_encryption) → NUL(legacy_stores, purge, cleanup)
   async login(homeserver, user, pass) {
     const baseUrl = homeserver.startsWith('http') ? homeserver : `https://${homeserver}`;
     this._baseUrl = baseUrl;
@@ -1431,6 +1617,7 @@ class KhoraService {
     }
   }
 
+  // DES(session, whoami_check, token_validation) → INS(matrix_client, valid_token, reconnection) | NUL(session, expired, destruction)
   async restoreSession() {
     const raw = localStorage.getItem('khora_session');
     if (!raw) return null;
@@ -1527,6 +1714,7 @@ class KhoraService {
     throw new Error('Rate limited — too many requests. Please try again.');
   }
 
+  // INS(matrix_room, e2ee+state, room_creation) — Megolm encryption enabled by default
   async createRoom(name, topic, extraState = []) {
     const initial_state = [
       { type: 'm.room.encryption', state_key: '', content: { algorithm: 'm.megolm.v1.aes-sha2' } },
@@ -1541,6 +1729,7 @@ class KhoraService {
     }
   }
 
+  // INS(bridge_room, power_levels, client_sovereign_creation) — client PL 100, provider PL 50
   async createClientRoom(name, topic, extraState = [], clientMatrixId = null) {
     const initial_state = [
       { type: 'm.room.encryption', state_key: '', content: { algorithm: 'm.megolm.v1.aes-sha2' } },
@@ -1597,11 +1786,13 @@ class KhoraService {
     try { return await this._api('GET', `/rooms/${encodeURIComponent(roomId)}/state/${type}/${sk}`); } catch { return null; }
   }
 
+  // ALT(room_state, state_event, protocol_mutation) — write state to Matrix room
   async setState(roomId, type, content, sk = '') {
     if (this.client) { await this._withRetry(() => this.client.sendStateEvent(roomId, type, content, sk)); }
     else { await this._api('PUT', `/rooms/${encodeURIComponent(roomId)}/state/${type}/${sk}`, content); }
   }
 
+  // INS(timeline_event, room, event_emission) — with crypto fallback for E2EE errors
   async sendEvent(roomId, type, content) {
     if (this.client) {
       try {
@@ -1703,6 +1894,7 @@ class KhoraService {
     } catch { return []; }
   }
 
+  // DES(room_topology, sync_state, room_classification) — read-only scan, caches to encrypted IDB
   // Batch-fetch all Khora state across joined rooms in a single request.
   // When the SDK is available, reads local sync state (no HTTP calls).
   // When using the API fallback, uses /sync with a tight filter — one request
@@ -1767,6 +1959,7 @@ class KhoraService {
     }
   }
 
+  // NUL(legacy_idb, store_names, security_cleanup)
   // Purge unencrypted IndexedDB databases created by the Matrix SDK sync layer
   // or legacy application caches. Preserves crypto stores (Olm/Megolm key material
   // needed for E2EE continuity) and our own encrypted vault.
@@ -1788,10 +1981,11 @@ class KhoraService {
     }
   }
 
+  // NUL(session+keys+cache, logout, full_teardown) — destroys all local state
   async logout() {
     if (this.client) { this.client.stopClient(); try { await this.client.logout(); } catch {} }
     this.client = null; this._token = null; this._userId = null;
-    // Destroy at-rest encryption key — local encrypted data becomes unreadable
+    // NUL(vault_key, logout, key_destruction) — local encrypted data becomes unreadable
     LocalVaultCrypto.clear();
     // Wipe encrypted local cache and close database connection
     try { await KhoraEncryptedCache.clear(); KhoraEncryptedCache.close(); } catch {}
@@ -1849,12 +2043,23 @@ class KhoraService {
 const svc = new KhoraService();
 
 /* ═══════════════════ WEBHOOK / AIRTABLE BRIDGE ═══════════════════
+ * Operator Manifest:
+ *   CON(browser → n8n_endpoint, access_token, webhook_transport)
+ *   SYN(tables[] + records[], parallel_fetch, hydrated_dataset)
+ *
+ * Triad Summary:
+ *   Existence:       —
+ *   Structure:       CON (transport link), SYN (parallel hydration)
+ *   Interpretation:  —
+ *   No REC — data passes through unchanged. No existence mutations.
+ *
  * Fetches table and record data from n8n webhook endpoints backed by
  * the amino Postgres schema. Auth is forwarded via query-param so the
  * browser never sends an Authorization header, avoiding CORS preflight.
  * ═══════════════════════════════════════════════════════════════════ */
 const WEBHOOK_BASE = 'https://n8n.intelechia.com/webhook';
 
+// CON(browser → n8n_endpoint, access_token, webhook_transport)
 async function webhookFetch(path, token) {
   const sep = path.includes('?') ? '&' : '?';
   const url = `${WEBHOOK_BASE}${path}${token ? `${sep}access_token=${encodeURIComponent(token)}` : ''}`;
@@ -1866,6 +2071,7 @@ async function webhookFetch(path, token) {
   return resp.json();
 }
 
+// SYN(tables[] + records[], parallel_fetch, hydrated_dataset) — merges table metadata with record data
 async function hydrateFromWebhooks(token) {
   const { tables } = await webhookFetch('/api/tables', token);
   const allTables = {};
@@ -1882,6 +2088,19 @@ async function hydrateFromWebhooks(token) {
 }
 
 /* ═══════════════════ DOMAIN CONFIG (§C.0) ═══════════════════
+ * Operator Manifest:
+ *   DES — pure designation. Forms, interpretations, transforms, vault fields,
+ *         roles, relationship types, terminology. All are vocabulary definitions.
+ *
+ * Triad Summary:
+ *   Existence:       DES (naming forms, fields, authorities, roles)
+ *   Structure:       —
+ *   Interpretation:  —
+ *   No mutations here. DOMAIN_CONFIG is the interpretive frame that other modules
+ *   reference. All actual INS/ALT/CON/REC operations happen elsewhere using
+ *   these designations. Changing DOMAIN_CONFIG changes the vocabulary itself —
+ *   which is a meta-level REC, but not one performed by code at runtime.
+ *
  * All domain-specific content is consolidated here. To adapt Tessera for a
  * different sector, replace the contents of DOMAIN_CONFIG — the application
  * logic, encryption model, bridge topology, and EO operator layer are all
@@ -2218,19 +2437,55 @@ const DOMAIN_CONFIG = {
     full_name:{method:'block'}, id_number:{method:'block'}, phone:{method:'block'}, email:{method:'block'},
   },
 
-  /* ── Vault Fields ── */
+  /* ── Vault Fields (with definitions & URIs) ── */
   vaultFields: [
-    {key:'full_name',label:'Full Name',category:'identity',sensitive:false},
-    {key:'dob',label:'Date of Birth',category:'identity',sensitive:true},
-    {key:'id_number',label:'ID Number',category:'identity',sensitive:true},
-    {key:'email',label:'Email',category:'contact',sensitive:false},
-    {key:'phone',label:'Phone',category:'contact',sensitive:false},
-    {key:'address',label:'Address',category:'contact',sensitive:true},
-    {key:'affiliation',label:'Organization / Affiliation',category:'details',sensitive:false},
-    {key:'case_notes',label:'Case Notes',category:'case',sensitive:false},
-    {key:'documents',label:'Documents',category:'case',sensitive:true},
-    {key:'history',label:'Case History',category:'case',sensitive:false},
-    {key:'restricted_notes',label:'Restricted Notes',category:'sensitive',sensitive:true},
+    {key:'full_name',label:'Full Name',category:'identity',sensitive:false,
+      uri:'khora:vault/full_name', data_type:'text',
+      definition:'The full legal name of the individual as it appears on government-issued identification, or as preferred by the individual if no ID is available.',
+      scope:'Legal or preferred name for identification within service contexts. Not aliases or nicknames unless no legal name is known.',
+      authority:{uri:'https://hudexchange.info/resource/3824/',name:'HMIS Data Standards',provision:'Element 3.01',org:'HUD'}},
+    {key:'dob',label:'Date of Birth',category:'identity',sensitive:true,
+      uri:'khora:vault/dob', data_type:'date',
+      definition:'The date on which the individual was born, used for age calculation and eligibility determination.',
+      scope:'Calendar date of birth. If exact date is unknown, use best estimate with a note.',
+      authority:{uri:'https://hudexchange.info/resource/3824/',name:'HMIS Data Standards',provision:'Element 3.03',org:'HUD'}},
+    {key:'id_number',label:'ID Number',category:'identity',sensitive:true,
+      uri:'khora:vault/id_number', data_type:'text',
+      definition:'A government-issued identification number such as SSN (last 4), state ID, or other official identifier.',
+      scope:'Any official ID number used for verification. Partial numbers (e.g., last 4 of SSN) preferred for security. Not internal case numbers.',
+      authority:{uri:'https://hudexchange.info/resource/3824/',name:'HMIS Data Standards',provision:'Element 3.02',org:'HUD'}},
+    {key:'email',label:'Email',category:'contact',sensitive:false,
+      uri:'khora:vault/email', data_type:'email',
+      definition:'The primary email address for electronic communication with the individual.',
+      scope:'Email used for service coordination. Not organizational or employer email unless individual has no personal email.'},
+    {key:'phone',label:'Phone',category:'contact',sensitive:false,
+      uri:'khora:vault/phone', data_type:'phone',
+      definition:'The primary phone number for reaching the individual, including mobile.',
+      scope:'Personal or most reliable phone number. Mobile preferred. Include area code.'},
+    {key:'address',label:'Address',category:'contact',sensitive:true,
+      uri:'khora:vault/address', data_type:'address',
+      definition:'The current physical or mailing address of the individual, if known.',
+      scope:'Last known address or place of stay. For unhoused individuals, may be a shelter address, encampment location, or "no fixed address."'},
+    {key:'affiliation',label:'Organization / Affiliation',category:'details',sensitive:false,
+      uri:'khora:vault/affiliation', data_type:'text',
+      definition:'The organization, employer, or institutional affiliation of the individual, if any.',
+      scope:'Primary organizational connection relevant to services. May be employer, school, faith community, or community organization.'},
+    {key:'case_notes',label:'Case Notes',category:'case',sensitive:false,
+      uri:'khora:vault/case_notes', data_type:'text_long',
+      definition:'Free-text notes documenting interactions, observations, and service activities related to the individual.',
+      scope:'Ongoing case documentation. Not restricted clinical notes or legally privileged information.'},
+    {key:'documents',label:'Documents',category:'case',sensitive:true,
+      uri:'khora:vault/documents', data_type:'document',
+      definition:'Uploaded files or document references associated with the individual, such as ID scans, intake forms, or release authorizations.',
+      scope:'Any document relevant to the individual\'s case. May include scanned IDs, signed forms, referral letters. Not case notes.'},
+    {key:'history',label:'Case History',category:'case',sensitive:false,
+      uri:'khora:vault/history', data_type:'text_long',
+      definition:'A chronological record of key events, status changes, and milestones in the individual\'s case.',
+      scope:'High-level timeline of case progression. Not detailed session notes — those go in Case Notes.'},
+    {key:'restricted_notes',label:'Restricted Notes',category:'sensitive',sensitive:true,
+      uri:'khora:vault/restricted_notes', data_type:'text_long',
+      definition:'Sensitive notes with restricted access, such as clinical observations, safety concerns, or legally protected information.',
+      scope:'Information requiring additional access controls beyond standard case notes. May include mental health observations, substance use details, or safety planning notes.'},
   ],
 
   /* ── Field Categories ── */
@@ -2335,6 +2590,41 @@ const CAT_ICONS = DOMAIN_CONFIG.fieldCatIcons;
 const CAT_COLORS = DOMAIN_CONFIG.fieldCatColors;
 const OBS_CAT_LABELS = DOMAIN_CONFIG.obsCatLabels;
 const OBS_CAT_COLORS = DOMAIN_CONFIG.obsCatColors;
+
+/* ═══════════════════ IN-BROWSER EMBEDDINGS HELPERS (§Field Fuzzy Match) ═══════════════════ */
+const getFieldEmbedding = async (text) => {
+  try {
+    if (!window.initEmbeddings) return null;
+    const pipe = await window.initEmbeddings();
+    if (!pipe) return null;
+    const output = await pipe(text, { pooling: 'mean', normalize: true });
+    return Array.from(output.data);
+  } catch (e) { console.debug('Embedding generation skipped'); return null; }
+};
+
+const cosineSim = (a, b) => {
+  if (!a || !b || a.length !== b.length) return 0;
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+  return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+};
+
+const findSimilarFields = async (text, fieldDefs, excludeUris = []) => {
+  try {
+    const embedding = await getFieldEmbedding(text);
+    if (!embedding) return [];
+    const results = [];
+    for (const [uri, def] of Object.entries(fieldDefs)) {
+      if (excludeUris.includes(uri)) continue;
+      const defText = `${def.label}. ${def.definition || ''}. ${def.scope || ''}`;
+      const defEmb = await getFieldEmbedding(defText);
+      if (!defEmb) continue;
+      const sim = cosineSim(embedding, defEmb);
+      if (sim > 0.6) results.push({ uri, def, similarity: sim });
+    }
+    return results.sort((a, b) => b.similarity - a.similarity).slice(0, 3);
+  } catch (e) { console.debug('Similarity search skipped'); return []; }
+};
 
 /* ═══════════════════ ORG ROLES & TYPES ═══════════════════ */
 const ORG_ROLES = DOMAIN_CONFIG.orgRoles;
@@ -2856,12 +3146,31 @@ function getFrameworkFields(enabledIds) {
   return fields;
 }
 
-/* ═══════════════════ ANONYMIZATION (§B.2) ═══════════════════ */
+/* ═══════════════════ ANONYMIZATION (§B.2) ═══════════════════
+ * Operator Manifest:
+ *   NUL(pii_field, block_policy, data_suppression)         — block method
+ *   SEG(dob → age_bucket, range_boundaries, k_anonymity)   — age_range method
+ *   SEG(numeric → bracket, range_rules, statistical_binning)— bracket method
+ *   ALT(address → geohash, hashing, location_anonymization) — area_hash method
+ *   SYN(observation + anon_demographics, cohort_hash, metric_emission) — emitMetric
+ *
+ * Triad Summary:
+ *   Existence:       NUL (PII suppression)
+ *   Structure:       SEG (bucketing, range partitioning)
+ *   Interpretation:  ALT (lossy hash transform)
+ *   ⚠️ No REC — frame is deliberately stable. Anonymization is lossy by design;
+ *   reinterpretation would violate the irreversibility guarantee.
+ * ═══════════════════════════════════════════════════════════ */
+// Transforms a single field according to DEFAULT_TRANSFORMS rules:
+//   block    → NUL(pii_field, privacy_policy, data_suppression) — returns null
+//   age_range→ SEG(dob → age_bucket, range_boundaries, k_anonymity)
+//   bracket  → SEG(numeric → bracket, range_rules, statistical_binning)
+//   area_hash→ ALT(address → geohash, hashing, location_anonymization)
 function anonymizeField(key, value) {
   const t = DEFAULT_TRANSFORMS[key];
   if (!t) return {key, value};
-  if (t.method === 'block') return null;
-  if (t.method === 'age_range' && value) {
+  if (t.method === 'block') return null; // NUL — suppress PII entirely
+  if (t.method === 'age_range' && value) { // SEG — partition into age buckets
     const age = Math.floor((Date.now()-new Date(value).getTime())/(365.25*24*60*60*1000));
     const bucket = t.buckets.find(b => {const [lo,hi]=b.split('-').map(Number);return age>=lo&&(!hi||age<=hi);});
     return {key:'age_range', value:bucket||'unknown'};
@@ -2875,6 +3184,8 @@ function anonymizeField(key, value) {
   return {key, value};
 }
 
+// SYN(observation + anon_demographics, cohort_hash, metric_emission)
+// Anonymizes identity, then synthesizes observation + demographics into a single metric event
 async function emitMetric(metricsRoom, clientId, observation, demographics, program) {
   const hash = await cohortHash(clientId);
   const anonDemo = {};
@@ -2888,6 +3199,7 @@ async function emitMetric(metricsRoom, clientId, observation, demographics, prog
 }
 
 /* ═══════════════════ RESOURCE PERMISSION UTILITIES ═══════════════════ */
+// DES(permission_check, grants+role, access_control) — read-only classification, no mutations
 
 /**
  * Check whether a user matches a permission grant.
@@ -2954,6 +3266,26 @@ function formatPermissionGrant(grant) {
 }
 
 /* ═══════════════════ RESOURCE TRACKING SERVICE (§Resource Build) ═══════════════════
+ * Operator Manifest:
+ *   DES(resource_type, category+unit+constraints, resource_catalog)     — createResourceType
+ *   INS(permissions, default_grants, access_control)                    — createResourceType
+ *   ALT(resource_type.{field}, updated_values, catalog_mutation)        — updateResourceType
+ *   ALT(permissions, grant_changes, access_control_mutation)            — updateResourcePermissions
+ *   CON(network_type → org_catalog, propagation_level, schema_cascade)  — propagateResourceType
+ *   CON(org → resource_type, relation_type, capacity_link)              — establishRelation
+ *   INS(inventory, initial_stock, supply_initialization)                — establishRelation
+ *   ALT(inventory.available, ±quantity, stock_adjustment)               — restock/adjust
+ *   INS(allocation, bridge_room, individual_grant)                      — allocateResource
+ *   INS(vault_shadow, client_vault, sovereign_record)                   — allocateResource
+ *   SYN(allocation + anon_demographics, cohort_hash, resource_metric)   — emitResourceMetric
+ *
+ * Triad Summary:
+ *   Existence:       DES (type creation), INS (inventory, allocations, vault shadows)
+ *   Structure:       CON (propagation, org↔type relations)
+ *   Interpretation:  ALT (stock changes, type updates), SYN (metrics)
+ *   ⚠️ No REC — resource frame is stable. Changing what "allocation" means
+ *   would be a governance action (GOV_PROPOSAL), not a runtime operation.
+ *
  * Core resource tracking infrastructure. Resources (beds, vouchers, funds, services) are
  * tracked across three levels — network, org, individual — using the existing room topology.
  *
@@ -3072,6 +3404,7 @@ const ResourceService = {
    * Create a resource type in the catalog (network or org room).
    * Emits DES operation. Returns event ID.
    */
+  // DES(resource_type, category+unit+constraints, resource_catalog) + INS(permissions, default_grants, access_control)
   async createResourceType(roomId, typeData, roomType) {
     const level = roomType === 'network' ? 'network' : roomType === 'individual' ? 'individual' : 'org';
     if (level === 'network' && !typeData.source?.propagation) {
@@ -3146,6 +3479,7 @@ const ResourceService = {
    * If propagation level changes, requires adopted_via reference (governance action).
    * Caller must have controller permission.
    */
+  // ALT(resource_type.{field}, updated_values, catalog_mutation)
   async updateResourceType(roomId, typeId, changes, roomType, callerRole) {
     const existing = await svc.getState(roomId, EVT.RESOURCE_TYPE, typeId);
     if (!existing) throw new Error(`Resource type ${typeId} not found`);
@@ -3183,6 +3517,7 @@ const ResourceService = {
    * Update permissions on a resource type. Caller must be a current controller.
    * Writes to both the resource type state and a dedicated RESOURCE_PERM state event.
    */
+  // ALT(permissions, grant_changes, access_control_mutation)
   async updateResourcePermissions(roomId, typeId, newPermissions, callerRole) {
     const existing = await svc.getState(roomId, EVT.RESOURCE_TYPE, typeId);
     if (!existing) throw new Error(`Resource type ${typeId} not found`);
@@ -3231,6 +3566,7 @@ const ResourceService = {
    * Respects propagation levels: required (immutable), standard (extendable),
    * recommended (visible), optional (catalog only).
    */
+  // CON(network_type → org_catalog, propagation_level, schema_cascade)
   async propagateResourceType(networkRoomId, orgRoomId, typeId) {
     const networkType = await svc.getState(networkRoomId, EVT.RESOURCE_TYPE, typeId);
     if (!networkType) throw new Error(`Resource type ${typeId} not found in network room`);
@@ -3271,6 +3607,7 @@ const ResourceService = {
    * Establish a relation between an org and a resource type.
    * Defaults opacity to SOVEREIGN (0). Emits CON operation.
    */
+  // CON(org → resource_type, relation_type, capacity_link) + INS(inventory, initial_stock, supply_initialization)
   async establishRelation(orgRoomId, relationData) {
     if (!RESOURCE_RELATION_TYPES.includes(relationData.relation_type)) {
       throw new Error(`Invalid relation type: ${relationData.relation_type}. Must be one of: ${RESOURCE_RELATION_TYPES.join(', ')}`);
@@ -3366,6 +3703,7 @@ const ResourceService = {
    * Restock inventory for a resource relation.
    * Adds quantity to total_capacity and available. Emits INS operation.
    */
+  // ALT(inventory.available, +quantity, supply_replenishment)
   async restockInventory(orgRoomId, relationId, quantity, metadata) {
     const existing = await svc.getState(orgRoomId, EVT.RESOURCE_INVENTORY, relationId);
     const now = Date.now();
@@ -3409,6 +3747,7 @@ const ResourceService = {
    * Adjust inventory for write-offs, corrections, or manual adjustments.
    * Emits ALT operation with reason.
    */
+  // ALT(inventory, ±adjustment+reason, correction)
   async adjustInventory(orgRoomId, relationId, adjustment, reason) {
     const inventory = await svc.getState(orgRoomId, EVT.RESOURCE_INVENTORY, relationId);
     if (!inventory) throw new Error(`No inventory found for relation ${relationId}`);
@@ -3442,6 +3781,8 @@ const ResourceService = {
    *
    * Returns { allocation, bridgeEventId, vaultEventId, inventoryEventId }
    */
+  // INS(allocation, bridge_room, individual_grant) + ALT(inventory, -quantity, stock_decrement) + INS(vault_shadow, client_vault, sovereign_record)
+  // ⚠️ Three-part write: bridge allocation + inventory decrement + vault shadow. Partial failure = inconsistency.
   async allocateResource(bridgeRoomId, allocationData, orgRoomId, vaultRoomId) {
     // STEP 1: Validate constraints
     const resourceType = await svc.getState(orgRoomId, EVT.RESOURCE_TYPE, allocationData.resource_type_id);
@@ -3997,6 +4338,7 @@ const ResourceService = {
    * Follows the existing metrics anonymization pipeline.
    * Strips PII, buckets amounts, hashes cohort.
    */
+  // SYN(allocation + anon_demographics, cohort_hash, resource_metric) + NUL(raw_identity, pipeline, pii_strip)
   async emitResourceMetric(metricsRoomId, allocation, resourceType, clientId) {
     const hash = await cohortHash(clientId);
 
@@ -4080,6 +4422,7 @@ const ResourceService = {
    * Load default resource types into a network room.
    * All seed types are created as draft maturity, optional propagation.
    */
+  // INS(seed_resource_types[], DEFAULT_RESOURCE_TYPES, initial_catalog) — batch DES for each type
   async loadSeedResourceTypes(networkRoomId) {
     const loaded = [];
     for (const seed of DEFAULT_RESOURCE_TYPES) {
@@ -4104,6 +4447,20 @@ const ResourceService = {
 };
 
 /* ═══════════════════ CLIENT DATA IMPORT ENGINE ═══════════════════
+ * Operator Manifest (per-record pipeline):
+ *   INS(encryption_key, crypto.subtle, per_record_isolation)
+ *   ALT(fields → ciphertext, per_record_key, field_encryption)
+ *   SEG(demographics, transform_rules, anonymization)
+ *   INS(client_record_room, identity+record_state, room_creation)
+ *   SYN(record + anon_demographics, cohort_hash, metric_emission)
+ *   INS(import_manifest, batch_metadata, audit_trail)
+ *
+ * Triad Summary:
+ *   Existence:       INS (keys, rooms, manifest)
+ *   Structure:       SEG (anonymization bucketing)
+ *   Interpretation:  ALT (encryption)
+ *   No REC, no SUP — batch pipeline, same pattern per record. Frame is stable.
+ *
  * Parses CSV/JSON files, maps columns to vault fields, encrypts each
  * record with its own AES-256-GCM key, creates a client_record room
  * per row, and emits only anonymized demographic metrics.
@@ -4193,6 +4550,7 @@ function autoMapColumns(sourceHeaders) {
 }
 
 // ── Per-record encryption + room creation ──
+// Pipeline per row: INS(key) → ALT(encrypt) → SEG(anonymize) → INS(room) → SYN(metric)
 // Creates one client_record room per row. Each record gets a unique
 // AES-256-GCM key. Only anonymized demographics are emitted as metrics.
 async function importClientRecords(records, mapping, metricsRoom, onProgress) {
@@ -7181,6 +7539,13 @@ const classifyRoom = async (roomId, scannedState) => {
   return {type:'unknown',label:'Unknown',color:'orange'};
 };
 
+// Meta-DES: the EO decoder ring — maps every domain event type to its canonical operator.
+// This function is the Rosetta Stone between Matrix events and the nine-operator vocabulary.
+// Each case below designates which EO operator a given event type represents.
+//
+// ⚠️ REC mappings: SCHEMA_PROP, SCHEMA_TRANSFORM, GOV_RHYTHM, MATCH_RESOLVE, m.room.encryption
+//    — these are frame-changing operations. Presence of REC = elevated review attention.
+// SUP mapping: MATCH_HIT — multiple identities may refer to same person (superposition).
 const classifyEvent = (ev, roomInfo) => {
   const type = ev.getType(); const content = ev.getContent();
   // Native EO operations
@@ -7213,6 +7578,10 @@ const classifyEvent = (ev, roomInfo) => {
       case EVT.SCHEMA_TRANSFORM: return {op:'REC',epistemic:'MEANT',label:'Transform Rule',desc:`${Object.keys(content.transforms||{}).length} transforms`};
       case EVT.TEAM_META: return {op:'DES',epistemic:'MEANT',label:'Team Metadata',desc:content.name||'team'};
       case EVT.TEAM_MEMBERS: return {op:'CON',epistemic:'MEANT',label:'Team Members',desc:`${(content.members||[]).length} member${(content.members||[]).length!==1?'s':''}`};
+      case EVT.TEAM_SCHEMA: return {op:'DES',epistemic:'MEANT',label:'Team Schema',desc:`v${content.version||1} — ${(content.fields||[]).length} fields`};
+      case EVT.TEAM_SCHEMA_RULE: return {op:'REC',epistemic:'MEANT',label:'Consent Rule',desc:TEAM_CONSENT_MODES[content.mode]?.label||content.mode};
+      case EVT.FIELD_DEF: return {op:'DES',epistemic:'MEANT',label:'Field Definitions',desc:`${Object.keys(content.definitions||{}).length} definitions`};
+      case EVT.FIELD_CROSSWALK: return {op:'SYN',epistemic:'MEANT',label:'Field Crosswalks',desc:`${(content.crosswalks||[]).length} crosswalks`};
       case EVT.NET_MEMBERS: return {op:'CON',epistemic:'MEANT',label:'Network Members',desc:`${(content.organizations||[]).length} orgs`};
       case EVT.GOV_PROPOSAL: return {op:'INS',epistemic:'MEANT',label:'Governance Proposal',desc:content.summary?.slice(0,50)};
       case EVT.GOV_RHYTHM: return {op:'REC',epistemic:'MEANT',label:'Governance Rhythm',desc:content.name};
@@ -7256,6 +7625,18 @@ const classifyEvent = (ev, roomInfo) => {
 };
 
 /* ═══════════════════ ACTIVITY STREAM (Choreo-aligned) ═══════════════════
+ * Operator Manifest:
+ *   All nine operators appear here as classification outputs.
+ *   This component is the primary EO *display* layer — read-only rendering
+ *   of the operator vocabulary produced by classifyEvent() above.
+ *
+ * Triad Summary:
+ *   All three triads rendered:
+ *     Identity  (NUL, DES, INS)  — existence operations
+ *     Structure (SEG, CON, SYN)  — relational operations
+ *     Time      (ALT, SUP, REC)  — interpretive operations
+ *   No mutations — display only. The stream shows EO history, doesn't create it.
+ *
  * Displays events in Choreo's EO operation grammar format.
  * Each event is mapped to: { op, target, context, frame }
  * aligned with the nine-operator Emergent Ontology model.
@@ -9083,6 +9464,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     return cats;
   }, [customFieldDefs, frameworkFields]);
 
+  // INS(custom_field_def, user_defined, schema_extension) — client creates custom vault field
   const handleAddCustomField = async () => {
     const label = newFieldLabel.trim();
     if (!label) return;
@@ -9096,6 +9478,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     showToast(`Custom field "${label}" created`, 'success');
   };
 
+  // NUL(custom_field, client_deleted, schema_retraction) — removes field definition and data
   const handleDeleteCustomField = async (fieldKey) => {
     const updated = customFieldDefs.filter(f => f.key !== fieldKey);
     const updatedData = {...vaultData};
@@ -9108,6 +9491,12 @@ const ClientApp = ({session, onLogout, showToast}) => {
   const vaultFrame = (room) => ({type:'vault',room:room||vaultRoom,role:'client',epistemic:'GIVEN'});
   const bridgeFrame = (room) => ({type:'bridge',room,role:'client',epistemic:'MEANT'});
 
+  // INS(vault_room, identity+snapshot+schema, sovereign_creation) — creates the client's entire data sovereignty container
+  // Operator Manifest for initVault:
+  //   INS(vault_room, identity+snapshot, sovereign_creation) — if no vault exists
+  //   DES(schema_catalog, forms+definitions, canonical_vocabulary) — seeds personal schema
+  //   CON(auto_join, invited_rooms, client_record_claim) — joins pending invites
+  //   No REC — vault frame is client-sovereign and stable.
   const initVault = async () => {
     setLoading(true);
     setInitError(null);
@@ -9124,7 +9513,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
       } catch (e) { console.warn('Invited room scan failed:', e.message); }
 
       // Phase 2: Scan joined rooms (now includes any rooms we just auto-joined)
-      const scanned = await svc.scanRooms([EVT.PROVIDER_PROFILE, EVT.TEAM_META, EVT.TEAM_MEMBERS, EVT.TEAM_SERVICE_INFO, EVT.TEAM_SUBSCRIBERS, EVT.TEAM_CHANNELS, EVT.REFERRAL_META, EVT.REFERRAL_REFS, EVT.REFERRAL_OUTCOME]);
+      const scanned = await svc.scanRooms([EVT.PROVIDER_PROFILE, EVT.TEAM_META, EVT.TEAM_MEMBERS, EVT.FIELD_DEF, EVT.TEAM_SERVICE_INFO, EVT.TEAM_SUBSCRIBERS, EVT.TEAM_CHANNELS, EVT.REFERRAL_META, EVT.REFERRAL_REFS, EVT.REFERRAL_OUTCOME]);
       let vault = null, schema = null;
       const detectedPending = [], detectedClaimed = [];
       const bridgeProfiles = {}; // bridgeRoomId → provider profile
@@ -9293,6 +9682,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     setMyResources(resources);
   };
 
+  // ALT(vault_snapshot, updated_fields, atomic_persistence) — single state write for all vault data
   const saveSnapshot = async (fields, obs, mc, cfd, ef) => {
     const snapshot = {fields:fields??vaultData, observations:obs??observations, metrics_consent:mc??metricsConsent, custom_field_defs:cfd??customFieldDefs, enabled_frameworks:ef??enabledFrameworks,
       last_modified_by: svc.userId, last_modified_at: Date.now(), origin_server: extractHomeserver(svc.userId)};
@@ -9305,15 +9695,21 @@ const ClientApp = ({session, onLogout, showToast}) => {
     setProviders(provs);
   };
 
-  // Edit identity fields — emits INS or ALT per field
+  // Edit identity fields — emits INS, ALT, or NUL per field depending on change type
+  // INS(field.value, client_input, vault_population) — new field
+  // ALT(field.value, old→new, vault_update) — changed field
+  // NUL(field.value, client_cleared, vault_clearance) — cleared field
   const handleEditSave = async () => {
     const updated = {...vaultData, ...editData};
     for (const [key, val] of Object.entries(editData)) {
       if (val && !vaultData[key]) {
+        // INS — field first populated
         await emitOp(vaultRoom, 'INS', {field:key,value:val}, {source:'client_input'}, vaultFrame());
       } else if (val && vaultData[key] && val !== vaultData[key]) {
+        // ALT — value change within stable frame
         await emitOp(vaultRoom, 'ALT', {field:key,entity:'client_profile'}, {from:vaultData[key],to:val,source:'client_input'}, vaultFrame());
       } else if (!val && vaultData[key]) {
+        // NUL — existence removal
         await emitOp(vaultRoom, 'NUL', {field:key,entity:'client_profile'}, {reason:'client_cleared',previous_value:vaultData[key]}, vaultFrame());
       }
     }
@@ -9327,7 +9723,8 @@ const ClientApp = ({session, onLogout, showToast}) => {
     }
   };
 
-  // Record structured observation (Addendum A)
+  // INS(observation, client_report, GIVEN_attestation) — this is the GIVEN entry point
+  // If metrics consent enabled: → SYN(observation + anon_demographics, cohort_hash, metric_emission)
   const handleRecordObservation = async () => {
     if (!obsValue || !obsModal) return;
     const obs = { id:genOpId(), category:obsModal.key, value:obsValue, date:obsDate, prompt_id:obsModal.id,
@@ -9349,6 +9746,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     }
   };
 
+  // CON(client → provider, bridge_room, relationship_establishment) + INS(bridge_room, e2ee+meta+refs, secure_channel)
   const handleAddProvider = async () => {
     if (!newProviderId.trim()) return;
     try {
@@ -9366,6 +9764,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Failed: '+e.message,'error'); }
   };
 
+  // ALT(bridge_refs, re_encrypted_fields, selective_sync) — encrypts shared fields with fresh keys
   const syncFieldsToBridge = async (bridgeRoomId, sharedFields, data) => {
     const refs = {};
     for (const [fk, shared] of Object.entries(sharedFields)) {
@@ -9378,6 +9777,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     await svc.setState(bridgeRoomId, EVT.BRIDGE_REFS, {fields:refs, updated:Date.now()});
   };
 
+  // SEG(field_visibility, shared|revoked, access_partitioning) — key rotation on each toggle
   const handleToggleField = async (pi, fk) => {
     const prov = providers[pi];
     const newShared = {...prov.sharedFields, [fk]:!prov.sharedFields[fk]};
@@ -9390,6 +9790,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     showToast(newShared[fk]?`Shared ${label} — new key issued`:`Revoked ${label} — key destroyed`, newShared[fk]?'success':'warn');
   };
 
+  // ALT(bridge.transferable, boolean_flip, transferability_policy)
   // Toggle whether this client allows their case to be transferred between providers within the org
   const handleToggleTransferable = async (pi) => {
     const prov = providers[pi];
@@ -9407,6 +9808,11 @@ const ClientApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Failed to update transfer setting: '+e.message, 'error'); }
   };
 
+  // ⚠️ HIGHEST-RISK VAULT OPERATION: NUL(old_bridge) → INS(new_bridge) → CON(re_establish)
+  // NUL(old_bridge, hard_revoke, relationship_destruction) — tombstone old room
+  // INS(new_bridge, fresh_keys, clean_room) — create replacement
+  // CON(client → provider, new_bridge, relationship_re_establishment) — re-link
+  // All old keys destroyed. All shared data re-encrypted with new keys.
   const handleHardRevoke = async (pi) => {
     const prov = providers[pi];
     try {
@@ -9429,6 +9835,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Hard revoke failed: '+e.message,'error'); }
   };
 
+  // NUL(relationship, full_severance, permanent_disconnection) — kicks provider, clears all refs
   const handleRemoveProvider = async (pi) => {
     const prov = providers[pi];
     try {
@@ -9444,6 +9851,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
   // ─── Room claiming: client takes ownership of a provider-created client_record room ───
   const claimFrame = (room) => ({type:'client_record',room,role:'client',epistemic:'GIVEN'});
 
+  // ALT(room_ownership, client_claim, sovereignty_transfer) — client takes PL 100, previous owner drops to PL 50
   const handleClaimRoom = async (record) => {
     try {
       // 0. Ensure we've joined the room (required before writing state)
@@ -9479,6 +9887,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     } catch (e) { showToast('Claim failed: ' + e.message, 'error'); }
   };
 
+  // NUL(room_member, owner_revocation, access_removal) — kicks user from claimed room
   const handleRevokeFromClaimed = async (record, targetUserId) => {
     try {
       await svc.kick(record.roomId, targetUserId, 'Removed by room owner');
@@ -9490,6 +9899,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     } catch (e) { showToast('Remove failed: ' + e.message, 'error'); }
   };
 
+  // NUL(client_record, owner_closed, permanent_decommission) — tombstones room permanently
   const handleDeleteClaimedRoom = async (record) => {
     try {
       // Tombstone the room — marks it as permanently closed
@@ -9505,6 +9915,9 @@ const ClientApp = ({session, onLogout, showToast}) => {
     } catch (e) { showToast('Close failed: ' + e.message, 'error'); }
   };
 
+  // ⚠️ REC(metrics_consent, enabled|disabled, data_flow_reinterpretation)
+  // INTERPRETATION SHIFT: changes what downstream systems receive. When enabled,
+  // anonymized demographics flow to metrics rooms. When disabled, flow stops entirely.
   const handleMetricsToggle = async () => {
     const newConsent = {...metricsConsent, enabled:!metricsConsent.enabled,
       categories:!metricsConsent.enabled? DEFAULT_PROMPTS.filter(p=>p.metrics).map(p=>p.category) : []};
@@ -9514,6 +9927,8 @@ const ClientApp = ({session, onLogout, showToast}) => {
     showToast(newConsent.enabled?'Metrics consent enabled — anonymized data will flow':'Metrics consent revoked',newConsent.enabled?'success':'warn');
   };
 
+  // ⚠️ REC(sharing_consent, shared|withheld, visibility_reinterpretation)
+  // INTERPRETATION SHIFT: reinterprets what team members can see about individuals.
   // Handle sharing consent response — client-side team member proactively chooses whether to withhold content
   const handleClientSharingConsent = async (team, withhold) => {
     try {
@@ -11273,7 +11688,8 @@ const DatabaseView = ({cases, caseAssignments, openCase, T, svc, caseAllocations
   ORG_TYPE_LABELS, ORG_ROLE_LABELS, notes, onNewNote, onNoteClick, onOpenIndividual, onOpenResource,
   resourceTypes, resourceRelations, resourceInventory, rosterRoom, networkRoom, onCreateResource, onRefresh,
   onRestock, onEstablishRelation, canViewResource, canControlResource, canAllocateResource,
-  clientRecords, onCreateClient, onCellEdit, onBulkAction, onReorder, onAddRow}) => {
+  clientRecords, onCreateClient, onCellEdit, onBulkAction, onReorder, onAddRow,
+  fieldDefs, fieldCrosswalks, teams, onSaveFieldDef, onSaveCrosswalk}) => {
 
   const [dbTab, setDbTab] = useState('individuals');
 
@@ -11407,7 +11823,8 @@ const DatabaseView = ({cases, caseAssignments, openCase, T, svc, caseAllocations
     <div className="db-tabs">
       {[{id:'individuals',label:'Individuals',count:allIndividuals.length,icon:'users'},
         {id:'notes',label:'Notes',count:(notes||[]).length,icon:'msg'},
-        {id:'resources',label:'Resources',count:(resourceTypes||[]).length,icon:'layers'}
+        {id:'resources',label:'Resources',count:(resourceTypes||[]).length,icon:'layers'},
+        {id:'definitions',label:'Definitions',count:Object.keys(fieldDefs||{}).length,icon:'grid'}
       ].map(tab => <button key={tab.id}
         className={'db-tab'+(dbTab===tab.id?' active':'')}
         onClick={()=>setDbTab(tab.id)}>
@@ -11482,6 +11899,808 @@ const DatabaseView = ({cases, caseAssignments, openCase, T, svc, caseAllocations
       canAllocateResource={canAllocateResource}
       individuals={cases}
     />}
+
+    {/* Definitions Tab — Field Dictionary */}
+    {dbTab==='definitions' && <FieldDictionaryView
+      fieldDefs={fieldDefs||{}}
+      fieldCrosswalks={fieldCrosswalks||[]}
+      teams={teams||[]}
+      onSaveFieldDef={onSaveFieldDef}
+      onSaveCrosswalk={onSaveCrosswalk}
+    />}
+  </div>;
+};
+
+/* ─── FieldDictionaryView — global data dictionary for all field definitions ─── */
+const FieldDictionaryView = ({fieldDefs, fieldCrosswalks, teams, onSaveFieldDef, onSaveCrosswalk}) => {
+  const [expandedUri, setExpandedUri] = useState(null);
+  const [crosswalkPopover, setCrosswalkPopover] = useState(null);
+  const [addCrosswalkFor, setAddCrosswalkFor] = useState(null);
+  const [potentialCrosswalks, setPotentialCrosswalks] = useState([]);
+  const [scanningCrosswalks, setScanningCrosswalks] = useState(false);
+  const scanDone = React.useRef(false);
+
+  // Background scan for potential crosswalks (runs once when tab opens)
+  React.useEffect(() => {
+    if (scanDone.current || Object.keys(fieldDefs||{}).length < 2) return;
+    scanDone.current = true;
+    (async () => {
+      try {
+        setScanningCrosswalks(true);
+        const existingPairs = new Set((fieldCrosswalks||[]).map(xw=>`${xw.from_uri}|${xw.to_uri}`));
+        const defs = Object.values(fieldDefs||{});
+        const potentials = [];
+        for (let i = 0; i < defs.length && potentials.length < 5; i++) {
+          const di = defs[i];
+          const textI = `${di.label}. ${di.definition||''}`;
+          const embI = await getFieldEmbedding(textI);
+          if (!embI) { setScanningCrosswalks(false); return; }
+          for (let j = i + 1; j < defs.length; j++) {
+            const dj = defs[j];
+            if (existingPairs.has(`${di.uri}|${dj.uri}`) || existingPairs.has(`${dj.uri}|${di.uri}`)) continue;
+            const textJ = `${dj.label}. ${dj.definition||''}`;
+            const embJ = await getFieldEmbedding(textJ);
+            if (!embJ) continue;
+            const sim = cosineSim(embI, embJ);
+            if (sim > 0.85) potentials.push({from:di, to:dj, similarity:sim});
+          }
+        }
+        setPotentialCrosswalks(potentials);
+        setScanningCrosswalks(false);
+      } catch { setScanningCrosswalks(false); }
+    })();
+  }, [fieldDefs, fieldCrosswalks]);
+  const [xwTargetUri, setXwTargetUri] = useState('');
+  const [xwRelationship, setXwRelationship] = useState('equivalent');
+  const [xwNotes, setXwNotes] = useState('');
+
+  const getCrosswalksForUri = (uri) =>
+    (fieldCrosswalks||[]).filter(xw => xw.from_uri === uri || (xw.bidirectional && xw.to_uri === uri));
+
+  const getTeamsUsing = (uri) =>
+    (teams||[]).filter(t => t.schema?.fields?.some(f => f.uri === uri));
+
+  const getSource = (uri) => {
+    if (uri?.startsWith('khora:vault/')) return {label:'Vault',color:'gold'};
+    if (uri?.startsWith('khora:team/')) return {label:'Team',color:'purple'};
+    if (uri?.startsWith('khora:org/')) return {label:'Org',color:'blue'};
+    return {label:'External',color:'teal'};
+  };
+
+  const defs = Object.values(fieldDefs||{});
+  const DEF_COLS = [
+    {key:'label', label:'Field', fixed:true},
+    {key:'key', label:'Key'},
+    {key:'category', label:'Category'},
+    {key:'definition', label:'Definition'},
+    {key:'data_type', label:'Type'},
+    {key:'source', label:'Source'},
+    {key:'authority_name', label:'Authority'},
+    {key:'crosswalks', label:'Also Known As'},
+    {key:'version', label:'v'},
+    {key:'sensitive', label:''},
+  ];
+
+  const defRows = defs.map(d => ({
+    ...d,
+    source: getSource(d.uri)?.label || 'Unknown',
+    authority_name: d.authority?.name || '',
+    crosswalks: getCrosswalksForUri(d.uri).length,
+  }));
+
+  const getDefVal = (row, key) => {
+    if (key === 'sensitive') return row.sensitive ? 'Yes' : 'No';
+    return row[key] || '';
+  };
+
+  const renderDefCell = (row, col) => {
+    if (col.key === 'label') return <div>
+      <span style={{fontWeight:600}}>{row.label}</span>
+      <div style={{fontSize:9,fontFamily:'var(--mono)',color:'var(--tx-3)',marginTop:2}}>{row.uri}</div>
+    </div>;
+    if (col.key === 'key') return <span style={{fontFamily:'var(--mono)',fontSize:11}}>{row.key}</span>;
+    if (col.key === 'category') {
+      const cl = CAT_LABELS[row.category] || row.category;
+      const cc = CAT_COLORS[row.category] || 'blue';
+      return <span className={`tag tag-${cc}`} style={{fontSize:9}}>{cl}</span>;
+    }
+    if (col.key === 'definition') return <div style={{fontSize:11.5,lineHeight:1.5,color:'var(--tx-1)',maxWidth:300}}>
+      {(row.definition||'').length > 120 ? (row.definition||'').slice(0,120)+'...' : (row.definition||'')}
+    </div>;
+    if (col.key === 'data_type') return <span className="tag tag-blue" style={{fontSize:8}}>{(row.data_type||'text').toUpperCase()}</span>;
+    if (col.key === 'source') {
+      const src = getSource(row.uri);
+      return <span className={`tag tag-${src.color}`} style={{fontSize:8}}>{src.label}</span>;
+    }
+    if (col.key === 'authority_name') return row.authority
+      ? <span style={{fontSize:10.5,color:'var(--teal)'}} title={row.authority.uri}>
+          {row.authority.org ? <strong>{row.authority.org}</strong> : ''} {row.authority.provision||''}
+        </span>
+      : <span style={{color:'var(--tx-3)',fontSize:10}}>—</span>;
+    if (col.key === 'crosswalks') {
+      const xws = getCrosswalksForUri(row.uri);
+      if (xws.length === 0) return <span style={{color:'var(--tx-3)',fontSize:10}}>—</span>;
+      return <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
+        {xws.slice(0,3).map(xw => {
+          const rel = CROSSWALK_TYPES[xw.relationship] || CROSSWALK_TYPES.related;
+          const targetUri = xw.from_uri === row.uri ? xw.to_uri : xw.from_uri;
+          const targetDef = fieldDefs[targetUri];
+          return <span key={xw.id} className={`tag tag-${rel.color}`} style={{fontSize:8,cursor:'pointer'}}
+            onClick={e=>{e.stopPropagation();setCrosswalkPopover({uri:row.uri,xws});}}>
+            {rel.symbol} {targetDef?.label || targetUri.split('/').pop()}
+          </span>;
+        })}
+        {xws.length > 3 && <span style={{fontSize:9,color:'var(--tx-3)'}}>+{xws.length-3}</span>}
+      </div>;
+    }
+    if (col.key === 'version') return <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-2)'}}>v{row.version||1}</span>;
+    if (col.key === 'sensitive') return row.sensitive ? <I n="lock" s={11} c="var(--red)"/> : null;
+    return row[col.key] || '';
+  };
+
+  return <div>
+    {/* Potential crosswalks banner (from background embedding scan) */}
+    {potentialCrosswalks.length > 0 && <div style={{padding:'10px 14px',background:'var(--teal-dim)',border:'1px solid rgba(61,214,140,.15)',borderRadius:'var(--r)',marginBottom:12,display:'flex',alignItems:'center',gap:10}}>
+      <I n="grid" s={14} c="var(--teal)"/>
+      <div style={{flex:1}}>
+        <span style={{fontSize:12,fontWeight:600,color:'var(--teal)'}}>{potentialCrosswalks.length} potential crosswalk{potentialCrosswalks.length!==1?'s':''} detected</span>
+        <span style={{fontSize:11,color:'var(--tx-2)',marginLeft:8}}>Fields that may refer to the same concept.</span>
+      </div>
+      <button className="b-gho b-xs" style={{color:'var(--teal)'}} onClick={()=>{
+        // Expand the first potential match
+        if (potentialCrosswalks[0]) setExpandedUri(potentialCrosswalks[0].from.uri);
+      }}>Review</button>
+    </div>}
+    <DataTable
+      data={defRows}
+      columns={DEF_COLS}
+      defaultVisibleCols={['label','category','definition','source','authority_name','crosswalks','sensitive']}
+      groupOptions={[{key:'category',label:'Category'},{key:'source',label:'Source'}]}
+      getVal={getDefVal}
+      renderCell={renderDefCell}
+      label="field definitions"
+      onRowClick={(row) => setExpandedUri(expandedUri === row.uri ? null : row.uri)}
+      selectedId={expandedUri}
+    />
+
+    {/* Expanded definition detail */}
+    {expandedUri && fieldDefs[expandedUri] && (() => {
+      const d = fieldDefs[expandedUri];
+      const src = getSource(d.uri);
+      const xws = getCrosswalksForUri(d.uri);
+      const usedBy = getTeamsUsing(d.uri);
+      return <div className="card" style={{marginTop:10,padding:'16px 20px',borderLeft:`3px solid var(--${src.color})`}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:700}}>{d.label}</div>
+            <div style={{fontSize:10,fontFamily:'var(--mono)',color:'var(--tx-3)',marginTop:2}}>{d.uri}</div>
+          </div>
+          <div style={{display:'flex',gap:4}}>
+            <span className={`tag tag-${src.color}`} style={{fontSize:9}}>{src.label}</span>
+            <span className="tag tag-blue" style={{fontSize:9}}>{(d.data_type||'text').toUpperCase()}</span>
+            {d.sensitive && <span className="tag tag-red" style={{fontSize:9}}><I n="lock" s={8}/>Sensitive</span>}
+          </div>
+        </div>
+
+        <div style={{marginTop:12}}>
+          <span className="section-label">DEFINITION</span>
+          <p style={{fontSize:12.5,lineHeight:1.6,color:'var(--tx-1)',marginTop:4}}>{d.definition || 'No definition provided.'}</p>
+        </div>
+
+        {d.scope && <div style={{marginTop:10}}>
+          <span className="section-label">SCOPE</span>
+          <p style={{fontSize:12,lineHeight:1.5,color:'var(--tx-2)',marginTop:4}}>{d.scope}</p>
+        </div>}
+
+        {d.authority && <div style={{marginTop:10}}>
+          <span className="section-label">AUTHORITY</span>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
+            <span className="tag tag-teal" style={{fontSize:9}}>{d.authority.org || 'External'}</span>
+            <span style={{fontSize:11.5,color:'var(--tx-1)'}}>{d.authority.name}</span>
+            {d.authority.provision && <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-2)'}}>{d.authority.provision}</span>}
+          </div>
+        </div>}
+
+        {/* Also known as — crosswalks */}
+        <div style={{marginTop:12}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+            <span className="section-label">ALSO KNOWN AS</span>
+            <button className="b-gho b-xs" onClick={()=>setAddCrosswalkFor(addCrosswalkFor===d.uri?null:d.uri)}
+              style={{display:'flex',alignItems:'center',gap:3}}><I n="plus" s={10}/>Link</button>
+          </div>
+          {xws.length === 0 && addCrosswalkFor !== d.uri
+            ? <p style={{fontSize:11,color:'var(--tx-3)',marginTop:4}}>No crosswalks. Link this field to equivalent definitions in other contexts.</p>
+            : <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:4}}>
+              {xws.map(xw => {
+                const rel = CROSSWALK_TYPES[xw.relationship] || CROSSWALK_TYPES.related;
+                const targetUri = xw.from_uri === d.uri ? xw.to_uri : xw.from_uri;
+                const targetDef = fieldDefs[targetUri];
+                return <div key={xw.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 10px',background:'var(--bg-2)',borderRadius:'var(--r)',border:'1px solid var(--border-0)'}}>
+                  <span style={{fontWeight:700,color:`var(--${rel.color})`,fontSize:14}} title={rel.desc}>{rel.symbol}</span>
+                  <div style={{flex:1}}>
+                    <span style={{fontSize:12,fontWeight:600}}>{targetDef?.label || targetUri}</span>
+                    {targetDef?.definition && <div style={{fontSize:10.5,color:'var(--tx-2)',marginTop:1}}>{targetDef.definition.slice(0,80)}{targetDef.definition.length>80?'...':''}</div>}
+                  </div>
+                  <span className={`tag tag-${rel.color}`} style={{fontSize:8}}>{rel.label}</span>
+                  {xw.notes && <span style={{fontSize:10,color:'var(--tx-3)'}} title={xw.notes}><I n="msg" s={10}/></span>}
+                </div>;
+              })}
+            </div>}
+          {/* Add crosswalk inline form */}
+          {addCrosswalkFor === d.uri && <div style={{marginTop:8,padding:'10px 12px',background:'var(--bg-2)',border:'1px solid var(--border-1)',borderRadius:'var(--r)'}}>
+            <div style={{fontSize:11,fontWeight:600,marginBottom:6}}>Link to another definition</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'flex-end'}}>
+              <div style={{flex:1,minWidth:180}}>
+                <label style={{fontSize:10,color:'var(--tx-2)',display:'block',marginBottom:3}}>Target field or URI</label>
+                <select value={xwTargetUri} onChange={e=>setXwTargetUri(e.target.value)} className="ipt" style={{fontSize:11,padding:'5px 8px'}}>
+                  <option value="">Select a field...</option>
+                  {Object.values(fieldDefs).filter(fd=>fd.uri!==d.uri).map(fd=>
+                    <option key={fd.uri} value={fd.uri}>{fd.label} ({fd.uri})</option>)}
+                </select>
+              </div>
+              <div style={{minWidth:120}}>
+                <label style={{fontSize:10,color:'var(--tx-2)',display:'block',marginBottom:3}}>Relationship</label>
+                <select value={xwRelationship} onChange={e=>setXwRelationship(e.target.value)} className="ipt" style={{fontSize:11,padding:'5px 8px'}}>
+                  {Object.values(CROSSWALK_TYPES).map(ct=>
+                    <option key={ct.id} value={ct.id}>{ct.symbol} {ct.label}</option>)}
+                </select>
+              </div>
+              <div style={{minWidth:120}}>
+                <label style={{fontSize:10,color:'var(--tx-2)',display:'block',marginBottom:3}}>Notes (optional)</label>
+                <input type="text" value={xwNotes} onChange={e=>setXwNotes(e.target.value)} className="ipt" placeholder="Why these are linked..." style={{fontSize:11,padding:'5px 8px'}}/>
+              </div>
+              <button className="b-pri b-xs" disabled={!xwTargetUri} onClick={()=>{
+                if (onSaveCrosswalk && xwTargetUri) {
+                  const xw = {
+                    id:'xw_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+                    from_uri:d.uri, to_uri:xwTargetUri,
+                    relationship:xwRelationship,
+                    bidirectional:xwRelationship==='equivalent'||xwRelationship==='related',
+                    notes:xwNotes||'',
+                    created_at:Date.now(),
+                  };
+                  onSaveCrosswalk(xw);
+                  setXwTargetUri(''); setXwNotes(''); setAddCrosswalkFor(null);
+                }
+              }}>Save</button>
+              <button className="b-gho b-xs" onClick={()=>{setAddCrosswalkFor(null);setXwTargetUri('');setXwNotes('');}}>Cancel</button>
+            </div>
+          </div>}
+        </div>
+
+        {/* Teams using this field */}
+        {usedBy.length > 0 && <div style={{marginTop:12}}>
+          <span className="section-label">USED BY TEAMS</span>
+          <div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:4}}>
+            {usedBy.map(t => <span key={t.roomId} className="tag tag-purple" style={{fontSize:9}}>{t.name||'Unnamed'}</span>)}
+          </div>
+        </div>}
+      </div>;
+    })()}
+  </div>;
+};
+
+/* ─── TeamDetailView — expanded team view with Overview / Schema / Activity tabs ─── */
+const TeamDetailView = ({team, teams, svc, fieldDefs, fieldCrosswalks, showToast, onBack, onInvite, onUpdateTeam, onSaveFieldDef, onSaveCrosswalk}) => {
+  const [teamTab, setTeamTab] = useState('overview');
+  const [addFieldModal, setAddFieldModal] = useState(false);
+  const [editFieldUri, setEditFieldUri] = useState(null);
+  // Add field form state
+  const [fieldDraft, setFieldDraft] = useState({key:'',label:'',definition:'',scope:'',category:'case',data_type:'text',sensitive:false,authority:null});
+  const [addExistingField, setAddExistingField] = useState(false);
+  const [selectedExistingUri, setSelectedExistingUri] = useState('');
+  // Embedding-based similarity suggestions
+  const [similarFields, setSimilarFields] = useState([]);
+  const [searchingSimilar, setSearchingSimilar] = useState(false);
+  const [dismissedSuggestions, setDismissedSuggestions] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('khora_dismissed_xw_suggestions')||'[]'); } catch { return []; }
+  });
+  const similarTimerRef = React.useRef(null);
+
+  const isLead = team.owner === svc?.userId;
+  const schema = team.schema || {version:1,fields:[],pending_changes:[],change_log:[]};
+  const schemaRule = team.schemaRule || {mode:'lead_decides'};
+  const consentMode = TEAM_CONSENT_MODES[schemaRule.mode] || TEAM_CONSENT_MODES.lead_decides;
+
+  // Resolve field URIs to full definitions
+  const resolvedFields = (schema.fields||[]).map(sf => {
+    const def = fieldDefs[sf.uri] || DOMAIN_CONFIG.vaultFields.find(v=>v.uri===sf.uri);
+    return {...sf, def: def || {uri:sf.uri, key:sf.uri.split('/').pop(), label:sf.uri.split('/').pop(), definition:''}};
+  });
+
+  // Get crosswalks for a field
+  const getCrosswalksForUri = (uri) =>
+    (fieldCrosswalks||[]).filter(xw => xw.from_uri === uri || (xw.bidirectional && xw.to_uri === uri));
+
+  const getSource = (uri) => {
+    if (uri?.startsWith('khora:vault/')) return {label:'Vault',color:'gold'};
+    if (uri?.startsWith('khora:team/')) return {label:'Team',color:'purple'};
+    if (uri?.startsWith('khora:org/')) return {label:'Org',color:'blue'};
+    return {label:'External',color:'teal'};
+  };
+
+  // Consent threshold helpers
+  const getMemberCount = () => (team.members||[]).length;
+  const getThreshold = () => {
+    if (schemaRule.mode === 'lead_decides') return 0;
+    if (schemaRule.mode === 'majority') return Math.floor(getMemberCount() / 2) + 1;
+    return getMemberCount(); // unanimous
+  };
+
+  const canModifySchema = () => {
+    if (schemaRule.mode === 'lead_decides') return isLead;
+    return true; // anyone can propose in majority/unanimous
+  };
+
+  // Apply a schema change
+  const applySchemaChange = async (change) => {
+    const currentSchema = {...schema};
+    if (schemaRule.mode === 'lead_decides' && isLead) {
+      // Apply immediately
+      if (change.action === 'add_field') {
+        currentSchema.fields = [...(currentSchema.fields||[]), {uri:change.uri, required:change.required||false, added_version:currentSchema.version+1}];
+      } else if (change.action === 'remove_field') {
+        currentSchema.fields = (currentSchema.fields||[]).filter(f=>f.uri!==change.uri);
+      }
+      currentSchema.version = (currentSchema.version||1) + 1;
+      currentSchema.last_modified = Date.now();
+      currentSchema.modified_by = svc.userId;
+      currentSchema.change_log = [...(currentSchema.change_log||[]), {version:currentSchema.version, summary:change.summary||change.action, by:svc.userId, ts:Date.now()}];
+      try {
+        await svc.setState(team.roomId, EVT.TEAM_SCHEMA, currentSchema);
+        onUpdateTeam({...team, schema:currentSchema});
+        showToast(`Schema updated to v${currentSchema.version}`,'success');
+      } catch(e) { showToast('Schema update failed: '+e.message,'error'); }
+    } else {
+      // Add as pending change
+      const pending = {
+        id: 'chg_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+        ...change,
+        proposed_by: svc.userId,
+        proposed_at: Date.now(),
+        approvals: schemaRule.mode === 'lead_decides' ? {} : {[svc.userId]: Date.now()},
+        blocks: {},
+      };
+      currentSchema.pending_changes = [...(currentSchema.pending_changes||[]), pending];
+      try {
+        await svc.setState(team.roomId, EVT.TEAM_SCHEMA, currentSchema);
+        onUpdateTeam({...team, schema:currentSchema});
+        showToast('Schema change proposed — awaiting approval','info');
+      } catch(e) { showToast('Failed: '+e.message,'error'); }
+    }
+  };
+
+  // Approve or block a pending change
+  const respondToChange = async (changeId, position) => {
+    const currentSchema = {...schema};
+    const pc = (currentSchema.pending_changes||[]).find(c=>c.id===changeId);
+    if (!pc) return;
+
+    if (position === 'approve') {
+      pc.approvals = {...(pc.approvals||{}), [svc.userId]:Date.now()};
+    } else {
+      pc.blocks = {...(pc.blocks||{}), [svc.userId]:Date.now()};
+    }
+
+    // Check if threshold met
+    const approvalCount = Object.keys(pc.approvals||{}).length;
+    const blockCount = Object.keys(pc.blocks||{}).length;
+    const threshold = getThreshold();
+
+    if (schemaRule.mode === 'unanimous' && blockCount > 0) {
+      // Blocked — remove pending change
+      currentSchema.pending_changes = (currentSchema.pending_changes||[]).filter(c=>c.id!==changeId);
+      showToast('Schema change blocked','warning');
+    } else if (approvalCount >= threshold) {
+      // Auto-apply
+      if (pc.action === 'add_field') {
+        currentSchema.fields = [...(currentSchema.fields||[]), {uri:pc.uri, required:pc.required||false, added_version:currentSchema.version+1}];
+      } else if (pc.action === 'remove_field') {
+        currentSchema.fields = (currentSchema.fields||[]).filter(f=>f.uri!==pc.uri);
+      }
+      currentSchema.version = (currentSchema.version||1) + 1;
+      currentSchema.last_modified = Date.now();
+      currentSchema.modified_by = svc.userId;
+      currentSchema.change_log = [...(currentSchema.change_log||[]), {version:currentSchema.version, summary:pc.summary||pc.action, by:pc.proposed_by, ts:Date.now()}];
+      currentSchema.pending_changes = (currentSchema.pending_changes||[]).filter(c=>c.id!==changeId);
+      showToast(`Schema updated to v${currentSchema.version} — approved by ${approvalCount} members`,'success');
+    }
+
+    try {
+      await svc.setState(team.roomId, EVT.TEAM_SCHEMA, currentSchema);
+      onUpdateTeam({...team, schema:currentSchema});
+    } catch(e) { showToast('Failed: '+e.message,'error'); }
+  };
+
+  // Change consent mode
+  const changeConsentMode = async (newMode) => {
+    const newRule = {mode:newMode, modified_by:svc.userId, modified_at:Date.now()};
+    try {
+      await svc.setState(team.roomId, EVT.TEAM_SCHEMA_RULE, newRule);
+      onUpdateTeam({...team, schemaRule:newRule});
+      showToast(`Consent mode changed to ${TEAM_CONSENT_MODES[newMode]?.label}`,'success');
+    } catch(e) { showToast('Failed: '+e.message,'error'); }
+  };
+
+  // Add existing field from vault/other defs
+  const handleAddExistingField = async () => {
+    if (!selectedExistingUri) return;
+    await applySchemaChange({action:'add_field', uri:selectedExistingUri, required:false, summary:`Added ${fieldDefs[selectedExistingUri]?.label || selectedExistingUri}`});
+    setAddExistingField(false);
+    setSelectedExistingUri('');
+  };
+
+  // Save new custom field definition + add to schema
+  const handleSaveNewField = async () => {
+    if (!fieldDraft.label || !fieldDraft.definition) { showToast('Label and definition are required','warning'); return; }
+    const key = fieldDraft.key || fieldDraft.label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+    const uri = `khora:team/${team.roomId}/${key}`;
+    const def = {
+      uri, key, label:fieldDraft.label, version:1,
+      definition:fieldDraft.definition, scope:fieldDraft.scope||'',
+      category:fieldDraft.category||'case', sensitive:fieldDraft.sensitive||false,
+      data_type:fieldDraft.data_type||'text', authority:fieldDraft.authority||null,
+      created_by:svc.userId, created_at:Date.now(), supersedes:null,
+    };
+    // Save the definition
+    if (onSaveFieldDef) await onSaveFieldDef(def);
+    // Add to team schema
+    await applySchemaChange({action:'add_field', uri, required:false, summary:`Added "${fieldDraft.label}"`});
+    setAddFieldModal(false);
+    setFieldDraft({key:'',label:'',definition:'',scope:'',category:'case',data_type:'text',sensitive:false,authority:null});
+  };
+
+  return <div className="anim-up" style={{maxWidth:960,margin:'0 auto'}}>
+    <button onClick={onBack} className="b-gho b-sm" style={{marginBottom:14,display:'flex',alignItems:'center',gap:4}}>
+      <I n="back" s={13}/>All Teams
+    </button>
+
+    {/* Team Header */}
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}}>
+      <div>
+        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>{team.name||'Unnamed Team'}</h2>
+        <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4}}>
+          {isLead&&<span className="tag tag-gold" style={{fontSize:9}}>LEAD</span>}
+          {team.org_name&&<span className="tag tag-blue" style={{fontSize:9}}>{team.org_name}</span>}
+          <span style={{fontSize:10,fontFamily:'var(--mono)',color:'var(--tx-3)'}}>{team.members?.length||0} members</span>
+          <span style={{fontSize:10,fontFamily:'var(--mono)',color:'var(--tx-3)'}}>{schema.fields?.length||0} fields</span>
+          <span style={{fontSize:10,fontFamily:'var(--mono)',color:'var(--tx-3)'}}>v{schema.version||1}</span>
+        </div>
+        {team.description&&<p style={{fontSize:12,color:'var(--tx-2)',marginTop:6,lineHeight:1.5}}>{team.description}</p>}
+      </div>
+      <div style={{display:'flex',gap:6}}>
+        {isLead&&<button onClick={()=>onInvite(team)} className="b-gho b-sm" style={{display:'flex',alignItems:'center',gap:4}}>
+          <I n="userPlus" s={12}/>Invite
+        </button>}
+      </div>
+    </div>
+
+    {/* Tab Bar */}
+    <div className="db-tabs">
+      {[{id:'overview',label:'Overview',icon:'users'},
+        {id:'schema',label:'Schema',icon:'grid'},
+        {id:'activity',label:'Activity',icon:'layers'}
+      ].map(tab=><button key={tab.id} className={'db-tab'+(teamTab===tab.id?' active':'')} onClick={()=>setTeamTab(tab.id)}>
+        <I n={tab.icon} s={13}/>{tab.label}
+      </button>)}
+    </div>
+
+    {/* ═══ OVERVIEW TAB ═══ */}
+    {teamTab==='overview'&&<div>
+      <div className="card" style={{padding:'16px 20px',marginBottom:12}}>
+        <span className="section-label">MEMBERS ({team.members?.length||0})</span>
+        <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:8}}>
+          {(team.members||[]).map((m,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 10px',background:'var(--bg-2)',borderRadius:'var(--r)'}}>
+            <div style={{width:28,height:28,borderRadius:'50%',background:m.role==='lead'?'var(--gold-dim)':'var(--bg-3)',display:'flex',alignItems:'center',justifyContent:'center',color:m.role==='lead'?'var(--gold)':'var(--tx-2)',flexShrink:0}}>
+              <I n={m.role==='lead'?'briefcase':'user'} s={12}/></div>
+            <div style={{flex:1}}>
+              <span style={{fontSize:12.5,fontWeight:500}}>{m.display_name||m.userId}</span>
+              {m.userId!==m.display_name&&<span style={{fontSize:10,color:'var(--tx-3)',fontFamily:'var(--mono)',marginLeft:6}}>{m.userId}</span>}
+            </div>
+            <span className={`tag ${m.role==='lead'?'tag-gold':'tag-blue'}`} style={{fontSize:8}}>{m.role?.toUpperCase()}</span>
+          </div>)}
+        </div>
+      </div>
+      <div className="card" style={{padding:'16px 20px'}}>
+        <span className="section-label">DETAILS</span>
+        <div style={{display:'grid',gridTemplateColumns:'100px 1fr',gap:'6px 12px',marginTop:8,fontSize:12}}>
+          <span style={{color:'var(--tx-3)'}}>Created</span><span>{team.created ? new Date(team.created).toLocaleDateString() : '—'}</span>
+          <span style={{color:'var(--tx-3)'}}>Room ID</span><span style={{fontFamily:'var(--mono)',fontSize:10,wordBreak:'break-all'}}>{team.roomId}</span>
+          <span style={{color:'var(--tx-3)'}}>Schema</span><span>v{schema.version||1} — {schema.fields?.length||0} fields</span>
+          <span style={{color:'var(--tx-3)'}}>Consent</span><span style={{display:'flex',alignItems:'center',gap:4}}>
+            <I n={consentMode.icon} s={11} c={`var(--${consentMode.color})`}/>
+            {consentMode.label}
+          </span>
+        </div>
+      </div>
+    </div>}
+
+    {/* ═══ SCHEMA TAB ═══ */}
+    {teamTab==='schema'&&<div>
+      {/* Header with consent mode + add field */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:12,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--tx-2)'}}>TEAM SCHEMA</span>
+          <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-3)'}}>v{schema.version||1} — {schema.fields?.length||0} fields</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          {isLead && <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <span style={{fontSize:10,color:'var(--tx-3)'}}>Consent:</span>
+            <select value={schemaRule.mode} onChange={e=>changeConsentMode(e.target.value)} className="ipt" style={{fontSize:10,padding:'3px 6px',minWidth:0}}>
+              {Object.values(TEAM_CONSENT_MODES).map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          </div>}
+          {canModifySchema() && <div style={{display:'flex',gap:4}}>
+            <button className="b-gho b-xs" onClick={()=>setAddExistingField(true)} style={{display:'flex',alignItems:'center',gap:3}}>
+              <I n="plus" s={10}/>Add Existing
+            </button>
+            <button className="b-pri b-xs" onClick={()=>{setAddFieldModal(true);setFieldDraft({key:'',label:'',definition:'',scope:'',category:'case',data_type:'text',sensitive:false,authority:null})}} style={{display:'flex',alignItems:'center',gap:3}}>
+              <I n="plus" s={10}/>New Field
+            </button>
+          </div>}
+        </div>
+      </div>
+
+      {/* Consent mode info banner */}
+      <div style={{padding:'8px 12px',background:`var(--${consentMode.color}-dim, var(--bg-2))`,border:`1px solid rgba(128,128,128,.1)`,borderRadius:'var(--r)',marginBottom:12,display:'flex',alignItems:'center',gap:8}}>
+        <I n={consentMode.icon} s={13} c={`var(--${consentMode.color})`}/>
+        <span style={{fontSize:11,color:'var(--tx-1)'}}>{consentMode.desc}</span>
+      </div>
+
+      {/* Pending changes */}
+      {(schema.pending_changes||[]).length > 0 && <div style={{marginBottom:12}}>
+        {schema.pending_changes.map(pc=>{
+          const approvalCount = Object.keys(pc.approvals||{}).length;
+          const threshold = getThreshold();
+          const alreadyResponded = !!(pc.approvals?.[svc.userId] || pc.blocks?.[svc.userId]);
+          return <div key={pc.id} style={{padding:'10px 14px',background:'var(--gold-dim)',border:'1px solid var(--gold-mid)',borderRadius:'var(--r)',marginBottom:6}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div>
+                <span style={{fontSize:12,fontWeight:600}}>Pending: {pc.summary || pc.action}</span>
+                <span style={{fontSize:10,color:'var(--tx-2)',marginLeft:8}}>by {(pc.proposed_by||'').split(':')[0]?.replace('@','')}</span>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <span style={{fontSize:10,fontFamily:'var(--mono)',color:'var(--tx-2)'}}>{approvalCount}/{threshold} approved</span>
+                {!alreadyResponded && <>
+                  <button className="b-gho b-xs" style={{color:'var(--green)'}} onClick={()=>respondToChange(pc.id,'approve')}>Approve</button>
+                  <button className="b-gho b-xs" style={{color:'var(--red)'}} onClick={()=>respondToChange(pc.id,'block')}>Block</button>
+                </>}
+                {alreadyResponded && <span className="tag tag-green" style={{fontSize:8}}>Responded</span>}
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div style={{marginTop:6,height:3,background:'var(--border-1)',borderRadius:2,overflow:'hidden'}}>
+              <div style={{height:'100%',background:'var(--green)',width:`${Math.min(100,approvalCount/threshold*100)}%`,borderRadius:2,transition:'width .3s'}}/>
+            </div>
+          </div>;
+        })}
+      </div>}
+
+      {/* Field table */}
+      {resolvedFields.length === 0
+        ? <div className="card" style={{textAlign:'center',padding:'40px 20px',borderStyle:'dashed'}}>
+            <I n="grid" s={32}/>
+            <p style={{color:'var(--tx-2)',marginTop:10,fontSize:13}}>No fields in schema</p>
+            <p style={{color:'var(--tx-3)',fontSize:11.5,marginTop:4}}>Add fields to define what data this team tracks about individuals.</p>
+          </div>
+        : <table className="dt" style={{width:'100%'}}>
+          <thead>
+            <tr>
+              <th style={{textAlign:'left',padding:'8px 12px',fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--tx-3)',borderBottom:'2px solid var(--border-1)'}}>Field</th>
+              <th style={{textAlign:'left',padding:'8px 12px',fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--tx-3)',borderBottom:'2px solid var(--border-1)'}}>Category</th>
+              <th style={{textAlign:'left',padding:'8px 12px',fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--tx-3)',borderBottom:'2px solid var(--border-1)',maxWidth:300}}>Definition</th>
+              <th style={{textAlign:'left',padding:'8px 12px',fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--tx-3)',borderBottom:'2px solid var(--border-1)'}}>Source</th>
+              <th style={{textAlign:'left',padding:'8px 12px',fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--tx-3)',borderBottom:'2px solid var(--border-1)'}}>Also Known As</th>
+              <th style={{width:60,textAlign:'center',padding:'8px 12px',fontSize:10,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.06em',color:'var(--tx-3)',borderBottom:'2px solid var(--border-1)'}}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {resolvedFields.map(sf=>{
+              const d = sf.def;
+              const src = getSource(d.uri);
+              const xws = getCrosswalksForUri(d.uri);
+              return <tr key={sf.uri} style={{borderBottom:'1px solid var(--border-0)'}}>
+                <td style={{padding:'10px 12px'}}>
+                  <span style={{fontWeight:600,fontSize:12.5}}>{d.label}</span>
+                  <div style={{fontSize:9,fontFamily:'var(--mono)',color:'var(--tx-3)',marginTop:1}}>{d.key}</div>
+                </td>
+                <td style={{padding:'10px 12px'}}>
+                  <span className={`tag tag-${CAT_COLORS[d.category]||'blue'}`} style={{fontSize:8}}>{CAT_LABELS[d.category]||d.category}</span>
+                </td>
+                <td style={{padding:'10px 12px',maxWidth:300}}>
+                  <span style={{fontSize:11.5,lineHeight:1.5,color:'var(--tx-1)'}}>
+                    {(d.definition||'').length > 100 ? (d.definition||'').slice(0,100)+'...' : (d.definition||'No definition')}
+                  </span>
+                </td>
+                <td style={{padding:'10px 12px'}}>
+                  <span className={`tag tag-${src.color}`} style={{fontSize:8}}>{src.label}</span>
+                </td>
+                <td style={{padding:'10px 12px'}}>
+                  {xws.length === 0 ? <span style={{color:'var(--tx-3)',fontSize:10}}>—</span>
+                  : <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>
+                    {xws.slice(0,2).map(xw=>{
+                      const rel = CROSSWALK_TYPES[xw.relationship]||CROSSWALK_TYPES.related;
+                      const targetUri = xw.from_uri===d.uri?xw.to_uri:xw.from_uri;
+                      const targetDef = fieldDefs[targetUri];
+                      return <span key={xw.id} className={`tag tag-${rel.color}`} style={{fontSize:8}}>
+                        {rel.symbol} {targetDef?.label||targetUri.split('/').pop()}
+                      </span>;
+                    })}
+                  </div>}
+                </td>
+                <td style={{padding:'10px 12px',textAlign:'center'}}>
+                  {canModifySchema() && <button className="b-gho b-xs" style={{color:'var(--red)',fontSize:10}} onClick={()=>applySchemaChange({action:'remove_field',uri:sf.uri,summary:`Removed "${d.label}"`})} title="Remove field">
+                    <I n="close" s={10}/>
+                  </button>}
+                </td>
+              </tr>;
+            })}
+          </tbody>
+        </table>}
+
+      {/* Change log */}
+      {(schema.change_log||[]).length > 0 && <div style={{marginTop:16}}>
+        <span className="section-label">CHANGE LOG</span>
+        <div style={{display:'flex',flexDirection:'column',gap:3,marginTop:6}}>
+          {[...(schema.change_log||[])].reverse().map((cl,i)=>
+            <div key={i} style={{fontSize:11,color:'var(--tx-2)',display:'flex',gap:8,padding:'4px 0'}}>
+              <span style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-3)',minWidth:24}}>v{cl.version}</span>
+              <span>{cl.summary}</span>
+              <span style={{marginLeft:'auto',fontSize:10,color:'var(--tx-3)'}}>
+                {(cl.by||'').split(':')[0]?.replace('@','')} — {cl.ts ? new Date(cl.ts).toLocaleDateString() : ''}
+              </span>
+            </div>)}
+        </div>
+      </div>}
+    </div>}
+
+    {/* ═══ ACTIVITY TAB ═══ */}
+    {teamTab==='activity'&&<div className="card" style={{padding:'20px',textAlign:'center'}}>
+      <I n="layers" s={28} c="var(--tx-3)"/>
+      <p style={{color:'var(--tx-2)',marginTop:10,fontSize:12}}>Activity stream for team operations will appear here.</p>
+      <p style={{color:'var(--tx-3)',fontSize:11,marginTop:4}}>Schema changes, member joins, and other team events are logged as epistemic operations.</p>
+    </div>}
+
+    {/* ═══ ADD EXISTING FIELD MODAL ═══ */}
+    {addExistingField && <div className="fb-adopt-modal" onClick={()=>setAddExistingField(false)}>
+      <div className="fb-adopt-panel" onClick={e=>e.stopPropagation()} style={{maxWidth:500}}>
+        <div style={{display:'flex',justifyContent:'space-between',marginBottom:16}}>
+          <div style={{fontSize:16,fontWeight:700}}>Add Existing Field</div>
+          <button onClick={()=>setAddExistingField(false)} style={{background:'none',border:'none',color:'var(--tx-2)',cursor:'pointer',fontSize:18}}>×</button>
+        </div>
+        <p style={{fontSize:12,color:'var(--tx-2)',marginBottom:12}}>Select a field from the global dictionary to add to this team's schema.</p>
+        <select value={selectedExistingUri} onChange={e=>setSelectedExistingUri(e.target.value)} className="ipt" style={{width:'100%',marginBottom:8}}>
+          <option value="">Choose a field...</option>
+          {Object.values(fieldDefs).filter(d=>!schema.fields?.some(f=>f.uri===d.uri)).map(d=>
+            <option key={d.uri} value={d.uri}>{d.label} — {(d.definition||'').slice(0,60)}{(d.definition||'').length>60?'...':''}</option>)}
+        </select>
+        {selectedExistingUri && fieldDefs[selectedExistingUri] && <div style={{padding:'10px 12px',background:'var(--bg-2)',borderRadius:'var(--r)',marginBottom:8}}>
+          <div style={{fontWeight:600,fontSize:12}}>{fieldDefs[selectedExistingUri].label}</div>
+          <div style={{fontSize:11,color:'var(--tx-2)',marginTop:4}}>{fieldDefs[selectedExistingUri].definition}</div>
+          {fieldDefs[selectedExistingUri].authority && <div style={{fontSize:10,color:'var(--teal)',marginTop:4}}>
+            {fieldDefs[selectedExistingUri].authority.org} — {fieldDefs[selectedExistingUri].authority.provision}
+          </div>}
+        </div>}
+        <div style={{textAlign:'right'}}>
+          <button className="b-gho b-sm" onClick={()=>setAddExistingField(false)} style={{marginRight:6}}>Cancel</button>
+          <button className="b-pri b-sm" disabled={!selectedExistingUri} onClick={handleAddExistingField}>Add to Schema</button>
+        </div>
+      </div>
+    </div>}
+
+    {/* ═══ NEW FIELD DEFINITION MODAL ═══ */}
+    {addFieldModal && <div className="fb-adopt-modal" onClick={()=>setAddFieldModal(false)}>
+      <div className="fb-adopt-panel" onClick={e=>e.stopPropagation()} style={{maxWidth:600}}>
+        <div style={{display:'flex',justifyContent:'space-between',marginBottom:16}}>
+          <div style={{fontSize:16,fontWeight:700}}>Define New Field</div>
+          <button onClick={()=>setAddFieldModal(false)} style={{background:'none',border:'none',color:'var(--tx-2)',cursor:'pointer',fontSize:18}}>×</button>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+          <div>
+            <label style={{fontSize:10,color:'var(--tx-2)',display:'block',marginBottom:3}}>Label *</label>
+            <input type="text" value={fieldDraft.label} onChange={e=>{
+              const label = e.target.value;
+              setFieldDraft(d=>({...d, label, key:label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')}));
+            }} className="ipt" placeholder="e.g. Housing Status" style={{width:'100%'}}/>
+          </div>
+          <div>
+            <label style={{fontSize:10,color:'var(--tx-2)',display:'block',marginBottom:3}}>Key</label>
+            <input type="text" value={fieldDraft.key} onChange={e=>setFieldDraft(d=>({...d,key:e.target.value}))} className="ipt" placeholder="housing_status" style={{width:'100%',fontFamily:'var(--mono)',fontSize:11}}/>
+          </div>
+        </div>
+        <div style={{marginBottom:10}}>
+          <label style={{fontSize:10,color:'var(--tx-2)',display:'block',marginBottom:3}}>Definition *</label>
+          <textarea value={fieldDraft.definition} onChange={e=>{
+            const val = e.target.value;
+            setFieldDraft(d=>({...d,definition:val}));
+            // Debounced similarity search
+            if (similarTimerRef.current) clearTimeout(similarTimerRef.current);
+            if (val.length > 20) {
+              similarTimerRef.current = setTimeout(async ()=>{
+                setSearchingSimilar(true);
+                const results = await findSimilarFields(`${fieldDraft.label}. ${val}`, fieldDefs, schema.fields?.map(f=>f.uri)||[]);
+                setSimilarFields(results.filter(r=>!dismissedSuggestions.includes(r.uri)));
+                setSearchingSimilar(false);
+              }, 500);
+            } else { setSimilarFields([]); }
+          }} className="ipt" rows={3} placeholder="What this field captures and what it means..." style={{width:'100%',resize:'vertical'}}/>
+        </div>
+        <div style={{marginBottom:10}}>
+          <label style={{fontSize:10,color:'var(--tx-2)',display:'block',marginBottom:3}}>Scope (optional)</label>
+          <textarea value={fieldDraft.scope} onChange={e=>setFieldDraft(d=>({...d,scope:e.target.value}))} className="ipt" rows={2} placeholder="What this field includes and excludes..." style={{width:'100%',resize:'vertical'}}/>
+        </div>
+        {/* Embedding-based similarity suggestions */}
+        {searchingSimilar && <div style={{padding:'8px 12px',background:'var(--bg-2)',borderRadius:'var(--r)',marginBottom:10,fontSize:11,color:'var(--tx-3)'}}>
+          Analyzing definitions...
+        </div>}
+        {similarFields.length > 0 && <div style={{padding:'10px 14px',background:'var(--teal-dim)',border:'1px solid rgba(61,214,140,.15)',borderRadius:'var(--r)',marginBottom:10}}>
+          <div style={{fontSize:11,fontWeight:600,color:'var(--teal)',marginBottom:8}}>Similar fields found:</div>
+          {similarFields.map(sf=><div key={sf.uri} style={{padding:'8px 10px',background:'var(--bg-2)',borderRadius:'var(--r)',marginBottom:4,display:'flex',alignItems:'flex-start',gap:8}}>
+            <div style={{flex:1}}>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <span style={{fontSize:12,fontWeight:600}}>{sf.def.label}</span>
+                <span style={{fontSize:9,fontFamily:'var(--mono)',color:'var(--teal)'}}>{Math.round(sf.similarity*100)}% match</span>
+              </div>
+              <div style={{fontSize:10.5,color:'var(--tx-2)',marginTop:2}}>{(sf.def.definition||'').slice(0,80)}{(sf.def.definition||'').length>80?'...':''}</div>
+            </div>
+            <div style={{display:'flex',gap:3,flexShrink:0}}>
+              <button className="b-gho b-xs" style={{color:'var(--green)',fontSize:9}} onClick={async ()=>{
+                if(onSaveCrosswalk){
+                  const key=fieldDraft.key||fieldDraft.label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+                  const newUri=`khora:team/${team.roomId}/${key}`;
+                  await onSaveCrosswalk({id:'xw_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),from_uri:newUri,to_uri:sf.uri,relationship:'equivalent',bidirectional:true,notes:'Auto-suggested by similarity analysis',created_at:Date.now()});
+                }
+                setSimilarFields(prev=>prev.filter(s=>s.uri!==sf.uri));
+              }}>Link as equivalent</button>
+              <button className="b-gho b-xs" style={{color:'var(--gold)',fontSize:9}} onClick={async ()=>{
+                if(onSaveCrosswalk){
+                  const key=fieldDraft.key||fieldDraft.label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+                  const newUri=`khora:team/${team.roomId}/${key}`;
+                  await onSaveCrosswalk({id:'xw_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),from_uri:newUri,to_uri:sf.uri,relationship:'related',bidirectional:true,notes:'Auto-suggested by similarity analysis',created_at:Date.now()});
+                }
+                setSimilarFields(prev=>prev.filter(s=>s.uri!==sf.uri));
+              }}>Link as related</button>
+              <button className="b-gho b-xs" style={{color:'var(--tx-3)',fontSize:9}} onClick={()=>{
+                const updated=[...dismissedSuggestions,sf.uri];
+                setDismissedSuggestions(updated);
+                try{localStorage.setItem('khora_dismissed_xw_suggestions',JSON.stringify(updated))}catch{}
+                setSimilarFields(prev=>prev.filter(s=>s.uri!==sf.uri));
+              }}>Ignore</button>
+            </div>
+          </div>)}
+        </div>}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 80px',gap:10,marginBottom:10}}>
+          <div>
+            <label style={{fontSize:10,color:'var(--tx-2)',display:'block',marginBottom:3}}>Category</label>
+            <select value={fieldDraft.category} onChange={e=>setFieldDraft(d=>({...d,category:e.target.value}))} className="ipt" style={{width:'100%'}}>
+              {FIELD_CATEGORIES.map(c=><option key={c} value={c}>{CAT_LABELS[c]||c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:10,color:'var(--tx-2)',display:'block',marginBottom:3}}>Data Type</label>
+            <select value={fieldDraft.data_type} onChange={e=>setFieldDraft(d=>({...d,data_type:e.target.value}))} className="ipt" style={{width:'100%'}}>
+              {['text','text_long','date','number','email','phone','address','single_select','multi_select','document'].map(t=>
+                <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
+            </select>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end'}}>
+            <label style={{fontSize:10,color:'var(--tx-2)',marginBottom:5}}>Sensitive</label>
+            <div onClick={()=>setFieldDraft(d=>({...d,sensitive:!d.sensitive}))} style={{
+              width:36,height:20,borderRadius:10,background:fieldDraft.sensitive?'var(--red)':'var(--border-2)',
+              cursor:'pointer',position:'relative',transition:'background .2s'}}>
+              <div style={{width:16,height:16,borderRadius:'50%',background:'white',position:'absolute',top:2,
+                left:fieldDraft.sensitive?18:2,transition:'left .2s'}}/>
+            </div>
+          </div>
+        </div>
+        <div style={{textAlign:'right',marginTop:14}}>
+          <button className="b-gho b-sm" onClick={()=>setAddFieldModal(false)} style={{marginRight:6}}>Cancel</button>
+          <button className="b-pri b-sm" disabled={!fieldDraft.label||!fieldDraft.definition} onClick={handleSaveNewField}>
+            {schemaRule.mode==='lead_decides'&&isLead?'Save & Add':'Propose Field'}
+          </button>
+        </div>
+      </div>
+    </div>}
   </div>;
 };
 
@@ -12299,6 +13518,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const [newTeamDesc, setNewTeamDesc] = useState('');
   const [teamInviteModal, setTeamInviteModal] = useState(null); // team object or null
   const [teamInviteUserId, setTeamInviteUserId] = useState('');
+  const [activeTeamDetail, setActiveTeamDetail] = useState(null); // expanded team detail view
+  // Field definitions & crosswalks
+  const [fieldDefs, setFieldDefs] = useState({});           // uri → definition object
+  const [fieldCrosswalks, setFieldCrosswalks] = useState([]); // crosswalk records
   const [sharingConsentModal, setSharingConsentModal] = useState(null); // {team, member} or null — prompts team member to choose sharing preference
   // Team creation — operational subscription config
   const [newTeamPublishService, setNewTeamPublishService] = useState(false);   // default OFF — private
@@ -12496,13 +13719,15 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     setInitError(null);
     try {
       // Single-pass scan: fetch all Khora state across rooms in one request
-      const scanned = await svc.scanRooms([EVT.ORG_METADATA, EVT.ORG_ROSTER, EVT.PROVIDER_PROFILE, EVT.ORG_OPACITY, EVT.ORG_MSG_ACCESS, EVT.ORG_MSG_CHANNEL, EVT.ORG_TERMINOLOGY, EVT.TEAM_META, EVT.TEAM_MEMBERS, EVT.TEAM_SERVICE_INFO, EVT.TEAM_SUBSCRIBERS, EVT.TEAM_CHANNELS, EVT.TEAM_DIRECTORY, EVT.REFERRAL_META, EVT.REFERRAL_REFS, EVT.REFERRAL_OUTCOME]);
+      const scanned = await svc.scanRooms([EVT.ORG_METADATA, EVT.ORG_ROSTER, EVT.PROVIDER_PROFILE, EVT.ORG_OPACITY, EVT.ORG_MSG_ACCESS, EVT.ORG_MSG_CHANNEL, EVT.ORG_TERMINOLOGY, EVT.TEAM_META, EVT.TEAM_MEMBERS, EVT.TEAM_SCHEMA, EVT.TEAM_SCHEMA_RULE, EVT.FIELD_DEF, EVT.FIELD_CROSSWALK, EVT.TEAM_SERVICE_INFO, EVT.TEAM_SUBSCRIBERS, EVT.TEAM_CHANNELS, EVT.TEAM_DIRECTORY, EVT.REFERRAL_META, EVT.REFERRAL_REFS, EVT.REFERRAL_OUTCOME]);
       let roster=null, metricsR=null, schema=null, network=null;
       let detectedOrg=null, detectedOrgRole=null;
       const bridgeData = [];
       const detectedClientRecords = [];
       const detectedOrgChannels = [];
       const detectedTeams = [];
+      const detectedFieldDefs = {};
+      const detectedCrosswalks = [];
       const detectedSubscribedTeams = [];
       const detectedServiceInfo = {};
       const detectedDirectoryListings = [];
@@ -12532,22 +13757,32 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         if (chanMeta && chanMeta.type === 'org_msg_channel') {
           detectedOrgChannels.push({roomId: rid, ...chanMeta});
         }
-        // Detect team rooms
+        // Detect team rooms (with schema + consent rule)
         if (id?.account_type==='team') {
           const teamMeta = state[EVT.TEAM_META] || {};
           const teamMembers = state[EVT.TEAM_MEMBERS] || {members:[]};
+          const teamSchema = state[EVT.TEAM_SCHEMA] || null;
+          const teamSchemaRule = state[EVT.TEAM_SCHEMA_RULE] || null;
           const serviceInfo = state[EVT.TEAM_SERVICE_INFO];
           const subscribers = state[EVT.TEAM_SUBSCRIBERS];
           const channels = state[EVT.TEAM_CHANNELS];
           const isMember = (teamMembers.members||[]).some(m=>m.userId===svc.userId);
           const isSubscriber = (subscribers?.subscribers||[]).some(s=>s.userId===svc.userId&&s.status==='approved');
-          const teamObj = {roomId:rid, ...teamMeta, members:teamMembers.members||[], owner:id.owner, created:id.created, serviceInfo, subscribers, channels};
+          const teamObj = {roomId:rid, ...teamMeta, members:teamMembers.members||[], owner:id.owner, created:id.created,
+            schema:teamSchema, schemaRule:teamSchemaRule, serviceInfo, subscribers, channels};
           if (isMember) {
             detectedTeams.push(teamObj);
           } else if (isSubscriber) {
             detectedSubscribedTeams.push(teamObj);
           }
           if (serviceInfo) detectedServiceInfo[rid] = serviceInfo;
+        }
+        // Collect field definitions and crosswalks from schema rooms
+        if (id?.account_type==='schema') {
+          const defs = state[EVT.FIELD_DEF];
+          if (defs?.definitions) Object.assign(detectedFieldDefs, defs.definitions);
+          const xws = state[EVT.FIELD_CROSSWALK];
+          if (xws?.crosswalks) detectedCrosswalks.push(...xws.crosswalks);
         }
         // Detect referral rooms (sent or received)
         if (id?.account_type==='referral') {
@@ -12646,6 +13881,22 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       if (Object.keys(detectedServiceInfo).length > 0) setTeamServiceInfoMap(detectedServiceInfo);
       if (detectedDirectoryListings.length > 0) setTeamDirectory(detectedDirectoryListings);
       if (detectedReferrals.length > 0) setReferrals(detectedReferrals);
+      // Load field definitions and crosswalks
+      // Seed vault field defs if schema room exists and no defs stored yet
+      if (schema && Object.keys(detectedFieldDefs).length === 0) {
+        const seedDefs = {};
+        for (const f of DOMAIN_CONFIG.vaultFields) {
+          seedDefs[f.uri] = { uri:f.uri, key:f.key, label:f.label, version:1,
+            definition:f.definition||'', scope:f.scope||'', category:f.category,
+            sensitive:f.sensitive, data_type:f.data_type||'text',
+            authority:f.authority||null, created_by:svc.userId, created_at:Date.now(),
+            supersedes:null };
+        }
+        try { await svc.setState(schema, EVT.FIELD_DEF, {definitions:seedDefs}); } catch(e) { console.debug('Field def seed:', e.message); }
+        Object.assign(detectedFieldDefs, seedDefs);
+      }
+      setFieldDefs(detectedFieldDefs);
+      setFieldCrosswalks(detectedCrosswalks);
       // Load client records detected during scan
       if (detectedClientRecords.length > 0) {
         // Check room membership to determine status
@@ -12928,6 +14179,24 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     }, 300); // 300ms debounce
   };
 
+  // ─── Bulk action handler for database table ───
+  const handleBulkAction = async (actionId, selectedIds) => {
+    if (actionId === 'delete') {
+      if (!confirm(`Revoke ${selectedIds.length} individual(s)? This marks them as tombstoned.`)) return;
+      for (const id of selectedIds) {
+        try {
+          const c = cases.find(cs => cs.bridgeRoomId === id);
+          if (c) await svc.setState(id, EVT.BRIDGE_META, { ...c.meta, status: 'tombstoned' });
+        } catch(e) { console.warn('Bulk delete failed for', id, e.message); }
+      }
+      showToast(`Revoked ${selectedIds.length} individual(s)`, 'info');
+    } else if (actionId === 'assign') {
+      showToast(`Assign ${selectedIds.length} individual(s) — use individual profiles to assign`, 'info');
+    } else if (actionId === 'tag') {
+      showToast(`Tag ${selectedIds.length} individual(s) — use individual profiles to tag`, 'info');
+    }
+  };
+
   // ─── Note save handler ───
   const handleNoteSave = (noteData) => {
     setDbNotes(prev => [noteData, ...prev]);
@@ -12984,6 +14253,12 @@ const ProviderApp = ({session, onLogout, showToast}) => {
 
   // ─── Row reorder handler for database table ───
   const handleReorder = (fromIdx, toIdx) => {
+    setClientRecords(prev => {
+      const updated = [...prev];
+      const [moved] = updated.splice(fromIdx, 1);
+      updated.splice(toIdx, 0, moved);
+      return updated;
+    });
     try {
       emitOp(orgRoom || rosterRoom, 'ALT',
         { entity: 'individual_order', field: 'sort_order' },
@@ -13322,6 +14597,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const handleCreateTeam = async () => {
     if (!newTeamName.trim()) return;
     try {
+      // Default team schema: identity + contact fields from vault
+      const defaultSchemaFields = DOMAIN_CONFIG.vaultFields
+        .filter(f => f.category === 'identity' || f.category === 'contact')
+        .map(f => ({uri:f.uri, required:f.category==='identity', added_version:1}));
       const initEvents = [
         {type:EVT.IDENTITY,state_key:'',content:{account_type:'team',owner:svc.userId,created:Date.now()}},
         {type:EVT.TEAM_META,state_key:'',content:{
@@ -13331,6 +14610,14 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         {type:EVT.TEAM_MEMBERS,state_key:'',content:{members:[
           {userId:svc.userId,role:'lead',joined:Date.now(),display_name:providerProfile.display_name||'',sharing_consent:'shared'}
         ]}},
+        {type:EVT.TEAM_SCHEMA,state_key:'',content:{
+          version:1, fields:defaultSchemaFields, pending_changes:[],
+          change_log:[{version:1,summary:'Initial schema',by:svc.userId,ts:Date.now()}],
+          last_modified:Date.now(), modified_by:svc.userId,
+        }},
+        {type:EVT.TEAM_SCHEMA_RULE,state_key:'',content:{
+          mode:'lead_decides', modified_by:svc.userId, modified_at:Date.now(),
+        }},
       ];
       // Add service info if publishing is enabled
       if (newTeamPublishService) {
@@ -13368,7 +14655,10 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         roomId, name:newTeamName, description:newTeamDesc||'', created:Date.now(),
         created_by:svc.userId, org_id:orgRoom||null, org_name:orgMeta.name||null,
         members:[{userId:svc.userId,role:'lead',joined:Date.now(),display_name:providerProfile.display_name||'',sharing_consent:'shared'}],
-        owner:svc.userId, serviceInfo,
+        owner:svc.userId,
+        schema:{version:1, fields:defaultSchemaFields, pending_changes:[], change_log:[]},
+        schemaRule:{mode:'lead_decides'},
+        serviceInfo,
         channels:newTeamPublishService?{channels:newTeamChannels}:undefined,
         subscribers:newTeamPublishService?{approval_mode:newTeamApprovalMode,subscribers:[]}:undefined,
       };
@@ -13593,6 +14883,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Error: '+e.message,'error'); }
   };
 
+  // INS(network_room, identity+members, federation_creation) + DES(schema_catalog, forms+definitions, canonical_vocabulary) + INS(seed_resources, defaults, initial_catalog)
   // Create a network — requires an org
   const handleCreateNetwork = async () => {
     if (!networkName.trim()) return;
@@ -13621,6 +14912,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Error: '+e.message,'error'); }
   };
 
+  // CON(org → network, join, membership_link)
   // Join existing network by room ID — requires an org
   const handleJoinNetwork = async () => {
     if (!joinNetworkId.trim()) return;
@@ -13895,6 +15187,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Error restocking: ' + e.message, 'error'); }
   };
 
+  // INS(org_room, identity+metadata+roster, organization_creation) + DES(org_schema, seeded_forms+definitions, local_vocabulary) + INS(staff_roster, creator_as_admin, initial_membership)
   const handleCreateOrg = async () => {
     if (!setupData.name.trim()) return;
     try {
@@ -13955,6 +15248,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Failed to join org: '+e.message,'error'); }
   };
 
+  // CON(user → org, invitation, staff_onboarding) — invites user and adds to roster
   const handleInviteStaff = async () => {
     if (!inviteUserId.trim()||!orgRoom) return;
     try {
@@ -13969,6 +15263,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Invite failed: '+e.message,'error'); }
   };
 
+  // NUL(staff_member, removed, membership_severance) — kicks from room and removes from roster
   const handleRemoveStaff = async (userId) => {
     if (userId===svc.userId) { showToast('Cannot remove yourself','error'); return; }
     try {
@@ -14001,6 +15296,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     } catch(e) { showToast('Error saving config: '+e.message, 'error'); }
   };
 
+  // INS(challenge, hashed_code+webhook, verification_initiation) → CON(code → email_inbox, webhook, out_of_band_delivery)
   const handleStartEmailVerify = async () => {
     if (!verifyEmail.trim() || !orgRoom) return;
     setVerifyError('');
@@ -14032,6 +15328,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     setVerifyPending(false);
   };
 
+  // DES(email_identity, code_validated, verified_attestation) on success | ALT(challenge.attempts, +1, lockout_progression) on failure
   const handleSubmitVerifyCode = async () => {
     if (!verifyCode.trim() || verifyCode.length !== 6 || !orgRoom) return;
     setVerifyError('');
@@ -14081,6 +15378,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     setVerifyPending(false);
   };
 
+  // NUL(verification, admin_revoked, attestation_destruction) — admin removes verified status
   const handleRevokeVerification = async (userId) => {
     if (!orgRoom || orgRole !== 'admin') return;
     try {
@@ -14454,7 +15752,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           {id:'schema',icon:'grid',label:'Schema',badge:schemaNotifCount,badgeClass:'nav-badge-teal'},
           {id:'metrics',icon:'bar',label:'Metrics'},
           {id:'activity',icon:'layers',label:'Activity Stream',badge:activityNotifCount,badgeClass:'nav-badge-teal'}
-        ].map(item=><div key={item.id} onClick={()=>{setView(item.id);setActiveCase(null);setActiveIndividual(null);setActiveResourceProfile(null);if(item.id!=='inbox'){setInboxConvo(null);setInboxMessages([])}}}
+        ].map(item=><div key={item.id} onClick={()=>{setView(item.id);setActiveCase(null);setActiveIndividual(null);setActiveResourceProfile(null);setActiveTeamDetail(null);if(item.id!=='inbox'){setInboxConvo(null);setInboxMessages([])}}}
           style={{padding:'9px 10px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:1,
             background:(view===item.id||((item.id==='database')&&(view==='individual-profile'||view==='resource-profile')))&&!activeCase?'var(--bg-4)':'transparent',
             borderLeft:(view===item.id||((item.id==='database')&&(view==='individual-profile'||view==='resource-profile')))&&!activeCase?'2px solid var(--gold)':'2px solid transparent',
@@ -14598,6 +15896,23 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           onBulkAction={handleBulkAction}
           onReorder={handleReorder}
           onAddRow={()=>{setCreateClientModal(true);setNewClientName('');setNewClientMatrixId('');setNewClientNotes('')}}
+          fieldDefs={fieldDefs}
+          fieldCrosswalks={fieldCrosswalks}
+          teams={teams}
+          onSaveFieldDef={async (def)=>{
+            const schemaRoom = svc.client ? svc.client.getRooms().find(r=>{const id=r.currentState.getStateEvents(EVT.IDENTITY,'');return id?.getContent()?.account_type==='schema'&&id.getContent().owner===svc.userId;})?.roomId : null;
+            if (!schemaRoom) return;
+            const updated = {...fieldDefs, [def.uri]:def};
+            await svc.setState(schemaRoom, EVT.FIELD_DEF, {definitions:updated});
+            setFieldDefs(updated);
+          }}
+          onSaveCrosswalk={async (xw)=>{
+            const schemaRoom = svc.client ? svc.client.getRooms().find(r=>{const id=r.currentState.getStateEvents(EVT.IDENTITY,'');return id?.getContent()?.account_type==='schema'&&id.getContent().owner===svc.userId;})?.roomId : null;
+            if (!schemaRoom) return;
+            const updated = [...fieldCrosswalks, {...xw, created_by:svc.userId}];
+            await svc.setState(schemaRoom, EVT.FIELD_CROSSWALK, {crosswalks:updated});
+            setFieldCrosswalks(updated);
+          }}
         />
         <NoteCreateModal
           open={newNoteModal}
@@ -14927,7 +16242,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       </div>}
 
       {/* TEAMS VIEW */}
-      {view==='teams'&&!activeCase&&<div className="anim-up" style={{maxWidth:960,margin:'0 auto'}}>
+      {view==='teams'&&!activeCase&&!activeTeamDetail&&<div className="anim-up" style={{maxWidth:960,margin:'0 auto'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:24}}>
           <div>
             <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Teams</h2>
@@ -14951,7 +16266,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
             <p style={{color:'var(--tx-3)',fontSize:11.5,marginTop:4}}>Create a team to collaborate with people across your organization or beyond.</p>
           </div>
         :<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:10}}>
-          {teams.map(team=><div key={team.roomId} className="card" style={{padding:0,overflow:'hidden'}}>
+          {teams.map(team=><div key={team.roomId} className="card" style={{padding:0,overflow:'hidden',cursor:'pointer'}} onClick={()=>setActiveTeamDetail(team)}>
             <div style={{padding:'14px 18px',borderBottom:'1px solid var(--border-0)'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
                 <span style={{fontSize:15,fontWeight:700}}>{team.name||'Unnamed Team'}</span>
@@ -15017,6 +16332,9 @@ const ProviderApp = ({session, onLogout, showToast}) => {
                 directoryListed:!!team.serviceInfo
               })}} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:3}}>
                 <I n="settings" s={11}/>Service Settings</button>}
+              <span style={{fontSize:10,fontFamily:'var(--mono)',color:'var(--tx-3)',marginLeft:'auto',display:'flex',alignItems:'center',gap:3}}>
+                <I n="grid" s={9}/>{team.schema?.fields?.length||0} fields
+              </span>
             </div>
             {/* Subscriber info + management for team leads */}
             {(()=>{
@@ -15062,7 +16380,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         <div style={{background:'var(--purple-dim,var(--blue-dim))',border:'1px solid rgba(128,90,213,.15)',borderRadius:'var(--r)',padding:'14px 18px',marginTop:20,display:'flex',gap:10,alignItems:'flex-start'}}>
           <I n="users" s={16} c="var(--purple,var(--blue))"/>
           <span style={{fontSize:12,color:'var(--tx-1)',lineHeight:1.6}}>
-            <strong>Teams are flexible.</strong> They can include anyone — staff from your org, people from other orgs, or unaffiliated individuals. Teams are not governed by org policies; they're lightweight collaboration groups.
+            <strong>Teams are flexible.</strong> They can include anyone — staff from your org, people from other orgs, or unaffiliated individuals. Teams are now governed by their own schema — click a team to view and manage its data definitions.
           </span>
         </div>
       </div>}
@@ -15261,6 +16579,36 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           </div>
         </div>}
       </div>}
+
+      {/* TEAM DETAIL VIEW */}
+      {view==='teams'&&!activeCase&&activeTeamDetail&&<TeamDetailView
+        team={activeTeamDetail}
+        teams={teams}
+        svc={svc}
+        fieldDefs={fieldDefs}
+        fieldCrosswalks={fieldCrosswalks}
+        showToast={showToast}
+        onBack={()=>setActiveTeamDetail(null)}
+        onInvite={(team)=>{setTeamInviteModal(team);setTeamInviteUserId('')}}
+        onUpdateTeam={(updated)=>{
+          setTeams(prev=>prev.map(t=>t.roomId===updated.roomId?updated:t));
+          setActiveTeamDetail(updated);
+        }}
+        onSaveFieldDef={async (def)=>{
+          const schemaRoom = svc.client ? svc.client.getRooms().find(r=>{const id=r.currentState.getStateEvents(EVT.IDENTITY,'');return id?.getContent()?.account_type==='schema'&&id.getContent().owner===svc.userId;})?.roomId : null;
+          if (!schemaRoom) return;
+          const updated = {...fieldDefs, [def.uri]:def};
+          await svc.setState(schemaRoom, EVT.FIELD_DEF, {definitions:updated});
+          setFieldDefs(updated);
+        }}
+        onSaveCrosswalk={async (xw)=>{
+          const schemaRoom = svc.client ? svc.client.getRooms().find(r=>{const id=r.currentState.getStateEvents(EVT.IDENTITY,'');return id?.getContent()?.account_type==='schema'&&id.getContent().owner===svc.userId;})?.roomId : null;
+          if (!schemaRoom) return;
+          const updated = [...fieldCrosswalks, {...xw, created_by:svc.userId}];
+          await svc.setState(schemaRoom, EVT.FIELD_CROSSWALK, {crosswalks:updated});
+          setFieldCrosswalks(updated);
+        }}
+      />}
 
       {/* CASE VIEW */}
       {view==='case'&&activeCaseData&&<div className="anim-up" style={{maxWidth:820,margin:'0 auto'}}>
