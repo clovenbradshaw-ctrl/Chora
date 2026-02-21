@@ -444,6 +444,68 @@ table.dt tr.dt-grp td{padding:9px 12px;font-size:12px;font-weight:700;color:var(
 .dt-cap-box .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--tx-2)}
 .dt-sov{margin-top:14px;padding:12px 16px;border-radius:var(--r-lg);background:var(--green-dim);border:1px solid rgba(61,214,140,.15);display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--green);line-height:1.5}
 .dt-hint{margin-top:8px;padding:10px 12px;border-radius:var(--r);background:var(--gold-dim);border:1px solid var(--gold-mid);font-size:12px;color:var(--tx-1);line-height:1.5}
+/* ═══ Database View ═══ */
+.db-view{max-width:1300px;margin:0 auto}
+.db-tabs{display:flex;gap:0;border-bottom:2px solid var(--border-0);margin-bottom:18px}
+.db-tab{padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--tx-2);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--sans);transition:all .15s;display:flex;align-items:center;gap:6px}
+.db-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.db-tab:hover:not(.active){color:var(--tx-0);background:var(--bg-2);border-radius:var(--r) var(--r) 0 0}
+.db-tab .db-tab-count{font-size:10px;padding:1px 6px;border-radius:8px;background:var(--bg-3);color:var(--tx-2);font-family:var(--mono)}
+.db-tab.active .db-tab-count{background:var(--gold-dim);color:var(--gold)}
+/* ═══ Enhanced DataTable: multi-select, drag ═══ */
+table.dt th.dt-sel-col,table.dt td.dt-sel-col{width:32px;min-width:32px;max-width:32px;padding:6px 4px;text-align:center;border-right:1px solid var(--border-0)}
+.dt-cb{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--border-2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .12s}
+.dt-cb.checked{background:var(--gold);border-color:var(--gold);color:#fff}
+.dt-cb.partial{background:var(--gold-dim);border-color:var(--gold)}
+.dt-cb:hover{border-color:var(--gold)}
+.dt-bulk-bar{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:var(--r-lg);background:var(--gold-dim);border:1px solid rgba(201,163,82,.2);margin-bottom:10px;animation:fadeIn .15s ease}
+.dt-bulk-bar .dt-bulk-count{font-size:12px;font-weight:700;color:var(--gold);font-family:var(--mono)}
+.dt-bulk-bar .dt-bulk-actions{display:flex;gap:4px;margin-left:auto}
+table.dt tr.dt-row.dragging{opacity:.4;background:var(--bg-3)}
+table.dt tr.dt-row.drag-over{border-top:2px solid var(--gold);background:var(--gold-dim)}
+table.dt td.dt-drag-handle{width:24px;min-width:24px;max-width:24px;padding:0 4px;cursor:grab;color:var(--tx-3);text-align:center;user-select:none}
+table.dt td.dt-drag-handle:active{cursor:grabbing}
+/* ═══ Editable cells ═══ */
+.dt-ecell{cursor:pointer;border-bottom:1px dashed transparent;padding-bottom:1px;transition:all .12s;min-height:20px}
+.dt-ecell:hover{border-bottom-color:var(--gold-dim)}
+.dt-ecell.editing{border-bottom-color:var(--gold)}
+.dt-ecell-input{width:100%;padding:2px 4px;font-size:13px;border:1.5px solid var(--gold);border-radius:3px;background:var(--bg-1);outline:none;font-family:var(--sans);color:var(--tx-0)}
+.dt-ecell-input:focus{box-shadow:0 0 0 2px var(--gold-dim)}
+/* ═══ Inline add row ═══ */
+.dt-add-row{padding:8px 12px;color:var(--tx-3);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;border-top:1px dashed var(--border-0);transition:all .15s}
+.dt-add-row:hover{background:var(--gold-dim);color:var(--gold)}
+/* ═══ Notes ═══ */
+.note-card{padding:14px 16px;border-radius:var(--r-lg);border:1px solid var(--border-0);background:var(--bg-1);margin-bottom:8px;transition:border-color .15s;cursor:pointer}
+.note-card:hover{border-color:var(--gold)}
+.note-card.attached{border-left:3px solid var(--green)}
+.note-card.standalone{border-left:3px solid var(--blue)}
+.note-card.tombstoned{opacity:.5;border-left-color:var(--red);background:var(--red-dim)}
+.note-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.note-title{font-size:14px;font-weight:600;color:var(--tx-0)}
+.note-meta{font-size:10px;color:var(--tx-2);font-family:var(--mono)}
+.note-body{font-size:12.5px;color:var(--tx-1);line-height:1.55;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.note-tags{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+.note-tag-chip{font-size:10px;padding:2px 8px;border-radius:10px;background:var(--purple-dim);color:var(--purple);font-weight:600;display:flex;align-items:center;gap:3px}
+.note-attached-to{font-size:10px;padding:2px 8px;border-radius:10px;background:var(--green-dim);color:var(--green);font-weight:600}
+/* ═══ Profile pages ═══ */
+.profile-page{max-width:1000px;margin:0 auto}
+.profile-header{display:flex;align-items:flex-start;gap:16px;margin-bottom:24px}
+.profile-avatar{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0}
+.profile-info{flex:1;min-width:0}
+.profile-name{font-family:var(--serif);font-size:22px;font-weight:700;margin-bottom:4px}
+.profile-badges{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.profile-tabs{display:flex;border-bottom:2px solid var(--border-0);margin-bottom:20px}
+.profile-tab{padding:9px 18px;font-size:12.5px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--tx-2);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--sans);transition:all .15s}
+.profile-tab.active{color:var(--green);border-bottom-color:var(--green)}
+.profile-tab:hover:not(.active){color:var(--tx-0)}
+.profile-section{margin-bottom:24px}
+.profile-section-title{font-size:11px;font-family:var(--mono);color:var(--tx-2);letter-spacing:.07em;font-weight:600;margin-bottom:10px;text-transform:uppercase}
+.profile-fields-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.profile-field-card{padding:12px 14px;border-radius:var(--r);border:1px solid var(--border-0);background:var(--bg-2)}
+.profile-field-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--tx-2);margin-bottom:4px}
+.profile-field-value{font-size:14px;font-weight:500;color:var(--tx-0)}
+/* ═══ Tombstone display ═══ */
+.tombstone-notice{padding:14px 16px;border-radius:var(--r);background:var(--red-dim);border:1px solid rgba(232,93,93,.15);display:flex;align-items:center;gap:10px;font-size:12px;color:var(--red)}
 </style>
 </head>
 <body>
@@ -972,6 +1034,9 @@ const EVT = {
   MATCH_TOKEN:    `${NS}.match.token`,
   MATCH_HIT:      `${NS}.match.hit`,
   MATCH_RESOLVE:  `${NS}.match.resolve`,
+  // Notes (standalone or attached to individuals)
+  NOTE:           `${NS}.note`,
+  NOTE_REF:       `${NS}.note.ref`,       // org-side reference pointing to bridge note
   // Client records (provider-created rooms representing clients)
   CLIENT_RECORD:  `${NS}.client.record`,
   // Import
@@ -9234,8 +9299,30 @@ const dtFmtDate = (iso) => {
   return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 };
 
-/* ─── Generic DataTable component ─── */
-const DataTable = ({data, columns, groupOptions, defaultVisibleCols, onRowClick, renderCell, getVal, selectedId, label}) => {
+/* ─── EditableCell — click-to-edit cell with blur save ─── */
+const EditableCell = ({value, onSave, placeholder, type}) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || '');
+  const inputRef = useRef(null);
+  useEffect(() => { setDraft(value || ''); }, [value]);
+  useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
+  const commit = () => {
+    setEditing(false);
+    if (draft !== (value || '')) onSave && onSave(draft);
+  };
+  if (editing) return <input ref={inputRef} className="dt-ecell-input" value={draft}
+    onChange={e=>setDraft(e.target.value)}
+    onBlur={commit}
+    onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();commit()}if(e.key==='Escape'){setDraft(value||'');setEditing(false)}}}
+    onClick={e=>e.stopPropagation()}/>;
+  return <div className="dt-ecell" onClick={e=>{e.stopPropagation();setEditing(true)}}>
+    {value || <span style={{color:'var(--tx-3)',fontStyle:'italic'}}>{placeholder||'—'}</span>}
+  </div>;
+};
+
+/* ─── Generic DataTable component (enhanced) ─── */
+const DataTable = ({data, columns, groupOptions, defaultVisibleCols, onRowClick, renderCell, getVal, selectedId, label,
+  selectable, onBulkAction, bulkActions, draggable, onReorder, onAddRow, addRowLabel, editable, onCellEdit}) => {
   const [search, setSearch] = useState('');
   const [groupBy, setGroupBy] = useState('none');
   const [sortField, setSortField] = useState(null);
@@ -9243,8 +9330,14 @@ const DataTable = ({data, columns, groupOptions, defaultVisibleCols, onRowClick,
   const [visibleCols, setVisibleCols] = useState(defaultVisibleCols || columns.map(c=>c.key));
   const [colDd, setColDd] = useState(false);
   const [grpDd, setGrpDd] = useState(false);
+  // Multi-select
+  const [selected, setSelected] = useState(new Set());
+  // Drag reorder
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
 
   const visCols = columns.filter(c => c.fixed || visibleCols.includes(c.key));
+  const extraColCount = (selectable ? 1 : 0) + (draggable ? 1 : 0);
 
   // Filter
   const filtered = data.filter(row => {
@@ -9288,7 +9381,47 @@ const DataTable = ({data, columns, groupOptions, defaultVisibleCols, onRowClick,
     setVisibleCols(prev => prev.includes(key) ? prev.filter(k=>k!==key) : [...prev, key]);
   };
 
+  // Multi-select helpers
+  const toggleSelect = (id, e) => {
+    e && e.stopPropagation();
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    if (selected.size === filtered.length) setSelected(new Set());
+    else setSelected(new Set(filtered.map(r=>r.id)));
+  };
+  const isAllSelected = filtered.length > 0 && selected.size === filtered.length;
+  const isSomeSelected = selected.size > 0 && selected.size < filtered.length;
+
+  // Drag handlers
+  const handleDragStart = (e, id) => { setDragId(id); e.dataTransfer.effectAllowed='move'; };
+  const handleDragOver = (e, id) => { e.preventDefault(); setDragOverId(id); };
+  const handleDragEnd = () => {
+    if (dragId && dragOverId && dragId !== dragOverId && onReorder) {
+      const fromIdx = data.findIndex(r=>r.id===dragId);
+      const toIdx = data.findIndex(r=>r.id===dragOverId);
+      if (fromIdx >= 0 && toIdx >= 0) onReorder(fromIdx, toIdx);
+    }
+    setDragId(null); setDragOverId(null);
+  };
+
   return <>
+    {/* Bulk action bar */}
+    {selectable && selected.size > 0 && <div className="dt-bulk-bar">
+      <span className="dt-bulk-count">{selected.size} selected</span>
+      <button className="b-gho b-xs" onClick={()=>setSelected(new Set())}>Clear</button>
+      <div className="dt-bulk-actions">
+        {(bulkActions||[]).map(a => <button key={a.id} className={a.cls||'b-gho b-xs'}
+          onClick={()=>{onBulkAction && onBulkAction(a.id, [...selected]); setSelected(new Set())}}>
+          {a.icon && <I n={a.icon} s={11}/>}{a.label}
+        </button>)}
+      </div>
+    </div>}
+
     <div className="dt-toolbar">
       <input className="dt-search" placeholder={`Search ${label||''}...`} value={search}
         onChange={e=>setSearch(e.target.value)}/>
@@ -9328,6 +9461,11 @@ const DataTable = ({data, columns, groupOptions, defaultVisibleCols, onRowClick,
     <div className="dt-wrap"><div className="dt-scroll">
       <table className="dt">
         <thead><tr>
+          {draggable && <th style={{width:24,padding:'6px 4px'}}/>}
+          {selectable && <th className="dt-sel-col">
+            <div className={'dt-cb'+(isAllSelected?' checked':isSomeSelected?' partial':'')}
+              onClick={toggleSelectAll}>{isAllSelected?'✓':isSomeSelected?'—':''}</div>
+          </th>}
           {visCols.map(c => <th key={c.key} onClick={()=>handleSort(c.key)}>
             {c.label}{sortField===c.key?(sortDir==='asc'?' ↑':' ↓'):''}
           </th>)}
@@ -9335,15 +9473,33 @@ const DataTable = ({data, columns, groupOptions, defaultVisibleCols, onRowClick,
         <tbody>
           {Object.entries(grouped).map(([gName, rows]) => <React.Fragment key={gName}>
             {gName !== '__all' && <tr className="dt-grp">
-              <td colSpan={visCols.length}>{'▾ '+gName+' ('+rows.length+')'}</td>
+              <td colSpan={visCols.length + extraColCount}>{'▾ '+gName+' ('+rows.length+')'}</td>
             </tr>}
-            {rows.map(row => <tr key={row.id} className={'dt-row'+(selectedId===row.id?' selected':'')+(row.status==='revoked'?' revoked':'')}
-              onClick={()=>onRowClick&&onRowClick(row)}>
-              {visCols.map(col => <td key={col.key}>{renderCell(row, col)}</td>)}
+            {rows.map(row => <tr key={row.id}
+              className={'dt-row'+(selectedId===row.id?' selected':'')+(row.status==='revoked'?' revoked':'')+(dragId===row.id?' dragging':'')+(dragOverId===row.id?' drag-over':'')}
+              onClick={()=>onRowClick&&onRowClick(row)}
+              draggable={draggable?true:undefined}
+              onDragStart={draggable?e=>handleDragStart(e,row.id):undefined}
+              onDragOver={draggable?e=>handleDragOver(e,row.id):undefined}
+              onDragEnd={draggable?handleDragEnd:undefined}>
+              {draggable && <td className="dt-drag-handle">⠿</td>}
+              {selectable && <td className="dt-sel-col">
+                <div className={'dt-cb'+(selected.has(row.id)?' checked':'')}
+                  onClick={e=>toggleSelect(row.id,e)}>{selected.has(row.id)?'✓':''}</div>
+              </td>}
+              {visCols.map(col => <td key={col.key}>
+                {editable && col.editable
+                  ? <EditableCell value={getVal(row,col.key)} placeholder={col.placeholder}
+                      onSave={v=>onCellEdit&&onCellEdit(row,col.key,v)}/>
+                  : renderCell(row, col)}
+              </td>)}
             </tr>)}
           </React.Fragment>)}
         </tbody>
       </table>
+      {onAddRow && <div className="dt-add-row" onClick={onAddRow}>
+        + {addRowLabel || 'Add row'}
+      </div>}
     </div></div>
   </>;
 };
@@ -9624,6 +9780,671 @@ const ResourcePanel = ({row, allocations, onClose, panelTab, setPanelTab}) => {
       </div>
     </div>
   </>;
+};
+
+/* ─── NoteCreateModal — create a note (attached or unattached) ─── */
+const NoteCreateModal = ({open, onClose, individuals, staff, svc, rosterRoom, onSave, showToast, T}) => {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [attachTo, setAttachTo] = useState('');   // bridgeRoomId or ''
+  const [tags, setTags] = useState([]);            // [{userId, displayName}]
+  const [tagSearch, setTagSearch] = useState('');
+  const [tagDd, setTagDd] = useState(false);
+
+  if (!open) return null;
+
+  const allPeople = [
+    ...(staff||[]).map(s => ({userId:s.userId, displayName:s.display_name||s.userId?.split(':')[0]?.replace('@','')||'Staff'})),
+    ...(individuals||[]).map(ind => ({userId:ind._case?.clientUserId||ind.id, displayName:ind.name||'Unknown'})),
+  ].filter((p,i,arr) => arr.findIndex(x=>x.userId===p.userId)===i);
+
+  const filteredPeople = allPeople.filter(p => !tags.find(t=>t.userId===p.userId) &&
+    (p.displayName||'').toLowerCase().includes(tagSearch.toLowerCase()));
+
+  const handleSave = async () => {
+    if (!title.trim() && !content.trim()) return;
+    const noteData = {
+      id: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+      title: title.trim(),
+      content: content.trim(),
+      attached_to: attachTo || null,
+      tags: tags,
+      author: svc.userId,
+      created: Date.now(),
+      updated: Date.now(),
+      tombstoned: false,
+    };
+    try {
+      // If attached to an individual, store in their bridge room (sovereignty)
+      // Also store a reference in roster room for org visibility
+      const targetRoom = attachTo || rosterRoom;
+      if (targetRoom) {
+        await svc.sendEvent(targetRoom, EVT.NOTE, noteData);
+        // If stored in bridge, also create a reference in roster room
+        if (attachTo && rosterRoom) {
+          await svc.sendEvent(rosterRoom, EVT.NOTE_REF, {
+            note_id: noteData.id,
+            subject_room: attachTo,
+            title: noteData.title,
+            attached_to: attachTo,
+            author: svc.userId,
+            created: noteData.created,
+          });
+        }
+      }
+      onSave && onSave(noteData);
+      showToast && showToast('Note created', 'success');
+      setTitle(''); setContent(''); setAttachTo(''); setTags([]); setTagSearch('');
+      onClose();
+    } catch(e) { showToast && showToast('Failed to create note: ' + e.message, 'error'); }
+  };
+
+  return <Modal open={open} onClose={onClose} title="New Note" w={560}>
+    <div style={{marginBottom:14}}>
+      <span className="section-label">TITLE</span>
+      <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Note title..."/>
+    </div>
+    <div style={{marginBottom:14}}>
+      <span className="section-label">CONTENT</span>
+      <textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="Write your note..." style={{minHeight:100}}/>
+    </div>
+    <div style={{marginBottom:14}}>
+      <span className="section-label">ATTACH TO {T?.client_term?.toUpperCase() || 'INDIVIDUAL'} (OPTIONAL)</span>
+      <select value={attachTo} onChange={e=>setAttachTo(e.target.value)} style={{width:'100%'}}>
+        <option value="">Standalone (not attached)</option>
+        {(individuals||[]).map(ind => <option key={ind.id} value={ind.id}>{ind.name||ind.id}</option>)}
+      </select>
+      <div style={{fontSize:10,color:'var(--tx-2)',marginTop:4}}>
+        {attachTo ? 'Stored in the individual\'s bridge room — they can see and control this note.' : 'Stored in your roster room — internal to your organization.'}
+      </div>
+    </div>
+    <div style={{marginBottom:18}}>
+      <span className="section-label">TAG PEOPLE</span>
+      <div style={{position:'relative'}}>
+        <input value={tagSearch} onChange={e=>{setTagSearch(e.target.value);setTagDd(true)}}
+          onFocus={()=>setTagDd(true)} placeholder="Search people to tag..."
+          style={{marginBottom:tags.length?6:0}}/>
+        {tagDd && tagSearch && filteredPeople.length > 0 && <div className="dt-dd" style={{position:'absolute',top:'100%',left:0,right:0,zIndex:200}}>
+          {filteredPeople.slice(0,8).map(p => <div key={p.userId} className="dt-dd-item"
+            onClick={()=>{setTags(prev=>[...prev,p]);setTagSearch('');setTagDd(false)}}>
+            <span style={{width:20,height:20,borderRadius:'50%',background:'var(--purple-dim)',color:'var(--purple)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,flexShrink:0}}>{(p.displayName||'?')[0].toUpperCase()}</span>
+            {p.displayName}
+            <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)',marginLeft:'auto'}}>{p.userId?.split(':')[0]?.replace('@','')}</span>
+          </div>)}
+        </div>}
+      </div>
+      {tags.length > 0 && <div className="note-tags">
+        {tags.map(t => <span key={t.userId} className="note-tag-chip" onClick={()=>setTags(prev=>prev.filter(x=>x.userId!==t.userId))}
+          style={{cursor:'pointer'}}>{t.displayName} ✕</span>)}
+      </div>}
+    </div>
+    <button onClick={handleSave} className="b-pri" disabled={!title.trim()&&!content.trim()} style={{width:'100%',padding:12,fontSize:14}}>
+      Save Note
+    </button>
+  </Modal>;
+};
+
+/* ─── NotesTable — table of all notes ─── */
+const NotesTable = ({notes, individuals, onNoteClick, onNewNote, T}) => {
+  const NOTE_COLS = [
+    {key:'title', label:'Title', fixed:true},
+    {key:'content', label:'Content'},
+    {key:'attached_to_name', label:'Attached To'},
+    {key:'tags_display', label:'Tags'},
+    {key:'author_name', label:'Author'},
+    {key:'created', label:'Created'},
+  ];
+  const NOTE_GROUPS = [
+    {k:'none',l:'No grouping'},
+    {k:'attached_to_name',l:'Attached To'},
+    {k:'author_name',l:'Author'},
+  ];
+
+  const noteRows = (notes||[]).map(n => {
+    const ind = (individuals||[]).find(i => i.id === n.attached_to);
+    return {
+      ...n,
+      attached_to_name: ind ? ind.name : (n.attached_to ? '[bridge]' : 'Standalone'),
+      tags_display: (n.tags||[]).map(t=>t.displayName).join(', ') || '—',
+      author_name: (n.author||'').split(':')[0]?.replace('@','') || 'Unknown',
+    };
+  });
+
+  const getNoteVal = (row, key) => {
+    if (key === 'created') return row.created || 0;
+    return row[key] || '';
+  };
+
+  const renderNoteCell = (row, col) => {
+    if (row.tombstoned) {
+      if (col.key === 'title') return <span style={{color:'var(--red)',fontStyle:'italic'}}>Deleted by individual</span>;
+      if (col.key === 'content') return <span style={{color:'var(--tx-3)'}}>—</span>;
+    }
+    if (col.key === 'title') return <div style={{fontWeight:600,fontSize:13}}>{row.title || '(untitled)'}</div>;
+    if (col.key === 'content') return <div style={{fontSize:12,color:'var(--tx-1)',maxWidth:300,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{row.content?.slice(0,80) || '—'}</div>;
+    if (col.key === 'attached_to_name') {
+      if (row.attached_to) return <span className="note-attached-to">{row.attached_to_name}</span>;
+      return <span style={{color:'var(--tx-3)',fontSize:12}}>Standalone</span>;
+    }
+    if (col.key === 'tags_display') {
+      if (!row.tags || row.tags.length === 0) return <span style={{color:'var(--tx-3)',fontSize:12}}>—</span>;
+      return <div className="note-tags">{row.tags.map(t =>
+        <span key={t.userId} className="note-tag-chip">{t.displayName}</span>)}</div>;
+    }
+    if (col.key === 'author_name') return <span style={{fontSize:12,color:'var(--tx-1)'}}>{row.author_name}</span>;
+    if (col.key === 'created') return <span style={{fontSize:12,color:'var(--tx-2)'}}>{dtFmtDate(row.created)}</span>;
+    return <span style={{color:'var(--tx-3)',fontSize:12}}>—</span>;
+  };
+
+  return <>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+      <div>
+        <p style={{color:'var(--tx-1)',fontSize:12.5}}>All notes across cases and standalone. Click a note for details.</p>
+      </div>
+      <button onClick={onNewNote} className="b-pri b-sm" style={{display:'flex',alignItems:'center',gap:4}}>
+        <I n="plus" s={12}/>New Note
+      </button>
+    </div>
+    {noteRows.length === 0
+      ? <div className="card" style={{textAlign:'center',padding:'40px 20px',borderStyle:'dashed'}}>
+          <I n="msg" s={28} c="var(--tx-3)"/>
+          <p style={{color:'var(--tx-2)',marginTop:10,fontSize:13}}>No notes yet</p>
+          <p style={{color:'var(--tx-3)',fontSize:11.5,marginTop:4}}>Click "New Note" to create one. Notes can be attached to individuals or standalone.</p>
+          <button onClick={onNewNote} className="b-pri b-sm" style={{marginTop:12}}>Create First Note</button>
+        </div>
+      : <DataTable
+          data={noteRows}
+          columns={NOTE_COLS}
+          groupOptions={NOTE_GROUPS}
+          defaultVisibleCols={['title','content','attached_to_name','tags_display','author_name','created']}
+          onRowClick={onNoteClick}
+          renderCell={renderNoteCell}
+          getVal={getNoteVal}
+          label="notes"
+          selectable={true}
+          bulkActions={[{id:'delete',label:'Delete',cls:'b-red b-xs',icon:'trash'}]}
+        />}
+  </>;
+};
+
+/* ─── DatabaseView — unified tabbed view for Individuals, Notes, Resources ─── */
+const DatabaseView = ({cases, caseAssignments, openCase, T, svc, caseAllocations, providerProfile, orgRoom, orgMeta, staff, orgRole, showToast,
+  bridgeNotes, rosterNotes, allAllocations, onCreateOrg, onEditProfile, onDiscover, myVerification, emailVerifyConfig, openEmailVerifyModal, orgChannels,
+  ORG_TYPE_LABELS, ORG_ROLE_LABELS, notes, onNewNote, onNoteClick, onOpenIndividual, onOpenResource,
+  resourceTypes, resourceRelations, resourceInventory, rosterRoom, networkRoom, onCreateResource, onRefresh,
+  onRestock, onEstablishRelation, canViewResource, canControlResource, canAllocateResource,
+  clientRecords, onCreateClient, onCellEdit, onBulkAction, onReorder, onAddRow}) => {
+
+  const [dbTab, setDbTab] = useState('individuals');
+
+  // Transform cases into individual rows (same as IndividualsView)
+  const individuals = cases.map(c => {
+    const assignment = caseAssignments[c.bridgeRoomId];
+    const fields = {};
+    Object.entries(c.sharedData||{}).forEach(([k,v]) => {
+      if (k === 'full_name') return;
+      fields[k] = { value: v, disclosed: true, eo_op: 'INS', frame: 'GIVEN', room: 'bridge', editable: false, history: [] };
+    });
+    return {
+      id: c.bridgeRoomId,
+      name: c.sharedData.full_name || c.clientUserId || 'Unknown',
+      alias: null,
+      status: c.meta?.status === 'tombstoned' ? 'revoked' : (c.sharedData.full_name ? 'active' : 'imported'),
+      disclosureLevel: Object.keys(c.sharedData||{}).length > 0 ? Math.min(Object.keys(c.sharedData).length / 10, 1) : 0,
+      lastContact: c.meta?.last_updated || c.meta?.created,
+      assignedTo: (assignment?.primary || c.meta?.provider || '').split(':')[0]?.replace('@','') || '—',
+      activeCases: 1,
+      priority: assignment?.priority || 'none',
+      nextAction: assignment?.next_action || null,
+      bridgeRoom: c.bridgeRoomId,
+      fields,
+      transferable: c.transferable,
+      _case: c,
+    };
+  });
+
+  // Also include client records that aren't yet in cases (provider-created)
+  const caseRoomIds = new Set(cases.map(c=>c.bridgeRoomId));
+  const extraClients = (clientRecords||[]).filter(r => !caseRoomIds.has(r.roomId)).map(r => ({
+    id: r.roomId,
+    name: r.client_name || 'Unknown',
+    alias: null,
+    status: r.status || 'created',
+    disclosureLevel: 0,
+    lastContact: r.created,
+    assignedTo: (r.owner||'').split(':')[0]?.replace('@','')||'—',
+    activeCases: 0,
+    priority: 'none',
+    bridgeRoom: r.roomId,
+    fields: {},
+    transferable: false,
+    _clientRecord: r,
+  }));
+  const allIndividuals = [...individuals, ...extraClients];
+
+  const IND_COLS = [
+    {key:'name', label:'Individual', fixed:true, editable:true, placeholder:'Enter name...'},
+    {key:'status', label:'Status'},
+    {key:'priority', label:'Priority', editable:true},
+    {key:'assignedTo', label:'Assigned'},
+    {key:'fields_count', label:'Fields'},
+    {key:'transferable', label:'Transfer'},
+  ];
+  // Add dynamic field columns
+  const fieldKeys = new Set();
+  cases.forEach(c => Object.keys(c.sharedData||{}).forEach(k => { if (k !== 'full_name') fieldKeys.add(k); }));
+  fieldKeys.forEach(k => {
+    IND_COLS.push({key:k, label:k.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase()), isField:true, editable:true});
+  });
+
+  const IND_GROUPS = [
+    {k:'none',l:'No grouping'},{k:'status',l:'Status'},{k:'assignedTo',l:'Assigned To'},{k:'priority',l:'Priority'},
+  ];
+  const defaultVisCols = ['name','status','priority','assignedTo','fields_count','transferable',...Array.from(fieldKeys).slice(0,3)];
+
+  const getIndVal = (row, key) => {
+    if (key === 'fields_count') return Object.keys(row.fields||{}).length;
+    if (key === 'transferable') return row.transferable ? 'Yes' : 'Locked';
+    if (row.fields && row.fields[key]) return row.fields[key].value || '';
+    return row[key] || '';
+  };
+
+  const renderIndCell = (row, col) => {
+    const k = col.key;
+    if (k === 'name') {
+      const initial = (row.name||'?')[0].toUpperCase();
+      return <div style={{display:'flex',alignItems:'center',gap:8}}>
+        <div style={{width:24,height:24,borderRadius:'50%',background:row.status==='revoked'?'var(--border-1)':'var(--green)',
+          display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:11,fontWeight:700,flexShrink:0}}>{initial}</div>
+        <div>
+          <div style={{fontWeight:600,fontSize:13}}>{row.name}</div>
+          {row.alias && <div style={{fontSize:11,color:'var(--tx-3)'}}>"{row.alias}"</div>}
+        </div>
+      </div>;
+    }
+    if (k === 'status') return <DtStatusBadge status={row.status}/>;
+    if (k === 'priority') {
+      const cls = DT_PRI_CFG[row.priority] || 'tag-purple';
+      return <span className={'tag '+cls} style={{fontSize:10}}>{row.priority}</span>;
+    }
+    if (k === 'assignedTo') return <span style={{fontSize:13,color:'var(--tx-1)'}}>{row.assignedTo}</span>;
+    if (k === 'fields_count') {
+      const ct = Object.keys(row.fields||{}).length;
+      return <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:22,height:22,
+        borderRadius:5,background:ct>0?'var(--green-dim)':'var(--bg-3)',color:ct>0?'var(--green)':'var(--tx-3)',
+        fontSize:12,fontWeight:700}}>{ct}</span>;
+    }
+    if (k === 'transferable') {
+      return row.transferable
+        ? <span className="tag tag-teal" style={{fontSize:9}}>Transferable</span>
+        : <span className="tag tag-red" style={{fontSize:9}}>Locked</span>;
+    }
+    if (col.isField && row.fields && row.fields[k]) {
+      const f = row.fields[k];
+      if (f.disclosed === false) return <span className="dt-locked"><DtLock/> not disclosed</span>;
+      return <span style={{fontSize:13}}>{f.value || '—'}</span>;
+    }
+    return <span style={{color:'var(--tx-3)',fontSize:12}}>—</span>;
+  };
+
+  // Stat cards
+  const indStats = [
+    {l:'Total',v:allIndividuals.length,c:'gold'},
+    {l:'Active',v:allIndividuals.filter(i=>i.status==='active').length,c:'green'},
+    {l:'Staff',v:(staff||[]).length||'—',c:'blue'},
+    {l:'Fields Shared',v:cases.reduce((s,c)=>s+Object.keys(c.sharedData||{}).length,0),c:'teal'},
+  ];
+
+  return <div className="anim-up db-view">
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+      <div>
+        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Database</h2>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:2}}>Manage individuals, notes, and resources in one place.</p>
+      </div>
+    </div>
+
+    {/* Tab bar */}
+    <div className="db-tabs">
+      {[{id:'individuals',label:'Individuals',count:allIndividuals.length,icon:'users'},
+        {id:'notes',label:'Notes',count:(notes||[]).length,icon:'msg'},
+        {id:'resources',label:'Resources',count:(resourceTypes||[]).length,icon:'layers'}
+      ].map(tab => <button key={tab.id}
+        className={'db-tab'+(dbTab===tab.id?' active':'')}
+        onClick={()=>setDbTab(tab.id)}>
+        <I n={tab.icon} s={13}/>
+        {tab.label}
+        <span className="db-tab-count">{tab.count}</span>
+      </button>)}
+    </div>
+
+    {/* Individuals Tab */}
+    {dbTab==='individuals' && <>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:16}}>
+        {indStats.map((s,i)=><div key={i} className="card" style={{padding:12}}><span className="section-label">{s.l.toUpperCase()}</span>
+          <span style={{fontSize:18,fontWeight:700,display:'block',marginTop:2}}>{s.v}</span></div>)}
+      </div>
+      <DataTable
+        data={allIndividuals}
+        columns={IND_COLS}
+        groupOptions={IND_GROUPS}
+        defaultVisibleCols={defaultVisCols}
+        onRowClick={(row) => onOpenIndividual ? onOpenIndividual(row) : (row._case ? openCase(row._case.bridgeRoomId) : null)}
+        renderCell={renderIndCell}
+        getVal={getIndVal}
+        label="individuals"
+        selectable={true}
+        bulkActions={[
+          {id:'assign',label:'Assign',cls:'b-gho b-xs',icon:'briefcase'},
+          {id:'tag',label:'Tag',cls:'b-gho b-xs',icon:'users'},
+          {id:'delete',label:'Delete',cls:'b-red b-xs',icon:'trash'},
+        ]}
+        onBulkAction={onBulkAction}
+        draggable={true}
+        onReorder={onReorder}
+        editable={true}
+        onCellEdit={onCellEdit}
+        onAddRow={onAddRow || onCreateClient}
+        addRowLabel={`Add ${T?.client_term || 'Individual'}`}
+      />
+      <div className="dt-sov">
+        <span style={{fontSize:14,flexShrink:0}}>◇</span>
+        <div><strong>Sovereignty model: </strong>Every row is a Matrix room. Edits emit EO events on blur — INS (△) instantiates, ALT (∿) transitions, NUL (∅) revokes. Data about an individual is stored in their bridge room, giving them control.</div>
+      </div>
+    </>}
+
+    {/* Notes Tab */}
+    {dbTab==='notes' && <NotesTable
+      notes={notes}
+      individuals={allIndividuals}
+      onNoteClick={onNoteClick}
+      onNewNote={onNewNote}
+      T={T}
+    />}
+
+    {/* Resources Tab */}
+    {dbTab==='resources' && <ResourcesTableView
+      resourceTypes={resourceTypes}
+      resourceRelations={resourceRelations}
+      resourceInventory={resourceInventory}
+      T={T}
+      svc={svc}
+      orgRole={orgRole}
+      orgRoom={orgRoom}
+      rosterRoom={rosterRoom}
+      networkRoom={networkRoom}
+      allAllocations={allAllocations}
+      onCreateResource={onCreateResource}
+      onRefresh={onRefresh}
+      onRestock={onRestock}
+      onEstablishRelation={onEstablishRelation}
+      canViewResource={canViewResource}
+      canControlResource={canControlResource}
+      canAllocateResource={canAllocateResource}
+      individuals={cases}
+    />}
+  </div>;
+};
+
+/* ─── IndividualProfilePage — full profile view for an individual ─── */
+const IndividualProfilePage = ({individual, notes, allocations, onBack, onOpenCase, onAddNote, svc, T, showToast}) => {
+  const [tab, setTab] = useState('fields');
+  if (!individual) return null;
+
+  const indNotes = (notes||[]).filter(n => n.attached_to === individual.id || n.indId === individual.id);
+  const indAllocs = (allocations||[]).filter(a => a.indId === individual.id);
+
+  return <div className="anim-up profile-page">
+    <button onClick={onBack} className="b-gho b-sm" style={{marginBottom:14,display:'flex',alignItems:'center',gap:4}}>
+      <I n="back" s={13}/>Back to Database
+    </button>
+
+    {/* Header */}
+    <div className="profile-header">
+      <div className="profile-avatar" style={{background:individual.status==='revoked'?'var(--border-1)':'var(--green)'}}>
+        {(individual.name||'?')[0].toUpperCase()}
+      </div>
+      <div className="profile-info">
+        <div className="profile-name">{individual.name || 'Unknown'}</div>
+        <div className="profile-badges">
+          <DtStatusBadge status={individual.status}/>
+          {individual.bridgeRoom && <DtRoom room={individual.bridgeRoom}/>}
+          {individual.transferable
+            ? <span className="tag tag-teal" style={{fontSize:9}}><I n="users" s={8}/>Transferable</span>
+            : <span className="tag tag-red" style={{fontSize:9}}><I n="lock" s={8}/>Transfer Locked</span>}
+          <DtDiscBar level={individual.disclosureLevel||0}/>
+        </div>
+        <div style={{display:'flex',gap:6,marginTop:10}}>
+          {individual._case && <button onClick={()=>onOpenCase(individual._case.bridgeRoomId)} className="b-pri b-sm" style={{display:'flex',alignItems:'center',gap:4}}>
+            <I n="briefcase" s={12}/>Open Case
+          </button>}
+          <button onClick={()=>onAddNote(individual.id)} className="b-gho b-sm" style={{display:'flex',alignItems:'center',gap:4}}>
+            <I n="msg" s={12}/>Add Note
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {/* Tabs */}
+    <div className="profile-tabs">
+      {[{id:'fields',label:'Fields'},{id:'notes',label:`Notes (${indNotes.length})`},{id:'allocations',label:`Allocations (${indAllocs.length})`},{id:'activity',label:'Activity'}].map(t =>
+        <button key={t.id} className={'profile-tab'+(tab===t.id?' active':'')} onClick={()=>setTab(t.id)}>{t.label}</button>)}
+    </div>
+
+    {/* Fields */}
+    {tab==='fields' && <div className="profile-section">
+      <div className="profile-section-title">Shared Fields — Client Controlled</div>
+      {Object.keys(individual.fields||{}).length === 0
+        ? <div className="card" style={{textAlign:'center',padding:'30px 20px',color:'var(--tx-3)'}}>No fields shared yet.</div>
+        : <div className="profile-fields-grid">
+          {Object.entries(individual.fields||{}).map(([key,f]) =>
+            <div key={key} className="profile-field-card">
+              <div className="profile-field-label">{key.replace(/_/g,' ')}</div>
+              {f.disclosed === false
+                ? <div className="dt-locked"><DtLock/> not disclosed</div>
+                : <div className="profile-field-value">{f.value || '—'}</div>}
+              <div style={{display:'flex',gap:4,marginTop:6}}>
+                {f.eo_op && <DtEo op={f.eo_op}/>}
+                {f.frame && <span className="dt-eo" style={{background:f.frame==='GIVEN'?'var(--teal-dim)':'var(--gold-dim)',
+                  color:f.frame==='GIVEN'?'var(--teal)':'var(--gold)'}}>{f.frame}</span>}
+              </div>
+            </div>)}
+        </div>}
+    </div>}
+
+    {/* Notes */}
+    {tab==='notes' && <div className="profile-section">
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <div className="profile-section-title" style={{marginBottom:0}}>Notes</div>
+        <button onClick={()=>onAddNote(individual.id)} className="b-gho b-xs" style={{display:'flex',alignItems:'center',gap:3}}>
+          <I n="plus" s={11}/>Add Note
+        </button>
+      </div>
+      {indNotes.length === 0
+        ? <div className="card" style={{textAlign:'center',padding:'30px 20px',color:'var(--tx-3)'}}>No notes yet. Click "Add Note" to create one.</div>
+        : indNotes.map(n => <div key={n.id} className={'note-card'+(n.tombstoned?' tombstoned':n.attached_to?' attached':' standalone')}>
+          {n.tombstoned
+            ? <div className="tombstone-notice"><I n="shield" s={14}/>This note was deleted by the individual. The record has been tombstoned.</div>
+            : <>
+              <div className="note-header">
+                <div className="note-title">{n.title || '(untitled)'}</div>
+                <div className="note-meta">{dtFmtDate(n.created)} · {(n.author||'').split(':')[0]?.replace('@','')}</div>
+              </div>
+              <div className="note-body">{n.content || n.text || ''}</div>
+              {n.tags && n.tags.length > 0 && <div className="note-tags">
+                {n.tags.map(t => <span key={t.userId} className="note-tag-chip">{t.displayName}</span>)}
+              </div>}
+            </>}
+        </div>)}
+    </div>}
+
+    {/* Allocations */}
+    {tab==='allocations' && <div className="profile-section">
+      <div className="profile-section-title">Resource Allocations</div>
+      {indAllocs.length === 0
+        ? <div className="card" style={{textAlign:'center',padding:'30px 20px',color:'var(--tx-3)'}}>No resource allocations.</div>
+        : indAllocs.map(a => <div key={a.id} className="dt-alloc">
+          <div className="dt-alloc-header">
+            <div>
+              <div style={{fontWeight:600,fontSize:13}}>{a.resourceName||'Resource'}</div>
+              <div style={{fontSize:11,color:'var(--tx-2)'}}>{a.quantity} {a.unit} · {dtFmtDate(a.at)}</div>
+            </div>
+            <div style={{display:'flex',gap:4}}>
+              <DtEo op={a.eo_op||'CON'}/>
+              <span className={'tag '+(a.status==='active'?'tag-green':'tag-purple')} style={{fontSize:10}}>{a.status}</span>
+            </div>
+          </div>
+        </div>)}
+    </div>}
+
+    {/* Activity */}
+    {tab==='activity' && <div className="profile-section">
+      <div className="profile-section-title">Recent Activity</div>
+      <div className="card" style={{textAlign:'center',padding:'30px 20px',color:'var(--tx-3)'}}>
+        Activity stream for this individual. Events are tracked in the Activity Stream view.
+      </div>
+    </div>}
+  </div>;
+};
+
+/* ─── ResourceProfilePage — full profile view for a resource ─── */
+const ResourceProfilePage = ({resource, allocations, onBack, T}) => {
+  const [tab, setTab] = useState('details');
+  if (!resource) return null;
+
+  const resAllocs = (allocations||[]).filter(a => a.resourceId === resource.id);
+
+  return <div className="anim-up profile-page">
+    <button onClick={onBack} className="b-gho b-sm" style={{marginBottom:14,display:'flex',alignItems:'center',gap:4}}>
+      <I n="back" s={13}/>Back to Database
+    </button>
+
+    <div className="profile-header">
+      <div className="profile-avatar" style={{background:'var(--teal)'}}>
+        <I n="layers" s={22}/>
+      </div>
+      <div className="profile-info">
+        <div className="profile-name">{resource.name}</div>
+        <div className="profile-badges">
+          <span className={'tag tag-'+(RESOURCE_CATEGORY_COLORS[resource.category]||'teal')} style={{fontSize:10}}>{RESOURCE_CATEGORY_LABELS[resource.category]||resource.category}</span>
+          {resource.relation && <span className="tag tag-gold" style={{fontSize:10}}>{resource.relation}</span>}
+          {resource.opacityLevel && (()=>{const o=DT_OP_CFG[resource.opacityLevel];return o?<span className={'tag '+o.cls} style={{fontSize:10}}>{o.l}</span>:null;})()}
+          <DtRoom room={resource.orgRoom}/>
+        </div>
+      </div>
+    </div>
+
+    <div className="profile-tabs">
+      {[{id:'details',label:'Details'},{id:'provisioning',label:'Provisioning'},{id:'allocations',label:`Allocations (${resAllocs.length})`}].map(t =>
+        <button key={t.id} className={'profile-tab'+(tab===t.id?' active':'')} onClick={()=>setTab(t.id)}>{t.label}</button>)}
+    </div>
+
+    {tab==='details' && <div className="profile-section">
+      <div className="dt-cap">
+        {[{n:resource.available||0,l:'Available',c:'var(--green)'},{n:resource.allocated||0,l:'Allocated',c:'var(--teal)'},
+          {n:resource.reserved||0,l:'Reserved',c:'var(--gold)'},{n:resource.totalCapacity||0,l:'Total',c:'var(--tx-0)'}]
+          .map((s,i) => <div key={i} className="dt-cap-box">
+            <div className="num" style={{color:s.c}}>{s.n}</div><div className="lbl">{s.l}</div>
+          </div>)}
+      </div>
+      <div style={{marginBottom:14}}><DtUtilBar pct={resource.utilizationPct||0}/></div>
+      <span className="section-label">Details</span>
+      <div className="dt-field-grid">
+        {[{k:'Holder',v:(resource.holder||'—')+' ('+(resource.holderType||'org')+')'},{k:'Relation',v:resource.relation||'—'},
+          {k:'Network',v:resource.network||'—'},{k:'Governance',v:resource.governance||'—'},{k:'Updated',v:dtFmtDate(resource.lastUpdated)},{k:'Unit',v:resource.unit||'—'}]
+          .map(({k,v}) => <React.Fragment key={k}><div className="dt-field-key">{k}</div><div>{v}</div></React.Fragment>)}
+      </div>
+    </div>}
+
+    {tab==='provisioning' && <div className="profile-section">
+      <span className="section-label">Provisioning Timeline</span>
+      {(resource.provisioningEvents||[]).length === 0
+        ? <div className="card" style={{textAlign:'center',padding:'30px 20px',color:'var(--tx-3)'}}>No provisioning events.</div>
+        : (resource.provisioningEvents||[]).map((evt,i) => {
+          const color = DT_PROV_COLORS[evt.event]||'var(--tx-2)';
+          return <div key={i} className="dt-prov">
+            <div className="dt-prov-icon" style={{background:color+'18',color}}>{evt.event==='restocked'?'↑':'→'}</div>
+            <div style={{flex:1}}>
+              <div><strong>{(evt.event||'').replace(/_/g,' ')}</strong> <DtEo op={evt.eo_op||'ALT'}/>{' '}
+                <span style={{color,fontWeight:600,fontFamily:'var(--mono)',fontSize:12}}>{evt.delta}</span></div>
+              <div style={{fontSize:11,color:'var(--tx-3)'}}>{dtFmtDate(evt.at)}</div>
+            </div>
+          </div>;
+        })}
+    </div>}
+
+    {tab==='allocations' && <div className="profile-section">
+      <span className="section-label">Allocations</span>
+      {resAllocs.length === 0
+        ? <div className="card" style={{textAlign:'center',padding:'30px 20px',color:'var(--tx-3)'}}>No allocations.</div>
+        : resAllocs.map(a => <div key={a.id} className="dt-alloc">
+          <div className="dt-alloc-header">
+            <div>
+              <div style={{fontWeight:600,fontSize:13}}>{a.indName||'[bridge ref]'}</div>
+              <div style={{fontSize:11,color:'var(--tx-2)'}}>{a.quantity} {a.unit} · {dtFmtDate(a.at)}</div>
+            </div>
+            <div style={{display:'flex',gap:4}}>
+              <DtEo op={a.eo_op||'CON'}/>
+              <span className={'tag '+(a.status==='active'?'tag-green':'tag-purple')} style={{fontSize:10}}>{a.status}</span>
+            </div>
+          </div>
+        </div>)}
+    </div>}
+  </div>;
+};
+
+/* ─── DashboardOverview — lightweight home with stats and recent activity ─── */
+const DashboardOverview = ({cases, clientRecords, staff, T, notes, resourceTypes, onGoToDatabase, onDiscover, onCreateClient}) => {
+  const recentNotes = (notes||[]).slice(0,5);
+  return <div className="anim-up" style={{maxWidth:1000,margin:'0 auto'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+      <div>
+        <h2 style={{fontFamily:'var(--serif)',fontSize:22,fontWeight:700}}>Dashboard</h2>
+        <p style={{color:'var(--tx-1)',fontSize:12.5,marginTop:2}}>Quick overview of your workspace.</p>
+      </div>
+      <div style={{display:'flex',gap:6}}>
+        <button onClick={onDiscover} className="b-gho b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="search" s={12}/>Find {T?.client_term||'Client'}</button>
+        <button onClick={onCreateClient} className="b-pri b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="plus" s={12}/>New {T?.client_term||'Individual'}</button>
+      </div>
+    </div>
+
+    {/* Summary stat cards */}
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10,marginBottom:24}}>
+      {[{l:`Active ${T?.client_term_plural||'Cases'}`,v:cases.length,c:'gold',i:'users'},
+        {l:`${T?.client_term||'Client'} Records`,v:(clientRecords||[]).length,c:'teal',i:'shield'},
+        {l:'Staff',v:(staff||[]).length||'—',c:'blue',i:'briefcase'},
+        {l:'Resources',v:(resourceTypes||[]).length,c:'green',i:'layers'},
+        {l:'Notes',v:(notes||[]).length,c:'purple',i:'msg'},
+      ].map((s,i)=><div key={i} className="card" style={{padding:14,cursor:'pointer'}} onClick={onGoToDatabase}>
+        <span className="section-label">{s.l.toUpperCase()}</span>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:4}}>
+          <span style={{fontSize:22,fontWeight:700}}>{s.v}</span>
+          <span style={{color:`var(--${s.c})`,opacity:.5}}><I n={s.i} s={18}/></span>
+        </div>
+      </div>)}
+    </div>
+
+    {/* Quick actions */}
+    <div className="card" style={{marginBottom:20}}>
+      <span className="section-label">QUICK ACTIONS</span>
+      <div style={{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}}>
+        <button onClick={onGoToDatabase} className="b-gho b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="grid" s={12}/>Open Database</button>
+        <button onClick={onDiscover} className="b-gho b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="search" s={12}/>Find {T?.client_term||'Client'}</button>
+        <button onClick={onCreateClient} className="b-gho b-sm" style={{display:'flex',alignItems:'center',gap:4}}><I n="plus" s={12}/>New {T?.client_term||'Individual'}</button>
+      </div>
+    </div>
+
+    {/* Recent notes */}
+    {recentNotes.length > 0 && <div className="card">
+      <span className="section-label">RECENT NOTES</span>
+      {recentNotes.map(n => <div key={n.id} style={{padding:'8px 0',borderBottom:'1px solid var(--border-0)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div>
+          <span style={{fontSize:13,fontWeight:600}}>{n.title||'(untitled)'}</span>
+          <span style={{fontSize:11,color:'var(--tx-2)',marginLeft:8}}>{(n.author||'').split(':')[0]?.replace('@','')}</span>
+        </div>
+        <span style={{fontSize:10,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>{dtFmtDate(n.created)}</span>
+      </div>)}
+    </div>}
+  </div>;
 };
 
 /* ─── IndividualsView — replaces old dashboard card grid ─── */
@@ -10023,6 +10844,13 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const [teamInviteUserId, setTeamInviteUserId] = useState('');
   // Client data import
   const [importModal, setImportModal] = useState(false);
+  // ─── Database / Notes / Profile state ───
+  const [dbNotes, setDbNotes] = useState([]);             // all notes across roster + bridges
+  const [newNoteModal, setNewNoteModal] = useState(false);
+  const [newNoteAttachTo, setNewNoteAttachTo] = useState(null); // pre-fill attach for profile page
+  const [activeIndividual, setActiveIndividual] = useState(null); // individual row for profile page
+  const [activeResourceProfile, setActiveResourceProfile] = useState(null); // resource row for profile page
+  const cellEditTimerRef = useRef({});                    // debounce timers for cell edits
   // Provider profile — self-reported identity info
   const [providerProfile, setProviderProfile] = useState({});
   const [profileModal, setProfileModal] = useState(false);
@@ -10393,6 +11221,81 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     }
     setBridgeNotes(notesMap);
     setAllAllocations(allAllocs);
+
+    // ─── Load structured notes (io.khora.note) from bridges + roster ───
+    const allNotes = [];
+    // Notes from bridge rooms (attached to individuals)
+    for (const c of currentCases) {
+      const room = svc.client.getRoom(c.bridgeRoomId);
+      if (!room) continue;
+      const events = room.getLiveTimeline().getEvents();
+      events.filter(e => e.getType() === EVT.NOTE).forEach(e => {
+        const content = e.getContent();
+        allNotes.push({
+          ...content,
+          id: content.id || e.getId(),
+          attached_to: content.attached_to || c.bridgeRoomId,
+          author: content.author || e.getSender(),
+          created: content.created || e.getTs(),
+          _sourceRoom: c.bridgeRoomId,
+        });
+      });
+    }
+    // Notes from roster room (standalone or references)
+    if (rosterRoom) {
+      const rRoom = svc.client.getRoom(rosterRoom);
+      if (rRoom) {
+        rRoom.getLiveTimeline().getEvents().filter(e => e.getType() === EVT.NOTE).forEach(e => {
+          const content = e.getContent();
+          allNotes.push({
+            ...content,
+            id: content.id || e.getId(),
+            author: content.author || e.getSender(),
+            created: content.created || e.getTs(),
+            _sourceRoom: rosterRoom,
+          });
+        });
+      }
+    }
+    // Sort by created desc, deduplicate by id
+    const seenNoteIds = new Set();
+    const dedupedNotes = allNotes.filter(n => { if (seenNoteIds.has(n.id)) return false; seenNoteIds.add(n.id); return true; })
+      .sort((a,b) => (b.created||0) - (a.created||0));
+    setDbNotes(dedupedNotes);
+  };
+
+  // ─── Cell edit handler with debounced EO event tracking ───
+  const handleDbCellEdit = (row, fieldKey, newValue) => {
+    const oldValue = row[fieldKey] || (row.fields && row.fields[fieldKey]?.value) || '';
+    if (newValue === oldValue) return;
+    // Debounce: clear existing timer for this row+field, set a new one
+    const timerKey = row.id + ':' + fieldKey;
+    if (cellEditTimerRef.current[timerKey]) clearTimeout(cellEditTimerRef.current[timerKey]);
+    cellEditTimerRef.current[timerKey] = setTimeout(async () => {
+      try {
+        const roomId = row.bridgeRoom || row.id;
+        // Emit EO operation to track the edit
+        await emitOp(roomId, oldValue ? 'ALT' : 'INS', {
+          entity: 'individual', field: fieldKey,
+        }, {
+          from: oldValue || undefined,
+          to: newValue,
+          edit_source: 'database_view',
+        }, {type: 'org', epistemic: 'MEANT', role: orgRole || 'provider'});
+        // If it's a field update on a bridge room, update the state
+        if (row._case && fieldKey !== 'name' && fieldKey !== 'priority') {
+          // Update shared data in the bridge
+          const updatedData = { ...row._case.sharedData, [fieldKey]: newValue };
+          await svc.setState(roomId, EVT.BRIDGE_REFS, { fields: updatedData });
+        }
+      } catch(e) { console.warn('Cell edit event failed:', e.message); }
+      delete cellEditTimerRef.current[timerKey];
+    }, 300); // 300ms debounce
+  };
+
+  // ─── Note save handler ───
+  const handleNoteSave = (noteData) => {
+    setDbNotes(prev => [noteData, ...prev]);
   };
 
   // Auto-register cases in org ROSTER_ASSIGN when they aren't tracked yet
@@ -10656,6 +11559,17 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       };
       setClientRecords(prev => [...prev, newRecord]);
       setCreateClientModal(false);
+      // Emit EO event to track individual creation
+      try {
+        await emitOp(roomId, 'INS', {
+          entity: 'individual',
+          designation: newClientName,
+        }, {
+          client_name: newClientName,
+          client_matrix_id: clientId || undefined,
+          edit_source: 'client_creation',
+        }, {type: 'org', epistemic: 'MEANT', role: orgRole || 'provider'});
+      } catch(e) { console.warn('Creation event tracking failed:', e.message); }
       setNewClientName(''); setNewClientMatrixId(''); setNewClientNotes('');
       showToast(`${T.client_term} "${newClientName}" created${clientId ? ' — invite sent' : ''}`,'success');
     } catch (e) { showToast('Failed: ' + e.message, 'error'); }
@@ -11584,22 +12498,21 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           const schemaNotifCount = notifications.filter(n => (n.type === 'schema_update' || n.type === 'schema_new') && !n.read).length;
           const activityNotifCount = notifications.filter(n => n.type === 'data_change' && !n.read).length;
           return [{id:'dashboard',icon:'briefcase',label:'Dashboard'},
+          {id:'database',icon:'grid',label:'Database'},
           {id:'inbox',icon:'msg',label:'Messages'},
-          {id:'clients',icon:'users',label:T.client_term_plural},
-          {id:'metrics',icon:'bar',label:'Metrics'},
           {id:'teams',icon:'users',label:`Teams${teams.length?` (${teams.length})`:''}`},
           {id:'schema',icon:'grid',label:'Schema',badge:schemaNotifCount,badgeClass:'nav-badge-teal'},
-          {id:'resources',icon:'layers',label:`Resources${resourceTypes.length?` (${resourceTypes.length})`:''}`},
+          {id:'metrics',icon:'bar',label:'Metrics'},
           {id:'activity',icon:'layers',label:'Activity Stream',badge:activityNotifCount,badgeClass:'nav-badge-teal'}
-        ].map(item=><div key={item.id} onClick={()=>{setView(item.id);setActiveCase(null);if(item.id!=='inbox'){setInboxConvo(null);setInboxMessages([])}}}
+        ].map(item=><div key={item.id} onClick={()=>{setView(item.id);setActiveCase(null);setActiveIndividual(null);setActiveResourceProfile(null);if(item.id!=='inbox'){setInboxConvo(null);setInboxMessages([])}}}
           style={{padding:'9px 10px',borderRadius:'var(--r)',cursor:'pointer',marginBottom:1,
-            background:view===item.id&&!activeCase?'var(--bg-4)':'transparent',
-            borderLeft:view===item.id&&!activeCase?'2px solid var(--gold)':'2px solid transparent',
+            background:(view===item.id||((item.id==='database')&&(view==='individual-profile'||view==='resource-profile')))&&!activeCase?'var(--bg-4)':'transparent',
+            borderLeft:(view===item.id||((item.id==='database')&&(view==='individual-profile'||view==='resource-profile')))&&!activeCase?'2px solid var(--gold)':'2px solid transparent',
             display:'flex',alignItems:'center',gap:8,transition:'all .15s',
-            color:view===item.id&&!activeCase?'var(--tx-0)':'var(--tx-1)'}}
+            color:(view===item.id||((item.id==='database')&&(view==='individual-profile'||view==='resource-profile')))&&!activeCase?'var(--tx-0)':'var(--tx-1)'}}
           onMouseEnter={e=>{if(!(view===item.id&&!activeCase))e.currentTarget.style.background='var(--bg-3)'}}
           onMouseLeave={e=>{if(!(view===item.id&&!activeCase))e.currentTarget.style.background='transparent'}}>
-          <I n={item.icon} s={14}/><span style={{fontSize:12.5,fontWeight:view===item.id?600:400}}>{item.label}</span>
+          <I n={item.icon} s={14}/><span style={{fontSize:12.5,fontWeight:view===item.id||((item.id==='database')&&(view==='individual-profile'||view==='resource-profile'))?600:400}}>{item.label}</span>
           {item.id==='inbox'&&(cases.length+orgChannels.length)>0&&<span className="nav-badge nav-badge-gold">{cases.length+orgChannels.length}</span>}
           {item.badge>0&&<span className={`nav-badge ${item.badgeClass}`}>{item.badge}</span>}
         </div>);
@@ -11672,32 +12585,113 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     {/* Main */}
     <div className="app-main" style={{flex:1,overflow:'auto',padding:24}}>
 
-      {/* DASHBOARD — Data Table View */}
-      {view==='dashboard'&&!activeCase&&<IndividualsView
+      {/* DASHBOARD — Overview */}
+      {view==='dashboard'&&!activeCase&&<DashboardOverview
         cases={cases}
-        caseAssignments={caseAssignments}
-        openCase={openCase}
-        T={T}
-        svc={svc}
-        caseAllocations={caseAllocations}
-        providerProfile={providerProfile}
-        orgRoom={orgRoom}
-        orgMeta={orgMeta}
+        clientRecords={clientRecords}
         staff={staff}
-        orgRole={orgRole}
-        showToast={showToast}
-        bridgeNotes={bridgeNotes}
-        rosterNotes={rosterNotes}
-        allAllocations={allAllocations}
-        onCreateOrg={()=>setCreateOrgModal(true)}
-        onEditProfile={openProfileModal}
+        T={T}
+        notes={dbNotes}
+        resourceTypes={resourceTypes}
+        onGoToDatabase={()=>{setView('database');setActiveCase(null)}}
         onDiscover={()=>setDiscoverModal(true)}
-        myVerification={myVerification}
-        emailVerifyConfig={emailVerifyConfig}
-        openEmailVerifyModal={openEmailVerifyModal}
-        orgChannels={orgChannels}
-        ORG_TYPE_LABELS={ORG_TYPE_LABELS}
-        ORG_ROLE_LABELS={ORG_ROLE_LABELS}
+        onCreateClient={()=>{setCreateClientModal(true);setNewClientName('');setNewClientMatrixId('');setNewClientNotes('')}}
+      />}
+
+      {/* DATABASE — Unified data management */}
+      {view==='database'&&!activeCase&&<>
+        <DatabaseView
+          cases={cases}
+          caseAssignments={caseAssignments}
+          openCase={openCase}
+          T={T}
+          svc={svc}
+          caseAllocations={caseAllocations}
+          providerProfile={providerProfile}
+          orgRoom={orgRoom}
+          orgMeta={orgMeta}
+          staff={staff}
+          orgRole={orgRole}
+          showToast={showToast}
+          bridgeNotes={bridgeNotes}
+          rosterNotes={rosterNotes}
+          allAllocations={allAllocations}
+          onCreateOrg={()=>setCreateOrgModal(true)}
+          onEditProfile={openProfileModal}
+          onDiscover={()=>setDiscoverModal(true)}
+          myVerification={myVerification}
+          emailVerifyConfig={emailVerifyConfig}
+          openEmailVerifyModal={openEmailVerifyModal}
+          orgChannels={orgChannels}
+          ORG_TYPE_LABELS={ORG_TYPE_LABELS}
+          ORG_ROLE_LABELS={ORG_ROLE_LABELS}
+          notes={dbNotes}
+          onNewNote={()=>{setNewNoteAttachTo(null);setNewNoteModal(true)}}
+          onNoteClick={(note)=>{/* TODO: note detail modal */}}
+          onOpenIndividual={(row)=>{setActiveIndividual(row);setView('individual-profile')}}
+          onOpenResource={(row)=>{setActiveResourceProfile(row);setView('resource-profile')}}
+          resourceTypes={resourceTypes}
+          resourceRelations={resourceRelations}
+          resourceInventory={resourceInventory}
+          rosterRoom={rosterRoom}
+          networkRoom={networkRoom}
+          onCreateResource={()=>{setResourceDraft({name:'',category:'general',unit:'unit',fungible:true,perishable:false,ttl_days:'',tags:'',permissions:buildDefaultResourcePermissions()});setCreateResourceModal(true)}}
+          onRefresh={()=>loadResources(orgRoom,networkRoom,rosterRoom)}
+          onRestock={(relation)=>{setRestockModal(relation);setRestockQty('');setRestockNote('')}}
+          onEstablishRelation={handleEstablishRelation}
+          canViewResource={canViewResource}
+          canControlResource={canControlResource}
+          canAllocateResource={canAllocateResource}
+          clientRecords={clientRecords}
+          onCreateClient={()=>{setCreateClientModal(true);setNewClientName('');setNewClientMatrixId('');setNewClientNotes('')}}
+          onCellEdit={handleDbCellEdit}
+          onAddRow={()=>{setCreateClientModal(true);setNewClientName('');setNewClientMatrixId('');setNewClientNotes('')}}
+        />
+        <NoteCreateModal
+          open={newNoteModal}
+          onClose={()=>setNewNoteModal(false)}
+          individuals={cases.map(c=>({id:c.bridgeRoomId,name:c.sharedData.full_name||c.clientUserId||'Unknown'}))}
+          staff={staff}
+          svc={svc}
+          rosterRoom={rosterRoom}
+          onSave={handleNoteSave}
+          showToast={showToast}
+          T={T}
+        />
+      </>}
+
+      {/* INDIVIDUAL PROFILE */}
+      {view==='individual-profile'&&activeIndividual&&<>
+        <IndividualProfilePage
+          individual={activeIndividual}
+          notes={dbNotes}
+          allocations={allAllocations}
+          onBack={()=>{setView('database');setActiveIndividual(null)}}
+          onOpenCase={openCase}
+          onAddNote={(indId)=>{setNewNoteAttachTo(indId);setNewNoteModal(true)}}
+          svc={svc}
+          T={T}
+          showToast={showToast}
+        />
+        <NoteCreateModal
+          open={newNoteModal}
+          onClose={()=>setNewNoteModal(false)}
+          individuals={cases.map(c=>({id:c.bridgeRoomId,name:c.sharedData.full_name||c.clientUserId||'Unknown'}))}
+          staff={staff}
+          svc={svc}
+          rosterRoom={rosterRoom}
+          onSave={handleNoteSave}
+          showToast={showToast}
+          T={T}
+        />
+      </>}
+
+      {/* RESOURCE PROFILE */}
+      {view==='resource-profile'&&activeResourceProfile&&<ResourceProfilePage
+        resource={activeResourceProfile}
+        allocations={allAllocations}
+        onBack={()=>{setView('database');setActiveResourceProfile(null)}}
+        T={T}
       />}
 
       {/* MESSAGES VIEW */}
