@@ -25,7 +25,11 @@
 <!-- Non-critical: username generator loaded as module (non-blocking) -->
 <script type="module">
 import { uniqueNamesGenerator, adjectives, animals } from 'https://esm.sh/unique-names-generator@4.7.1';
-window.generateUsername = () => uniqueNamesGenerator({ dictionaries: [adjectives, animals], separator: '-', length: 2, style: 'lowerCase' });
+window.generateUsername = () => {
+  const base = uniqueNamesGenerator({ dictionaries: [adjectives, animals], separator: '-', length: 2, style: 'lowerCase' });
+  const num = Math.floor(Math.random() * 9000) + 1000;
+  return base + '-' + num;
+};
 window._nameGenReady = true;
 </script>
 <!-- Lazy-loaded: in-browser embeddings for field definition fuzzy matching (non-blocking) -->
@@ -8417,6 +8421,8 @@ const LoginScreen = ({onLogin}) => {
   const [mode,setMode] = useState('login'); // login | register
   const [hs,setHs] = useState('matrix.org'); const [user,setUser] = useState(''); const [pass,setPass] = useState('');
   const [loading,setLoading] = useState(false); const [err,setErr] = useState('');
+  const [extReg, setExtReg] = useState(null); // null or { server, username }
+  const [copied, setCopied] = useState(false);
 
   // Extract host server from username if present (e.g. @user:matrix.org -> matrix.org)
   const userHost = user.includes(':') ? user.split(':').slice(1).join(':') : '';
@@ -8443,7 +8449,9 @@ const LoginScreen = ({onLogin}) => {
           });
           if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.error || `Registration failed (${resp.status}). Try logging in if account exists.`); }
         } else {
-          throw new Error(`This server requires extra verification (like email or CAPTCHA) that must be completed on their website. Visit https://${effectiveHs} to create your account, then come back here and use the "Sign In" tab.`);
+          setExtReg({ server: effectiveHs, username: user.replace(/^@/, '').split(':')[0] });
+          setLoading(false);
+          return;
         }
       }
       const s = await svc.login(effectiveHs, user, pass); onLogin(s);
@@ -8467,18 +8475,46 @@ const LoginScreen = ({onLogin}) => {
         </p>
 
         <div className="tabs" style={{marginBottom:20}}>
-          <div className={`tab ${mode==='login'?'active':''}`} onClick={()=>{setMode('login');setErr('')}}>Sign In</div>
-          <div className={`tab ${mode==='register'?'active':''}`} onClick={()=>{setMode('register');setErr('')}}>Create Account</div>
+          <div className={`tab ${mode==='login'?'active':''}`} onClick={()=>{setMode('login');setErr('');setExtReg(null)}}>Sign In</div>
+          <div className={`tab ${mode==='register'?'active':''}`} onClick={()=>{setMode('register');setErr('');setExtReg(null)}}>Create Account</div>
         </div>
 
-        {mode==='register'&&<div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'12px 14px',marginBottom:16,fontSize:12,color:'var(--tx-1)',lineHeight:1.7}}>
+        {extReg && <div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:20,marginBottom:16}}>
+          <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-2)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>● STEP 1</div>
+          <div style={{fontFamily:'var(--serif)',fontSize:18,fontWeight:700,color:'var(--tx-0)',marginBottom:8}}>Create your account on <span style={{color:'var(--teal)'}}>{extReg.server}</span></div>
+          <div style={{fontSize:12.5,color:'var(--tx-1)',lineHeight:1.6,marginBottom:16}}>This server requires verification (like email or CAPTCHA). Create your account on their website first, then come back to sign in.</div>
+          <div style={{marginBottom:16}}>
+            <div style={{fontFamily:'var(--mono)',fontSize:9.5,color:'var(--tx-2)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:4}}>YOUR USERNAME</div>
+            <div style={{display:'flex',alignItems:'center',gap:8,background:'var(--bg-1)',border:'1px solid var(--border-1)',borderRadius:'var(--r)',padding:'10px 12px'}}>
+              <span style={{flex:1,fontFamily:'var(--mono)',fontSize:14,color:'var(--tx-0)',fontWeight:600}}>{extReg.username}</span>
+              <button type="button" className="b-gho b-xs" onClick={()=>{navigator.clipboard.writeText(extReg.username);setCopied(true);setTimeout(()=>setCopied(false),2000)}} style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:4}}>
+                <I n={copied?"check":"copy"} s={12}/> {copied?"Copied":"Copy"}
+              </button>
+            </div>
+          </div>
+          <button type="button" className="b-pri" onClick={()=>window.open('https://'+extReg.server,'_blank')} style={{width:'100%',padding:10,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+            Open {extReg.server} <I n="external-link" s={14}/>
+          </button>
+          <div style={{borderTop:'1px solid var(--border-0)',margin:'20px 0'}}/>
+          <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--tx-2)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:6}}>● STEP 2</div>
+          <div style={{fontFamily:'var(--serif)',fontSize:18,fontWeight:700,color:'var(--tx-0)',marginBottom:8}}>Sign in here</div>
+          <div style={{fontSize:12.5,color:'var(--tx-1)',lineHeight:1.6,marginBottom:16}}>Once your account exists on the server, come back and sign in with the same username and password.</div>
+          <button type="button" className="b-pri" onClick={()=>{setExtReg(null);setMode('login');setErr('')}} style={{width:'100%',padding:10,fontSize:13,display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginBottom:10}}>
+            I've created my account <I n="arrow-right" s={14}/>
+          </button>
+          <button type="button" className="b-gho" onClick={()=>setExtReg(null)} style={{width:'100%',padding:8,fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',gap:4,color:'var(--tx-2)'}}>
+            <I n="arrow-left" s={12}/> Pick a different server
+          </button>
+        </div>}
+
+        {mode==='register'&&!extReg&&<div style={{background:'var(--teal-dim)',border:'1px solid rgba(62,201,176,.15)',borderRadius:'var(--r)',padding:'12px 14px',marginBottom:16,fontSize:12,color:'var(--tx-1)',lineHeight:1.7}}>
           <div style={{fontWeight:600,color:'var(--tx-0)',marginBottom:4}}>What is a Matrix account?</div>
           <div>Khora runs on <strong style={{color:'var(--tx-0)'}}>Matrix</strong> — an open network, like email. You pick a server to host your account, and you can connect with anyone on the network regardless of which server they use.</div>
           <div style={{marginTop:8}}>All servers use <strong style={{color:'var(--tx-0)'}}>end-to-end encryption</strong> — your data is encrypted on your device before it's sent, so no server operator can read it. The main differences between servers are speed, location, and who runs them.</div>
           <div style={{marginTop:8,fontSize:11.5,color:'var(--tx-2)'}}>Since your server can see <em>metadata</em> (who you talk to, when you're online), consider using a <strong style={{color:'var(--tx-1)'}}>random username</strong> — click the dice icon below to generate one. Browse servers at <a href="https://servers.joinmatrix.org/" target="_blank" rel="noopener" style={{color:'var(--teal)'}}>servers.joinmatrix.org</a>.</div>
         </div>}
 
-        <form onSubmit={go}>
+        {!extReg && <form onSubmit={go}>
           <div style={{marginBottom:14}}>
             <span className="section-label">USERNAME</span>
             <div style={{display:'flex',gap:6}}>
@@ -8503,7 +8539,7 @@ const LoginScreen = ({onLogin}) => {
           <button type="submit" className="b-pri" disabled={loading} style={{width:'100%',padding:12,fontSize:14,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
             {loading?<Spin s={16}/>:<I n="lock" s={16}/>} {loading?'Connecting...':(mode==='register'?'Create Account & Connect':'Connect')}
           </button>
-        </form>
+        </form>}
         <div style={{marginTop:16,display:'flex',alignItems:'center',gap:8,justifyContent:'center'}}>
           <div style={{width:6,height:6,borderRadius:'50%',background:typeof matrixcs!=='undefined'?'var(--green)':'var(--gold)'}}/>
           <span style={{fontFamily:'var(--mono)',fontSize:10.5,color:'var(--tx-3)'}}>
