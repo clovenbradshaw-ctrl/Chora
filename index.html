@@ -1463,10 +1463,36 @@ class KhoraService {
     if (this.client) {
       const room = this.client.getRoom(roomId);
       if (!room) return [];
-      return room.getLiveTimeline().getEvents()
-        .filter(ev => ev.getType() === 'm.room.message')
-        .map(ev => ({ id: ev.getId(), sender: ev.getSender(), content: ev.getContent(), ts: ev.getTs() }))
-        .reverse();
+      // Paginate backwards to capture historical messages beyond the live sync window
+      try {
+        for (let i = 0; i < 3; i++) {
+          const canPaginate = room.getLiveTimeline().getPaginationToken('b');
+          if (!canPaginate) break;
+          await this.client.scrollback(room, limit);
+        }
+      } catch (e) { /* pagination may fail — continue with available events */ }
+      const seenIds = new Set();
+      const allMsgs = [];
+      const timelineSets = room.getTimelineSets ? room.getTimelineSets() : [];
+      if (timelineSets.length > 0) {
+        for (const ts of timelineSets) {
+          for (const tl of ts.getTimelines()) {
+            for (const ev of tl.getEvents()) {
+              if (ev.getType() === 'm.room.message' && !seenIds.has(ev.getId())) {
+                seenIds.add(ev.getId());
+                allMsgs.push({ id: ev.getId(), sender: ev.getSender(), content: ev.getContent(), ts: ev.getTs() });
+              }
+            }
+          }
+        }
+      } else {
+        for (const ev of room.getLiveTimeline().getEvents()) {
+          if (ev.getType() === 'm.room.message') {
+            allMsgs.push({ id: ev.getId(), sender: ev.getSender(), content: ev.getContent(), ts: ev.getTs() });
+          }
+        }
+      }
+      return allMsgs.sort((a, b) => a.ts - b.ts).slice(-limit).reverse();
     }
     const d = await this._api('GET', `/rooms/${encodeURIComponent(roomId)}/messages?dir=b&limit=${limit}`);
     return (d.chunk || []).filter(e => e.type === 'm.room.message')
@@ -7114,18 +7140,37 @@ const RecordProvenance = ({ roomId, entityKey, label, session }) => {
       if (svc.client) {
         const room = svc.client.getRoom(roomId);
         if (room) {
-          // Collect from timeline
-          for (const ev of room.getLiveTimeline().getEvents()) {
-            if (ev.getType() === EVT.OP) {
-              const c = ev.getContent();
-              const tField = c.target?.field; const tEntity = c.target?.entity;
-              const tType = c.target?.type;
-              if (tField === entityKey || tEntity === entityKey || tType === entityKey) {
-                allOps.push({ ...c, _sender: ev.getSender(), _eventTs: ev.getTs() });
+          // Paginate backwards to capture historical EO operations
+          try {
+            for (let i = 0; i < 5; i++) {
+              const canPaginate = room.getLiveTimeline().getPaginationToken('b');
+              if (!canPaginate) break;
+              await svc.client.scrollback(room, 100);
+            }
+          } catch (e) { /* pagination may fail — continue with available events */ }
+          // Collect from all timelines (not just live)
+          const seenIds = new Set();
+          const timelineSets = room.getTimelineSets ? room.getTimelineSets() : [];
+          const collectFromEvent = (ev) => {
+            if (seenIds.has(ev.getId()) || ev.getType() !== EVT.OP) return;
+            seenIds.add(ev.getId());
+            const c = ev.getContent();
+            const tField = c.target?.field; const tEntity = c.target?.entity;
+            const tType = c.target?.type;
+            if (tField === entityKey || tEntity === entityKey || tType === entityKey) {
+              allOps.push({ ...c, _sender: ev.getSender(), _eventTs: ev.getTs() });
+            }
+          };
+          if (timelineSets.length > 0) {
+            for (const ts of timelineSets) {
+              for (const tl of ts.getTimelines()) {
+                for (const ev of tl.getEvents()) collectFromEvent(ev);
               }
             }
+          } else {
+            for (const ev of room.getLiveTimeline().getEvents()) collectFromEvent(ev);
           }
-          // Collect from state events (EO ops are timeline events, but check state too)
+          // Also collect from state events
           for (const ev of room.currentState.getStateEvents()) {
             if (ev.getType() === EVT.OP) {
               const c = ev.getContent();
@@ -7330,7 +7375,7 @@ const ActivityStream = ({session}) => {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(new Set());
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [filter, setFilter] = useState({ triad: 'all', operator: 'all', roomType: 'all', epistemic: 'all' });
+  const [filter, setFilter] = useState({ triad: 'all', operator: 'all', roomType: 'all', epistemic: 'all', sender: 'all' });
   const [viewMode, setViewMode] = useState('stream'); // stream | table | triads
   const [jsonExpanded, setJsonExpanded] = useState(new Set());
 
@@ -7346,10 +7391,40 @@ const ActivityStream = ({session}) => {
         if (svc.client) {
           const room = svc.client.getRoom(rid);
           if (room) {
+            // Paginate backwards to load historical timeline events (EO ops are timeline events)
+            try {
+              for (let i = 0; i < 5; i++) {
+                const canPaginate = room.oldState?.paginationToken || (room.getLiveTimeline().getPaginationToken('b'));
+                if (!canPaginate) break;
+                await svc.client.scrollback(room, 100);
+              }
+            } catch (e) { /* pagination may fail for some rooms — continue with what we have */ }
             const seenIds = new Set();
-            for (const ev of room.getLiveTimeline().getEvents()) {
+            // Gather events from all available timelines (not just live)
+            const timelineSets = room.getTimelineSets ? room.getTimelineSets() : [];
+            const allTimelineEvents = [];
+            if (timelineSets.length > 0) {
+              for (const ts of timelineSets) {
+                for (const tl of ts.getTimelines()) {
+                  for (const ev of tl.getEvents()) {
+                    if (!seenIds.has(ev.getId())) {
+                      seenIds.add(ev.getId());
+                      allTimelineEvents.push(ev);
+                    }
+                  }
+                }
+              }
+            } else {
+              // Fallback to live timeline only
+              for (const ev of room.getLiveTimeline().getEvents()) {
+                if (!seenIds.has(ev.getId())) {
+                  seenIds.add(ev.getId());
+                  allTimelineEvents.push(ev);
+                }
+              }
+            }
+            for (const ev of allTimelineEvents) {
               const cls = classifyEvent(ev, roomInfo);
-              seenIds.add(ev.getId());
               allEvents.push({
                 id: ev.getId(), roomId: rid, roomInfo, sender: ev.getSender(),
                 ts: ev.getTs(), type: ev.getType(),
@@ -7383,11 +7458,12 @@ const ActivityStream = ({session}) => {
   useEffect(() => { loadEvents(); }, []);
   useEffect(() => { if (!autoRefresh) return; const iv = setInterval(loadEvents, 5000); return () => clearInterval(iv); }, [autoRefresh]);
 
-  // Apply filters (including triad filter)
+  // Apply filters (including triad and sender filters)
   const filtered = useMemo(() => events.filter(ev => {
     if (filter.roomType !== 'all' && ev.roomInfo.type !== filter.roomType) return false;
     if (filter.operator !== 'all' && ev.op !== filter.operator) return false;
     if (filter.epistemic !== 'all' && ev.epistemic !== filter.epistemic) return false;
+    if (filter.sender === 'mine' && ev.sender !== svc.userId) return false;
     if (filter.triad !== 'all') {
       const triad = OPERATOR_TRIADS[filter.triad];
       if (triad && !triad.ops.includes(ev.op)) return false;
@@ -7474,6 +7550,9 @@ const ActivityStream = ({session}) => {
       <select value={filter.epistemic} onChange={e=>setFilter({...filter,epistemic:e.target.value})} style={{width:'auto',padding:'5px 8px',fontSize:11}}>
         <option value="all">All Epistemic</option><option value="GIVEN">GIVEN</option><option value="MEANT">MEANT</option>
       </select>
+      <select value={filter.sender} onChange={e=>setFilter({...filter,sender:e.target.value})} style={{width:'auto',padding:'5px 8px',fontSize:11,fontWeight:filter.sender==='mine'?600:'normal',color:filter.sender==='mine'?'var(--teal)':'inherit'}}>
+        <option value="all">All Actors</option><option value="mine">My Actions</option>
+      </select>
       <div style={{marginLeft:'auto',display:'flex',gap:6,alignItems:'center'}}>
         <span style={{fontSize:9,color:'var(--tx-3)',fontFamily:'var(--mono)'}}>LIVE</span>
         <Toggle on={autoRefresh} onChange={()=>setAutoRefresh(!autoRefresh)}/>
@@ -7482,6 +7561,7 @@ const ActivityStream = ({session}) => {
     </div>
     <div style={{fontSize:10,color:'var(--tx-3)',fontFamily:'var(--mono)',marginBottom:10}}>
       {filtered.length} operation{filtered.length!==1?'s':''} of {events.length} total
+      {filter.sender==='mine'&&<span> · <span style={{color:'var(--teal)',fontWeight:600}}>my actions only</span></span>}
       {filter.triad!=='all'&&<span> · triad: <span style={{color:`var(--${OPERATOR_TRIADS[filter.triad]?.color||'purple'})`}}>{OPERATOR_TRIADS[filter.triad]?.label}</span></span>}
     </div>
 
@@ -8321,6 +8401,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
   const handleSendBridgeMsg = async () => {
     if (!msgText.trim()||!activeBridge) return;
     await svc.sendMessage(activeBridge, msgText, {[`${NS}.type`]:'note'});
+    await emitOp(activeBridge, 'INS', {type:'client_note',field:'message'}, {body:msgText}, bridgeFrame(activeBridge));
     setMsgText(''); setTimeout(()=>loadBridgeMessages(activeBridge),500);
   };
   const openBridge = (bid) => { setActiveBridge(bid); setView('bridge'); loadBridgeMessages(bid); };
@@ -8337,6 +8418,7 @@ const ClientApp = ({session, onLogout, showToast}) => {
     const prov = providers[inboxConvo];
     if (!prov) return;
     await svc.sendMessage(prov.bridgeRoomId, inboxMsgText, {[`${NS}.type`]:'note'});
+    await emitOp(prov.bridgeRoomId, 'INS', {type:'client_note',field:'message'}, {body:inboxMsgText}, bridgeFrame(prov.bridgeRoomId));
     setInboxMsgText('');
     setTimeout(() => loadInboxMessages(prov.bridgeRoomId), 500);
   };
@@ -10332,7 +10414,28 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     for (const c of currentCases) {
       const room = svc.client.getRoom(c.bridgeRoomId);
       if (!room) continue;
-      const events = room.getLiveTimeline().getEvents();
+      // Paginate backwards to capture historical observations, messages, and allocations
+      try {
+        for (let i = 0; i < 3; i++) {
+          const canPaginate = room.getLiveTimeline().getPaginationToken('b');
+          if (!canPaginate) break;
+          await svc.client.scrollback(room, 100);
+        }
+      } catch (e) { /* pagination may fail — continue with available events */ }
+      const seenIds = new Set();
+      const events = [];
+      const timelineSets = room.getTimelineSets ? room.getTimelineSets() : [];
+      if (timelineSets.length > 0) {
+        for (const ts of timelineSets) {
+          for (const tl of ts.getTimelines()) {
+            for (const ev of tl.getEvents()) {
+              if (!seenIds.has(ev.getId())) { seenIds.add(ev.getId()); events.push(ev); }
+            }
+          }
+        }
+      } else {
+        for (const ev of room.getLiveTimeline().getEvents()) events.push(ev);
+      }
       // Extract observations as "shared notes"
       const obs = events.filter(e => e.getType() === EVT.OBSERVATION).map(e => {
         const content = e.getContent();
@@ -10533,14 +10636,39 @@ const ProviderApp = ({session, onLogout, showToast}) => {
     showToast(`Observation recorded: ${provObsModal.question}`,'success');
   };
 
-  // Load provider observations from bridge
+  // Load provider observations from bridge (paginate to capture historical observations)
   const loadProviderObservations = async (bid) => {
     if (!svc.client) return;
     const room = svc.client.getRoom(bid);
     if (!room) return;
-    const obs = room.getLiveTimeline().getEvents()
-      .filter(e=>e.getType()===EVT.OBSERVATION)
-      .map(e=>e.getContent());
+    // Paginate backwards to ensure we capture historical observations
+    try {
+      for (let i = 0; i < 3; i++) {
+        const canPaginate = room.getLiveTimeline().getPaginationToken('b');
+        if (!canPaginate) break;
+        await svc.client.scrollback(room, 100);
+      }
+    } catch (e) { /* pagination may fail — continue with available events */ }
+    const seenIds = new Set();
+    const allEvents = [];
+    const timelineSets = room.getTimelineSets ? room.getTimelineSets() : [];
+    if (timelineSets.length > 0) {
+      for (const ts of timelineSets) {
+        for (const tl of ts.getTimelines()) {
+          for (const ev of tl.getEvents()) {
+            if (!seenIds.has(ev.getId()) && ev.getType() === EVT.OBSERVATION) {
+              seenIds.add(ev.getId());
+              allEvents.push(ev);
+            }
+          }
+        }
+      }
+    } else {
+      for (const ev of room.getLiveTimeline().getEvents()) {
+        if (ev.getType() === EVT.OBSERVATION) allEvents.push(ev);
+      }
+    }
+    const obs = allEvents.map(e=>e.getContent());
     setProvObservations(obs);
   };
 
@@ -10649,6 +10777,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           });
         } catch (e) { console.warn('Invite failed:', e.message); }
       }
+      await emitOp(roomId, 'DES', {entity:'client_record',field:newClientName}, {created_by:svc.userId,client_id:clientId||undefined,status:clientId?'invited':'created'}, orgFrame());
       const newRecord = {
         roomId, client_name: newClientName, client_matrix_id: clientId,
         notes: newClientNotes || undefined, owner: svc.userId,
@@ -10674,6 +10803,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       await svc.setState(clientInviteModal.roomId, EVT.IDENTITY, {
         ...clientInviteModal, client_matrix_id: clientId, status: 'invited',
       });
+      await emitOp(clientInviteModal.roomId, 'CON', {entity:'client_record',field:clientId}, {invited_by:svc.userId,status:'invited'}, orgFrame());
       setClientRecords(prev => prev.map(r =>
         r.roomId === clientInviteModal.roomId
           ? { ...r, client_matrix_id: clientId, status: 'invited' }
@@ -10697,6 +10827,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           {userId:svc.userId,role:'lead',joined:Date.now(),display_name:providerProfile.display_name||''}
         ]}},
       ]);
+      await emitOp(roomId, 'DES', {entity:'team',field:newTeamName}, {created_by:svc.userId,org:orgMeta.name||null}, orgFrame());
       const newTeam = {
         roomId, name:newTeamName, description:newTeamDesc||'', created:Date.now(),
         created_by:svc.userId, org_id:orgRoom||null, org_name:orgMeta.name||null,
@@ -10720,6 +10851,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
       // Update the members list
       const updatedMembers = [...(teamInviteModal.members||[]), {userId:uid,role:'member',joined:Date.now()}];
       await svc.setState(teamInviteModal.roomId, EVT.TEAM_MEMBERS, {members:updatedMembers});
+      await emitOp(teamInviteModal.roomId, 'CON', {entity:'team_member',field:uid}, {invited_by:svc.userId,role:'member'}, orgFrame());
       setTeams(prev => prev.map(t => t.roomId===teamInviteModal.roomId ? {...t, members:updatedMembers} : t));
       showToast(`Invited ${uid} to team`,'success');
       setTeamInviteUserId('');
@@ -11269,6 +11401,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         updated: Date.now(),
       };
       await svc.setState(rosterRoom, EVT.PROVIDER_PROFILE, profile);
+      await emitOp(rosterRoom, 'ALT', {entity:'provider_profile',field:'profile'}, {display_name:profile.display_name,title:profile.title,updated_by:svc.userId}, orgFrame());
       setProviderProfile(profile);
       // Broadcast profile to all bridge rooms so clients can see provider identity
       for (const c of cases) {
@@ -11467,6 +11600,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
         },
       };
       await svc.sendMessage(inboxConvo, inboxMsgText, envelope);
+      await emitOp(inboxConvo, 'INS', {type:'org_message',field:'message'}, {opacity:orgOpacity,body_length:inboxMsgText.length}, orgFrame());
     } else {
       await svc.sendMessage(inboxConvo, inboxMsgText, {[`${NS}.type`]:'note'});
       await emitOp(inboxConvo, 'INS', {type:'provider_note',field:'message'}, {body:inboxMsgText}, bridgeFrame(inboxConvo));
