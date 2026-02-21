@@ -10890,6 +10890,113 @@ const DatabaseView = ({cases, caseAssignments, openCase, T, svc, caseAllocations
   </div>;
 };
 
+/* ─── ProfileActivityFeed — loads and displays EO operations for an individual ─── */
+const ProfileActivityFeed = ({individual, svc}) => {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const roomId = individual.bridgeRoom || individual._case?.bridgeRoomId || individual.id;
+        if (!roomId || !svc.client) { setLoading(false); return; }
+        const room = svc.client.getRoom(roomId);
+        if (!room) { setLoading(false); return; }
+
+        const collected = [];
+        const seenIds = new Set();
+
+        // Collect from timeline events
+        const timeline = room.getLiveTimeline();
+        const timelineEvents = timeline.getEvents();
+        for (const ev of timelineEvents) {
+          if (seenIds.has(ev.getId())) continue;
+          const type = ev.getType();
+          if (!type.startsWith('io.khora.') && !type.startsWith('m.room.')) continue;
+          const classified = classifyEvent(ev);
+          if (classified) {
+            seenIds.add(ev.getId());
+            collected.push({
+              id: ev.getId(),
+              ...classified,
+              sender: ev.getSender(),
+              ts: ev.getTs(),
+            });
+          }
+        }
+
+        // Collect from state events (EO ops stored as state)
+        const opEvents = room.currentState.getStateEvents(EVT.OP);
+        if (opEvents) {
+          for (const ev of (Array.isArray(opEvents) ? opEvents : [opEvents])) {
+            if (seenIds.has(ev.getId())) continue;
+            const content = ev.getContent();
+            if (content.op) {
+              seenIds.add(ev.getId());
+              collected.push({
+                id: ev.getId(),
+                op: content.op,
+                epistemic: content.frame?.epistemic || 'MEANT',
+                label: content.target?.field || content.target?.entity || content.op + ' Operation',
+                desc: [content.context?.from, content.context?.to].filter(Boolean).join(' → ') ||
+                      content.context?.edit_source || '',
+                sender: ev.getSender(),
+                ts: ev.getTs(),
+              });
+            }
+          }
+        }
+
+        collected.sort((a, b) => b.ts - a.ts);
+        if (!cancelled) setEvents(collected.slice(0, 50));
+      } catch (e) { console.warn('Profile activity load failed:', e.message); }
+      if (!cancelled) setLoading(false);
+    };
+    load();
+
+    // Listen for new EO events
+    const handler = () => load();
+    window.addEventListener('khora:eo', handler);
+    window.addEventListener('khora:timeline', handler);
+    return () => { cancelled = true; window.removeEventListener('khora:eo', handler); window.removeEventListener('khora:timeline', handler); };
+  }, [individual.id, individual.bridgeRoom]);
+
+  if (loading) return <div className="card" style={{textAlign:'center',padding:'30px 20px',color:'var(--tx-3)'}}>Loading activity...</div>;
+  if (events.length === 0) return <div className="card" style={{textAlign:'center',padding:'30px 20px',color:'var(--tx-3)'}}>No activity recorded yet for this individual.</div>;
+
+  return <div>
+    {events.map(ev => {
+      const opColor = OP_COLORS[ev.op] || 'blue';
+      const verb = OP_DESCRIPTIONS[ev.op]?.verb || ev.op;
+      const username = (ev.sender||'').split(':')[0]?.replace('@','') || 'unknown';
+      return <div key={ev.id} style={{
+        display:'flex', gap:10, padding:'10px 0',
+        borderBottom:'1px solid var(--border-0)'
+      }}>
+        <span className="dt-eo" style={{background:`var(--${opColor}-dim)`,
+          color:`var(--${opColor})`, flexShrink:0}}>{ev.op}</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13}}>
+            <strong>{verb}</strong>
+            {ev.label && <span style={{color:'var(--tx-1)'}}> — {ev.label}</span>}
+          </div>
+          {ev.desc && <div style={{fontSize:11,color:'var(--tx-2)',marginTop:2}}>{ev.desc}</div>}
+          <div style={{fontSize:10,color:'var(--tx-3)',marginTop:3}}>
+            {username} · {new Date(ev.ts).toLocaleString()}
+            {ev.epistemic && <span className="dt-eo" style={{
+              marginLeft:6, fontSize:8, padding:'1px 5px',
+              background:ev.epistemic==='GIVEN'?'var(--teal-dim)':'var(--gold-dim)',
+              color:ev.epistemic==='GIVEN'?'var(--teal)':'var(--gold)'
+            }}>{ev.epistemic}</span>}
+          </div>
+        </div>
+      </div>;
+    })}
+  </div>;
+};
+
 /* ─── IndividualProfilePage — full profile view for an individual ─── */
 const IndividualProfilePage = ({individual, notes, allocations, onBack, onOpenCase, onAddNote, svc, T, showToast,
   resourceTypes, resourceRelations, resourceInventory, orgRoom, orgRole, canAllocateResource, onAllocate}) => {
@@ -11012,9 +11119,7 @@ const IndividualProfilePage = ({individual, notes, allocations, onBack, onOpenCa
     {/* Activity */}
     {tab==='activity' && <div className="profile-section">
       <div className="profile-section-title">Recent Activity</div>
-      <div className="card" style={{textAlign:'center',padding:'30px 20px',color:'var(--tx-3)'}}>
-        Activity stream for this individual. Events are tracked in the Activity Stream view.
-      </div>
+      <ProfileActivityFeed individual={individual} svc={svc} />
     </div>}
 
     {/* Allocate Resource Modal */}
@@ -11606,6 +11711,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   const [dbNotes, setDbNotes] = useState([]);             // all notes across roster + bridges
   const [newNoteModal, setNewNoteModal] = useState(false);
   const [newNoteAttachTo, setNewNoteAttachTo] = useState(null); // pre-fill attach for profile page
+  const [noteDetailModal, setNoteDetailModal] = useState(null); // note object for detail view
   const [activeIndividual, setActiveIndividual] = useState(null); // individual row for profile page
   const [activeResourceProfile, setActiveResourceProfile] = useState(null); // resource row for profile page
   const cellEditTimerRef = useRef({});                    // debounce timers for cell edits
@@ -12121,11 +12227,37 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           to: newValue,
           edit_source: 'database_view',
         }, {type: 'org', epistemic: 'MEANT', role: orgRole || 'provider'});
-        // If it's a field update on a bridge room, update the state
-        if (row._case && fieldKey !== 'name' && fieldKey !== 'priority') {
-          // Update shared data in the bridge
-          const updatedData = { ...row._case.sharedData, [fieldKey]: newValue };
-          await svc.setState(roomId, EVT.BRIDGE_REFS, { fields: updatedData });
+        // Persist the edit to Matrix state
+        if (row._case) {
+          if (fieldKey === 'name') {
+            // Update full_name in bridge shared data
+            const updatedData = { ...row._case.sharedData, full_name: newValue };
+            await svc.setState(roomId, EVT.BRIDGE_REFS, { fields: updatedData });
+            // Update client_name in ROSTER_ASSIGN for org room
+            if (orgRoom && caseAssignments[roomId]) {
+              const updatedAssignments = { ...caseAssignments };
+              updatedAssignments[roomId] = { ...updatedAssignments[roomId], client_name: newValue };
+              await svc.setState(orgRoom, EVT.ROSTER_ASSIGN, { assignments: updatedAssignments });
+              setCaseAssignments(updatedAssignments);
+            }
+          } else if (fieldKey === 'priority') {
+            // Update priority in ROSTER_ASSIGN
+            if (orgRoom && caseAssignments[roomId]) {
+              const updatedAssignments = { ...caseAssignments };
+              updatedAssignments[roomId] = { ...updatedAssignments[roomId], priority: newValue };
+              await svc.setState(orgRoom, EVT.ROSTER_ASSIGN, { assignments: updatedAssignments });
+              setCaseAssignments(updatedAssignments);
+            }
+          } else {
+            // Dynamic field — update shared data in bridge
+            const updatedData = { ...row._case.sharedData, [fieldKey]: newValue };
+            await svc.setState(roomId, EVT.BRIDGE_REFS, { fields: updatedData });
+          }
+        } else if (row._clientRecord) {
+          // Client record rows — update identity state
+          const updates = { ...row._clientRecord };
+          if (fieldKey === 'name') updates.client_name = newValue;
+          await svc.setState(row.id, EVT.IDENTITY, updates);
         }
       } catch(e) { console.warn('Cell edit event failed:', e.message); }
       delete cellEditTimerRef.current[timerKey];
@@ -12135,6 +12267,65 @@ const ProviderApp = ({session, onLogout, showToast}) => {
   // ─── Note save handler ───
   const handleNoteSave = (noteData) => {
     setDbNotes(prev => [noteData, ...prev]);
+  };
+
+  // ─── Bulk action handler for database table ───
+  const handleBulkAction = async (actionId, selectedRows) => {
+    if (actionId === 'delete') {
+      if (!window.confirm(`Remove ${selectedRows.length} individual(s) from roster?`)) return;
+      for (const rowId of selectedRows) {
+        const c = cases.find(c => c.bridgeRoomId === rowId);
+        const roomId = rowId;
+        try {
+          await emitOp(roomId, 'NUL',
+            { entity: 'individual', field: 'status' },
+            { from: c ? 'active' : 'created', to: 'removed', edit_source: 'database_bulk' },
+            { type: 'org', epistemic: 'MEANT', role: orgRole || 'provider' });
+          if (orgRoom && caseAssignments[roomId]) {
+            const updatedAssignments = { ...caseAssignments };
+            delete updatedAssignments[roomId];
+            await svc.setState(orgRoom, EVT.ROSTER_ASSIGN, { assignments: updatedAssignments });
+            setCaseAssignments(updatedAssignments);
+          }
+        } catch (e) { console.warn('Bulk delete failed for', roomId, e.message); }
+      }
+      showToast(`${selectedRows.length} individual(s) removed`, 'success');
+    } else if (actionId === 'assign') {
+      const staffList = (staff || []).map(s => s.display_name || s.userId?.split(':')[0]?.replace('@','') || s.userId);
+      const staffName = window.prompt('Assign to staff member' + (staffList.length > 0 ? ' (' + staffList.join(', ') + ')' : '') + ':');
+      if (!staffName) return;
+      for (const rowId of selectedRows) {
+        try {
+          if (orgRoom && caseAssignments[rowId]) {
+            const updatedAssignments = { ...caseAssignments };
+            updatedAssignments[rowId] = {
+              ...updatedAssignments[rowId],
+              primary: staffName,
+              staff: [staffName, ...(updatedAssignments[rowId].staff || []).filter(s => s !== staffName)]
+            };
+            await svc.setState(orgRoom, EVT.ROSTER_ASSIGN, { assignments: updatedAssignments });
+            setCaseAssignments(updatedAssignments);
+          }
+          await emitOp(rowId, 'ALT',
+            { entity: 'individual', field: 'assigned_to' },
+            { to: staffName, edit_source: 'database_bulk' },
+            { type: 'org', epistemic: 'MEANT', role: orgRole || 'provider' });
+        } catch (e) { console.warn('Bulk assign failed for', rowId, e.message); }
+      }
+      showToast(`${selectedRows.length} individual(s) assigned to ${staffName}`, 'success');
+    } else if (actionId === 'tag') {
+      showToast('Tagging is not yet implemented', 'info');
+    }
+  };
+
+  // ─── Row reorder handler for database table ───
+  const handleReorder = (fromIdx, toIdx) => {
+    try {
+      emitOp(orgRoom || rosterRoom, 'ALT',
+        { entity: 'individual_order', field: 'sort_order' },
+        { from: fromIdx, to: toIdx, edit_source: 'database_drag' },
+        { type: 'org', epistemic: 'MEANT', role: orgRole || 'provider' });
+    } catch (e) { /* silent */ }
   };
 
   // Auto-register cases in org ROSTER_ASSIGN when they aren't tracked yet
@@ -13557,7 +13748,7 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           ORG_ROLE_LABELS={ORG_ROLE_LABELS}
           notes={dbNotes}
           onNewNote={()=>{setNewNoteAttachTo(null);setNewNoteModal(true)}}
-          onNoteClick={(note)=>{/* TODO: note detail modal */}}
+          onNoteClick={(note)=>setNoteDetailModal(note)}
           onOpenIndividual={(row)=>{setActiveIndividual(row);setView('individual-profile')}}
           onOpenResource={(row)=>{setActiveResourceProfile(row);setView('resource-profile')}}
           resourceTypes={resourceTypes}
@@ -13575,6 +13766,8 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           clientRecords={clientRecords}
           onCreateClient={()=>{setCreateClientModal(true);setNewClientName('');setNewClientMatrixId('');setNewClientNotes('')}}
           onCellEdit={handleDbCellEdit}
+          onBulkAction={handleBulkAction}
+          onReorder={handleReorder}
           onAddRow={()=>{setCreateClientModal(true);setNewClientName('');setNewClientMatrixId('');setNewClientNotes('')}}
         />
         <NoteCreateModal
@@ -13588,6 +13781,30 @@ const ProviderApp = ({session, onLogout, showToast}) => {
           showToast={showToast}
           T={T}
         />
+        <Modal open={!!noteDetailModal} onClose={()=>setNoteDetailModal(null)}
+          title={noteDetailModal?.title || 'Note'} w={560}>
+          {noteDetailModal && <>
+            <div style={{marginBottom:14}}>
+              <span className="section-label">CONTENT</span>
+              <div style={{fontSize:13,color:'var(--tx-0)',lineHeight:1.7,whiteSpace:'pre-wrap',
+                background:'var(--bg-2)',padding:14,borderRadius:'var(--r)',border:'1px solid var(--border-0)',
+                marginTop:6}}>{noteDetailModal.content || noteDetailModal.text || '(empty)'}</div>
+            </div>
+            {noteDetailModal.attached_to && <div style={{marginBottom:14}}>
+              <span className="section-label">ATTACHED TO</span>
+              <div style={{fontSize:12,color:'var(--tx-1)',marginTop:4}}>{noteDetailModal.attached_to_name || noteDetailModal.attached_to}</div>
+            </div>}
+            {noteDetailModal.tags?.length > 0 && <div style={{marginBottom:14}}>
+              <span className="section-label">TAGGED</span>
+              <div className="note-tags" style={{marginTop:4}}>
+                {noteDetailModal.tags.map(t => <span key={t.userId} className="note-tag-chip">{t.displayName}</span>)}
+              </div>
+            </div>}
+            <div style={{fontSize:11,color:'var(--tx-3)',borderTop:'1px solid var(--border-0)',paddingTop:10}}>
+              Created {dtFmtDate(noteDetailModal.created)} by {(noteDetailModal.author||'').split(':')[0]?.replace('@','') || 'unknown'}
+            </div>
+          </>}
+        </Modal>
       </>}
 
       {/* INDIVIDUAL PROFILE */}
