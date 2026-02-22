@@ -14884,10 +14884,13 @@ const ActivityStream = ({
     setLoading(true);
     try {
       const scanned = await svc.scanRooms();
-      const roomIds = svc.client ? svc.client.getRooms().map(r => r.roomId) : Object.keys(scanned);
+      const roomIds = Object.keys(scanned);
       const allRooms = [];
       const allEvents = [];
+      let skippedRooms = 0;
       for (const rid of roomIds) {
+        if (allEvents.length >= 500) break;
+        try {
         const roomInfo = await classifyRoom(rid, scanned[rid]);
         allRooms.push({
           id: rid,
@@ -14898,8 +14901,8 @@ const ActivityStream = ({
           if (room) {
             // Paginate backwards to load historical timeline events (EO ops are timeline events)
             try {
-              for (let i = 0; i < 5; i++) {
-                const canPaginate = room.oldState?.paginationToken || room.getLiveTimeline().getPaginationToken('b');
+              for (let i = 0; i < 2; i++) {
+                const canPaginate = room.getLiveTimeline().getPaginationToken('b');
                 if (!canPaginate) break;
                 await svc.client.scrollback(room, 100);
               }
@@ -14964,10 +14967,15 @@ const ActivityStream = ({
             }
           }
         }
+        } catch (roomErr) {
+          skippedRooms++;
+          console.warn('ActivityStream: skipping room', rid, roomErr.message);
+        }
       }
       allEvents.sort((a, b) => b.ts - a.ts);
       setRooms(allRooms);
       setEvents(allEvents);
+      if (skippedRooms > 0) console.warn(`ActivityStream: ${skippedRooms} room(s) skipped due to errors`);
     } catch (e) {
       console.error('ActivityStream error:', e);
     }
@@ -15094,13 +15102,13 @@ const ActivityStream = ({
     }
   }, "Activity Stream"), /*#__PURE__*/React.createElement("span", {
     className: "tag tag-purple"
-  }, "CHOREO")), /*#__PURE__*/React.createElement("p", {
+  }, "EO")), /*#__PURE__*/React.createElement("p", {
     style: {
       color: 'var(--tx-1)',
       fontSize: 13,
       lineHeight: 1.6
     }
-  }, "Operations displayed in Choreo's EO grammar: ", /*#__PURE__*/React.createElement("span", {
+  }, "Operations displayed in EO grammar: ", /*#__PURE__*/React.createElement("span", {
     style: {
       fontFamily: 'var(--mono)',
       color: 'var(--purple)',
@@ -15991,7 +15999,7 @@ const ActivityStream = ({
       color: 'var(--purple)',
       fontWeight: 600
     }
-  }, "Choreo"), " \u2014 EO data store. Nine operators, three triads, append-only log. Operations are facts.")));
+  }, "Khora"), " \u2014 EO data store. Nine operators, three triads, append-only log. Operations are facts.")));
 };
 
 /* ═══════════════════ WELCOME / INVITATION SCREEN ═══════════════════ */
