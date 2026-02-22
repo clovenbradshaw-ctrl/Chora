@@ -597,6 +597,11 @@ table.dt td.dt-drag-handle:active{cursor:grabbing}
 .pd-res-card{padding:12px 16px;border-radius:var(--r);border:1px solid var(--border-0);background:var(--bg-2);display:flex;align-items:center;justify-content:space-between;transition:border-color .15s}
 .pd-res-card:hover{border-color:var(--green)}
 .pd-empty{text-align:center;padding:30px 20px;border:1px dashed var(--border-1);border-radius:var(--r);color:var(--tx-3)}
+/* ═══ Transparency Page ═══ */
+@media(max-width:700px){
+  .tp-source-split{flex-direction:column!important;height:auto!important;min-height:auto!important}
+  .tp-source-nav{width:100%!important;min-width:100%!important;max-height:200px;border-right:none!important;border-bottom:1px solid var(--border-0)}
+}
 </style>
 </head>
 <body>
@@ -18815,6 +18820,10 @@ const ClientApp = ({
     id: 'activity',
     icon: 'layers',
     label: 'Activity Stream'
+  }, {
+    id: 'transparency',
+    icon: 'eye',
+    label: 'Transparency'
   }].map(item => /*#__PURE__*/React.createElement("div", {
     key: item.id,
     onClick: () => {
@@ -21349,6 +21358,8 @@ const ClientApp = ({
     s: 13
   }))))), view === 'activity' && !activeBridge && /*#__PURE__*/React.createElement(ActivityStream, {
     session: session
+  }), view === 'transparency' && !activeBridge && /*#__PURE__*/React.createElement(TransparencyPage, {
+    onBack: () => setView('dashboard')
   })), /*#__PURE__*/React.createElement(Modal, {
     open: editModal,
     onClose: () => setEditModal(false),
@@ -30495,6 +30506,10 @@ const ProviderApp = ({
       label: 'Activity Stream',
       badge: activityNotifCount,
       badgeClass: 'nav-badge-teal'
+    }, {
+      id: 'transparency',
+      icon: 'eye',
+      label: 'Transparency'
     }].map(item => /*#__PURE__*/React.createElement("div", {
       key: item.id,
       onClick: () => {
@@ -35426,6 +35441,8 @@ const ProviderApp = ({
     individuals: cases
   }), view === 'activity' && /*#__PURE__*/React.createElement(ActivityStream, {
     session: session
+  }), view === 'transparency' && /*#__PURE__*/React.createElement(TransparencyPage, {
+    onBack: () => setView('dashboard')
   })), /*#__PURE__*/React.createElement(Modal, {
     open: discoverModal,
     onClose: () => setDiscoverModal(false),
@@ -38118,6 +38135,343 @@ const ProviderApp = ({
     n: "users",
     s: 16
   }), " Transfer Case")))));
+};
+
+/* ═══════════════════ TRANSPARENCY & PRIVACY ═══════════════════
+ * Operator Manifest:
+ *   DES(transparency.page, {purpose: trust_through_visibility}) — existence
+ *   INS(transparency.source, {live_code_introspection}) — source viewer
+ *   CON(transparency.eo_sections, {navigable_tree}) — structural navigation
+ *   DES(transparency.privacy, {access_matrix, data_flow}) — privacy model
+ *
+ * Triad Summary:
+ *   Existence:       DES (page purpose, privacy model designation)
+ *   Structure:       CON (EO section linkage, navigable tree)
+ *   Interpretation:  INS (live source introspection — code IS the documentation)
+ *
+ * This page exists so that anyone using Khora can verify exactly what the
+ * software does, who has access to their data, and how the EO operation
+ * layer governs all state transitions. The source code viewer reads the
+ * live running code — it cannot be out of date.
+ * ═══════════════════════════════════════════════════════════ */
+const TransparencyPage = ({ onBack }) => {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [sourceCode, setSourceCode] = useState('');
+  const [eoSections, setEoSections] = useState([]);
+  const [activeSection, setActiveSection] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedCards, setExpandedCards] = useState({});
+  const codeRef = useRef(null);
+
+  // Read the live source code from the running page
+  useEffect(() => {
+    const scripts = document.querySelectorAll('script:not([src]):not([type])');
+    let code = '';
+    scripts.forEach(s => { if (s.textContent.length > 1000) code = s.textContent; });
+    if (!code) {
+      const allScripts = document.querySelectorAll('script');
+      allScripts.forEach(s => { if (!s.src && s.textContent.length > 1000) code = s.textContent; });
+    }
+    setSourceCode(code);
+
+    // Parse EO section headers
+    const lines = code.split('\n');
+    const sections = [];
+    const sectionRe = /\/\*\s*═{3,}\s*(.*?)\s*═{3,}\s*\*\//;
+    const operatorRe = /\/\*\s*═{3,}\s*(.*?)\s*═{3,}[\s\S]*?Triad Summary:([\s\S]*?)═{3,}/g;
+    lines.forEach((line, i) => {
+      const m = line.match(sectionRe);
+      if (m) {
+        sections.push({ name: m[1].trim(), line: i + 1 });
+      }
+    });
+    setEoSections(sections);
+    if (sections.length > 0) setActiveSection(sections[0]);
+  }, []);
+
+  const toggleCard = (id) => setExpandedCards(prev => ({ ...prev, [id]: !prev[id] }));
+
+  // Get code for a specific section
+  const getSectionCode = (section) => {
+    if (!sourceCode || !section) return '';
+    const lines = sourceCode.split('\n');
+    const startLine = section.line - 1;
+    // Find next section or end
+    const nextSection = eoSections.find(s => s.line > section.line);
+    const endLine = nextSection ? nextSection.line - 2 : lines.length;
+    return lines.slice(startLine, Math.min(endLine, startLine + 500)).join('\n');
+  };
+
+  // Filter sections by search
+  const filteredSections = searchQuery
+    ? eoSections.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : eoSections;
+
+  // Privacy model data
+  const accessMatrix = [
+    { entity: 'Your Vault Data', you: true, provider: false, org: false, network: false, server: false,
+      detail: 'Encrypted in your private Matrix room. Only your session keys can decrypt. Not even the homeserver operator can read vault contents.' },
+    { entity: 'Bridge Shared Fields', you: true, provider: true, org: false, network: false, server: false,
+      detail: 'Only the specific fields you choose to share via a bridge are visible to the linked provider. You control which fields and can revoke at any time.' },
+    { entity: 'Observations', you: true, provider: true, org: false, network: false, server: false,
+      detail: 'Written by providers into the bridge room. Both you and the provider can read observations. They cannot be silently edited — EO provenance tracks all changes.' },
+    { entity: 'Case Messages', you: true, provider: true, org: false, network: false, server: false,
+      detail: 'Messages in a bridge room are visible to both parties. End-to-end encrypted via Matrix. The homeserver sees encrypted blobs only.' },
+    { entity: 'Org Channel Messages', you: false, provider: true, org: true, network: false, server: false,
+      detail: 'Organization-internal channels are visible to org members only. Not shared with individuals/clients.' },
+    { entity: 'Anonymized Metrics', you: false, provider: true, org: true, network: true, server: false,
+      detail: 'Aggregate, k-anonymized (k=5) demographic data. No PII — no names, DOB, SSN, addresses. Only statistical ranges and hashed identifiers.' },
+    { entity: 'Schema Definitions', you: false, provider: true, org: true, network: true, server: false,
+      detail: 'Field definitions, form structures, and data standards. Shared across the network for interoperability. Contains no personal data.' },
+    { entity: 'EO Operation Log', you: true, provider: true, org: false, network: false, server: false,
+      detail: 'Every state change is recorded as an EO operation with provenance chain. Both parties in a room can audit the full operation history.' },
+    { entity: 'Matrix Homeserver', you: false, provider: false, org: false, network: false, server: true,
+      detail: 'The homeserver stores encrypted event blobs and room membership. It cannot read encrypted content. It knows which rooms exist and who is in them.' },
+  ];
+
+  const dataFlows = [
+    { from: 'You', to: 'Your Vault', description: 'All personal data starts in your encrypted vault room. Only your device keys can decrypt it.', icon: 'lock' },
+    { from: 'You', to: 'Bridge Room', description: 'When you share fields with a provider, selected data is copied into a shared bridge room. You choose exactly which fields.', icon: 'shield' },
+    { from: 'Provider', to: 'Bridge Room', description: 'Providers write observations, notes, and case data into the bridge. Both parties can read.', icon: 'clipboard' },
+    { from: 'Bridge Room', to: 'Org Metrics', description: 'If you consent, anonymized aggregate statistics (k=5 anonymity) flow upward. No PII ever leaves the bridge.', icon: 'bar' },
+    { from: 'Org', to: 'Network', description: 'Organizations can share anonymized metrics and schema definitions with the broader network. Never individual data.', icon: 'layers' },
+  ];
+
+  const eoExplainer = [
+    { op: 'NUL', name: 'Null', desc: 'Empty state — no entity exists yet. The starting point before any data is created.', triad: 'Existence' },
+    { op: 'DES', name: 'Designate', desc: 'Names or classifies an entity. Sets the frame for what something IS without creating data.', triad: 'Existence' },
+    { op: 'INS', name: 'Instantiate', desc: 'Creates a new field or entity with a value. The moment data comes into being.', triad: 'Existence' },
+    { op: 'SEG', name: 'Segment', desc: 'Partitions data into structural segments. Creates boundaries between logical groups.', triad: 'Structure' },
+    { op: 'CON', name: 'Connect', desc: 'Links entities together — provenance chains, relationships, structural connections.', triad: 'Structure' },
+    { op: 'SYN', name: 'Synthesize', desc: 'Combines multiple sources into a unified view. Parallel data hydration.', triad: 'Structure' },
+    { op: 'ALT', name: 'Alter', desc: 'Changes a value within an existing frame. Every alteration is tracked with from/to provenance.', triad: 'Interpretation' },
+    { op: 'SUP', name: 'Superpose', desc: 'Holds multiple valid values simultaneously. Represents uncertainty or competing interpretations.', triad: 'Interpretation' },
+    { op: 'REC', name: 'Reconcile', desc: 'Resolves superposition into a single value. The final judgment that collapses alternatives.', triad: 'Interpretation' },
+  ];
+
+  const triadColors = { Existence: 'green', Structure: 'blue', Interpretation: 'purple' };
+
+  const AccessDot = ({ yes }) => React.createElement('div', {
+    style: {
+      width: 10, height: 10, borderRadius: '50%',
+      background: yes ? 'var(--green)' : 'var(--bg-4)',
+      border: yes ? 'none' : '1px solid var(--border-1)',
+      margin: '0 auto'
+    }
+  });
+
+  // ── Overview Tab ──
+  const renderOverview = () => React.createElement('div', { className: 'anim-up' },
+    React.createElement('div', { className: 'card', style: { marginBottom: 16 } },
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 } },
+        React.createElement('div', { style: { width: 36, height: 36, borderRadius: 'var(--r)', background: 'var(--teal-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--teal)' } },
+          React.createElement(I, { n: 'shield', s: 18 })),
+        React.createElement('div', null,
+          React.createElement('h3', { style: { fontSize: 15, fontWeight: 700 } }, 'How Khora Works'),
+          React.createElement('p', { style: { fontSize: 11.5, color: 'var(--tx-2)' } }, 'Sovereign case management — you own your data'))),
+      React.createElement('div', { style: { fontSize: 13, color: 'var(--tx-1)', lineHeight: 1.7 } },
+        React.createElement('p', { style: { marginBottom: 10 } },
+          'Khora is a case management system built on Matrix, an open federated protocol for encrypted communication. Your data lives in encrypted Matrix rooms — not in a proprietary database controlled by any single organization.'),
+        React.createElement('p', { style: { marginBottom: 10 } },
+          'Every state change in the system is governed by the EO (Elegant Objects) operation layer — a formal ontological framework with 9 canonical operators organized into 3 triads (Existence, Structure, Interpretation). This means every data change is traceable, auditable, and follows strict transition rules.'),
+        React.createElement('p', null,
+          'The source code of this application is fully visible on this page. Nothing is hidden. You can inspect exactly what the software does, verify the privacy claims, and audit the EO operation logic yourself.'))),
+
+    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, marginBottom: 16 } },
+      [
+        { icon: 'lock', color: 'green', title: 'End-to-End Encrypted', desc: 'All data in Matrix rooms is encrypted. Only participants with session keys can decrypt.' },
+        { icon: 'shield', color: 'teal', title: 'You Own Your Rooms', desc: 'When you claim a room, you become superadmin (power level 100). You can kick anyone — including providers.' },
+        { icon: 'eye', color: 'blue', title: 'Full Transparency', desc: 'This page lets you read the actual running source code. The code IS the documentation.' },
+        { icon: 'users', color: 'gold', title: 'Explicit Consent', desc: 'Data only flows where you allow it. Every bridge share is opt-in. Metrics require consent.' },
+      ].map((card, i) => React.createElement('div', { key: i, className: 'card', style: { display: 'flex', gap: 10, alignItems: 'flex-start' } },
+        React.createElement('div', { style: { width: 30, height: 30, borderRadius: 'var(--r)', background: `var(--${card.color}-dim)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: `var(--${card.color})`, flexShrink: 0 } },
+          React.createElement(I, { n: card.icon, s: 15 })),
+        React.createElement('div', null,
+          React.createElement('div', { style: { fontSize: 13, fontWeight: 700, marginBottom: 3 } }, card.title),
+          React.createElement('div', { style: { fontSize: 12, color: 'var(--tx-2)', lineHeight: 1.5 } }, card.desc))))),
+
+    // EO Operators
+    React.createElement('div', { className: 'card', style: { marginBottom: 16 } },
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 } },
+        React.createElement('span', { className: 'section-label', style: { marginBottom: 0 } }, 'EO OPERATION VOCABULARY'),
+        React.createElement('span', { style: { fontSize: 10, color: 'var(--tx-3)', fontFamily: 'var(--mono)' } }, '9 canonical operators × 3 triads')),
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 } },
+        eoExplainer.map(op => React.createElement('div', {
+          key: op.op,
+          style: { padding: '10px 12px', border: '1px solid var(--border-0)', borderRadius: 'var(--r)', background: 'var(--bg-1)' }
+        },
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 } },
+            React.createElement('span', { className: 'dt-eo', style: { fontWeight: 700 } }, op.op),
+            React.createElement('span', { style: { fontSize: 12, fontWeight: 600 } }, op.name),
+            React.createElement('span', { className: `tag tag-${triadColors[op.triad]}`, style: { fontSize: 8, padding: '1px 6px', marginLeft: 'auto' } }, op.triad)),
+          React.createElement('p', { style: { fontSize: 11.5, color: 'var(--tx-2)', lineHeight: 1.5 } }, op.desc))))),
+
+    // Adjacency Matrix
+    React.createElement('div', { className: 'card' },
+      React.createElement('span', { className: 'section-label' }, 'OPERATOR ADJACENCY — TRANSITION RULES'),
+      React.createElement('p', { style: { fontSize: 12, color: 'var(--tx-2)', lineHeight: 1.5, marginBottom: 12 } },
+        'Every operation must follow the adjacency matrix below. If a transition is not adjacent, the EO engine automatically emits intermediate operations to create a valid path. This ensures structural integrity of all state changes.'),
+      React.createElement('div', { style: { overflowX: 'auto' } },
+        React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontFamily: 'var(--mono)', fontSize: 11 } },
+          React.createElement('thead', null,
+            React.createElement('tr', null,
+              React.createElement('th', { style: { padding: '6px 8px', textAlign: 'left', borderBottom: '1px solid var(--border-1)', color: 'var(--tx-2)' } }, 'From \\ To'),
+              ...OPERATORS.map(op => React.createElement('th', { key: op, style: { padding: '6px 8px', textAlign: 'center', borderBottom: '1px solid var(--border-1)', color: 'var(--tx-1)' } }, op)))),
+          React.createElement('tbody', null,
+            OPERATORS.map(from => React.createElement('tr', { key: from },
+              React.createElement('td', { style: { padding: '5px 8px', fontWeight: 600, color: 'var(--tx-1)', borderBottom: '1px solid var(--border-0)' } }, from),
+              ...OPERATORS.map(to => React.createElement('td', { key: to, style: { padding: '5px 8px', textAlign: 'center', borderBottom: '1px solid var(--border-0)' } },
+                OP_ADJ[from]?.includes(to)
+                  ? React.createElement('span', { style: { color: 'var(--green)', fontWeight: 700 } }, '●')
+                  : React.createElement('span', { style: { color: 'var(--tx-3)' } }, '·'))))))))));
+
+  // ── Privacy Tab ──
+  const renderPrivacy = () => React.createElement('div', { className: 'anim-up' },
+    // Access Matrix
+    React.createElement('div', { className: 'card', style: { marginBottom: 16 } },
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 } },
+        React.createElement(I, { n: 'lock', s: 16, c: 'var(--green)' }),
+        React.createElement('h3', { style: { fontSize: 15, fontWeight: 700 } }, 'Access Matrix'),
+        React.createElement('span', { style: { fontSize: 11, color: 'var(--tx-2)', marginLeft: 'auto', fontFamily: 'var(--mono)' } }, 'who can see what')),
+      React.createElement('div', { style: { overflowX: 'auto' } },
+        React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 12 } },
+          React.createElement('thead', null,
+            React.createElement('tr', { style: { borderBottom: '2px solid var(--border-1)' } },
+              React.createElement('th', { style: { padding: '8px 10px', textAlign: 'left', fontWeight: 600, color: 'var(--tx-1)' } }, 'Data'),
+              ['You', 'Provider', 'Org', 'Network', 'Server'].map(h =>
+                React.createElement('th', { key: h, style: { padding: '8px 6px', textAlign: 'center', fontWeight: 600, color: 'var(--tx-2)', fontSize: 11 } }, h)))),
+          React.createElement('tbody', null,
+            accessMatrix.map((row, i) => React.createElement(React.Fragment, { key: i },
+              React.createElement('tr', {
+                style: { borderBottom: '1px solid var(--border-0)', cursor: 'pointer', transition: 'background .15s' },
+                onClick: () => toggleCard('access-' + i),
+                onMouseEnter: e => e.currentTarget.style.background = 'var(--bg-3)',
+                onMouseLeave: e => e.currentTarget.style.background = 'transparent'
+              },
+                React.createElement('td', { style: { padding: '10px 10px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 } },
+                  React.createElement(I, { n: expandedCards['access-' + i] ? 'chevronDown' : 'chevR', s: 10 }),
+                  row.entity),
+                [row.you, row.provider, row.org, row.network, row.server].map((v, j) =>
+                  React.createElement('td', { key: j, style: { padding: '10px 6px', textAlign: 'center' } },
+                    React.createElement(AccessDot, { yes: v })))),
+              expandedCards['access-' + i] && React.createElement('tr', null,
+                React.createElement('td', { colSpan: 6, style: { padding: '8px 10px 12px 28px', fontSize: 12, color: 'var(--tx-2)', lineHeight: 1.6, background: 'var(--bg-1)', borderBottom: '1px solid var(--border-0)' } }, row.detail))))))),
+
+    // Data Flow
+    React.createElement('div', { className: 'card', style: { marginBottom: 16 } },
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 } },
+        React.createElement(I, { n: 'layers', s: 16, c: 'var(--blue)' }),
+        React.createElement('h3', { style: { fontSize: 15, fontWeight: 700 } }, 'Data Flow'),
+        React.createElement('span', { style: { fontSize: 11, color: 'var(--tx-2)', marginLeft: 'auto', fontFamily: 'var(--mono)' } }, 'how data moves through the system')),
+      dataFlows.map((flow, i) => React.createElement('div', {
+        key: i,
+        style: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', borderBottom: i < dataFlows.length - 1 ? '1px solid var(--border-0)' : 'none' }
+      },
+        React.createElement('div', { style: { width: 28, height: 28, borderRadius: 'var(--r)', background: 'var(--bg-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--tx-1)', flexShrink: 0, marginTop: 2 } },
+          React.createElement(I, { n: flow.icon, s: 13 })),
+        React.createElement('div', null,
+          React.createElement('div', { style: { fontSize: 12.5, fontWeight: 600, marginBottom: 2 } },
+            React.createElement('span', { style: { color: 'var(--teal)' } }, flow.from),
+            React.createElement('span', { style: { color: 'var(--tx-3)', margin: '0 6px' } }, '→'),
+            React.createElement('span', { style: { color: 'var(--gold)' } }, flow.to)),
+          React.createElement('p', { style: { fontSize: 12, color: 'var(--tx-2)', lineHeight: 1.5 } }, flow.description))))),
+
+    // Key Guarantees
+    React.createElement('div', { className: 'card' },
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 } },
+        React.createElement(I, { n: 'shieldCheck', s: 16, c: 'var(--teal)' }),
+        React.createElement('h3', { style: { fontSize: 15, fontWeight: 700 } }, 'Key Privacy Guarantees')),
+      [
+        { title: 'No hidden data collection', desc: 'There is no analytics, no telemetry, no tracking pixels, no third-party scripts that phone home. The only network calls are to Matrix homeservers you choose.' },
+        { title: 'Encryption at rest', desc: 'Matrix rooms use end-to-end encryption. The homeserver stores encrypted blobs. Decryption keys never leave your device.' },
+        { title: 'Sovereignty by default', desc: 'When you claim a room, you get power level 100 (superadmin). You can kick anyone — including the provider who created the room. Ownership cannot be revoked.' },
+        { title: 'Consent-gated sharing', desc: 'Every bridge share is opt-in. Metrics aggregation requires explicit consent. You can revoke field sharing at any time from your vault.' },
+        { title: 'Auditable operations', desc: 'Every state change emits an EO operation with a provenance chain linking it to the previous operation on that entity. The full history is inspectable.' },
+        { title: 'K-anonymity for metrics', desc: 'Aggregate metrics use k-anonymity (k=5). Any demographic combination with fewer than 5 matching individuals is suppressed. PII fields are never included.' },
+        { title: 'Open protocol, no lock-in', desc: 'Built on Matrix (open federated protocol). You can run your own homeserver, migrate to a different client, or export your data at any time.' },
+      ].map((g, i) => React.createElement('div', {
+        key: i, style: { padding: '10px 0', borderBottom: i < 6 ? '1px solid var(--border-0)' : 'none', display: 'flex', gap: 10, alignItems: 'flex-start' }
+      },
+        React.createElement('div', { style: { color: 'var(--green)', flexShrink: 0, marginTop: 2 } },
+          React.createElement(I, { n: 'check', s: 14 })),
+        React.createElement('div', null,
+          React.createElement('div', { style: { fontSize: 13, fontWeight: 600, marginBottom: 2 } }, g.title),
+          React.createElement('div', { style: { fontSize: 12, color: 'var(--tx-2)', lineHeight: 1.5 } }, g.desc)))))));
+
+  // ── Source Code Tab ──
+  const renderSource = () => React.createElement('div', { className: 'anim-up', style: { display: 'flex', gap: 0, border: '1px solid var(--border-0)', borderRadius: 'var(--r-lg)', overflow: 'hidden', height: 'calc(100vh - 220px)', minHeight: 500 } },
+    // Section navigator sidebar
+    React.createElement('div', { style: { width: 260, minWidth: 260, background: 'var(--bg-2)', borderRight: '1px solid var(--border-0)', display: 'flex', flexDirection: 'column' } },
+      React.createElement('div', { style: { padding: '12px 10px', borderBottom: '1px solid var(--border-0)' } },
+        React.createElement('input', {
+          type: 'text', placeholder: 'Search sections…',
+          value: searchQuery, onChange: e => setSearchQuery(e.target.value),
+          style: { fontSize: 12, padding: '7px 10px' }
+        })),
+      React.createElement('div', { style: { padding: '4px 0', fontSize: 10, color: 'var(--tx-3)', fontFamily: 'var(--mono)', textAlign: 'center', borderBottom: '1px solid var(--border-0)' } },
+        filteredSections.length + ' EO sections found'),
+      React.createElement('div', { style: { flex: 1, overflow: 'auto', padding: '4px 0' } },
+        filteredSections.map((sec, i) => React.createElement('div', {
+          key: i,
+          onClick: () => setActiveSection(sec),
+          style: {
+            padding: '7px 10px', cursor: 'pointer', fontSize: 11, fontFamily: 'var(--mono)',
+            background: activeSection?.line === sec.line ? 'var(--bg-4)' : 'transparent',
+            borderLeft: activeSection?.line === sec.line ? '2px solid var(--gold)' : '2px solid transparent',
+            color: activeSection?.line === sec.line ? 'var(--tx-0)' : 'var(--tx-2)',
+            transition: 'all .12s', lineHeight: 1.4
+          },
+          onMouseEnter: e => { if (activeSection?.line !== sec.line) e.currentTarget.style.background = 'var(--bg-3)'; },
+          onMouseLeave: e => { if (activeSection?.line !== sec.line) e.currentTarget.style.background = 'transparent'; }
+        },
+          React.createElement('div', { style: { fontWeight: activeSection?.line === sec.line ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, sec.name),
+          React.createElement('div', { style: { fontSize: 9, color: 'var(--tx-3)', marginTop: 2 } }, 'line ' + sec.line))))),
+    // Code viewer
+    React.createElement('div', { style: { flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-1)', minWidth: 0 } },
+      React.createElement('div', { style: { padding: '10px 16px', borderBottom: '1px solid var(--border-0)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-2)' } },
+        React.createElement(I, { n: 'eye', s: 14, c: 'var(--gold)' }),
+        React.createElement('span', { style: { fontSize: 13, fontWeight: 600 } }, activeSection?.name || 'Source Code'),
+        React.createElement('span', { style: { fontSize: 10, color: 'var(--tx-3)', fontFamily: 'var(--mono)', marginLeft: 'auto' } },
+          activeSection ? 'line ' + activeSection.line : sourceCode.split('\n').length + ' total lines'),
+        React.createElement('span', { style: { fontSize: 9, color: 'var(--tx-3)', fontFamily: 'var(--mono)', background: 'var(--bg-3)', padding: '2px 6px', borderRadius: 'var(--r)' } }, 'LIVE · READ-ONLY')),
+      React.createElement('pre', {
+        ref: codeRef,
+        style: { flex: 1, overflow: 'auto', padding: '12px 0', margin: 0, fontFamily: 'var(--mono)', fontSize: 11.5, lineHeight: 1.6, color: 'var(--tx-1)', whiteSpace: 'pre', tabSize: 2 }
+      },
+        (activeSection ? getSectionCode(activeSection) : sourceCode.slice(0, 5000)).split('\n').map((line, i) => React.createElement('div', {
+          key: i,
+          style: { display: 'flex', paddingRight: 16, minHeight: 20 }
+        },
+          React.createElement('span', { style: { width: 52, textAlign: 'right', paddingRight: 12, color: 'var(--tx-3)', userSelect: 'none', flexShrink: 0, fontSize: 10 } },
+            (activeSection ? activeSection.line + i : i + 1)),
+          React.createElement('span', { style: {
+            flex: 1, paddingLeft: 4,
+            color: line.trim().startsWith('/*') || line.trim().startsWith('*') || line.trim().startsWith('//') ? 'var(--tx-3)' :
+                   line.includes('const ') || line.includes('function ') || line.includes('async ') ? 'var(--blue)' :
+                   line.match(/['"`]/) ? 'var(--green)' : 'var(--tx-1)'
+          } }, line || ' '))))));
+
+  return React.createElement('div', { className: 'anim-up', style: { maxWidth: 1000, margin: '0 auto' } },
+    // Header
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 } },
+      onBack && React.createElement('button', { onClick: onBack, className: 'b-gho b-sm', style: { display: 'flex', alignItems: 'center', gap: 4 } },
+        React.createElement(I, { n: 'back', s: 13 }), 'Back'),
+      React.createElement('div', null,
+        React.createElement('h2', { style: { fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 700 } }, 'Transparency & Privacy'),
+        React.createElement('p', { style: { color: 'var(--tx-1)', fontSize: 12.5, marginTop: 2 } },
+          'How Khora works, who has access, and the full source code — nothing hidden'))),
+    // Tabs
+    React.createElement('div', { className: 'tabs' },
+      [{ id: 'overview', label: 'How It Works' }, { id: 'privacy', label: 'Privacy & Access' }, { id: 'source', label: 'Source Code' }].map(t =>
+        React.createElement('div', {
+          key: t.id,
+          className: 'tab' + (activeTab === t.id ? ' active' : ''),
+          onClick: () => setActiveTab(t.id)
+        }, t.label))),
+    // Content
+    activeTab === 'overview' && renderOverview(),
+    activeTab === 'privacy' && renderPrivacy(),
+    activeTab === 'source' && renderSource());
 };
 
 /* ═══════════════════ MAIN APP ═══════════════════ */
