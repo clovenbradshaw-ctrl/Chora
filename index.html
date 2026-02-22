@@ -39447,7 +39447,7 @@ const App = () => {
     n: "lock",
     s: 14
   }), " Sign in"))));
-  if (!welcomed && !session) return /*#__PURE__*/React.createElement(WelcomeScreen, {
+  if (!welcomed && !session && !localStorage.getItem('khora_session')) return /*#__PURE__*/React.createElement(WelcomeScreen, {
     onContinue: () => {
       setWelcomed(true);
       try {
