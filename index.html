@@ -518,9 +518,7 @@ button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r)
 .nav-badge-teal{background:rgba(62,201,176,.15);color:var(--teal)}
 .nav-badge-blue{background:rgba(91,156,245,.15);color:var(--blue)}
 .nav-badge-purple{background:rgba(167,139,250,.15);color:var(--purple)}
-/* ═══ Activity Stream ═══ */
-.choreo-triad-card:hover{border-color:var(--border-2)!important;transform:translateY(-1px)}
-.choreo-op-row{transition:border-color .15s}
+/* ═══ Action Log ═══ */
 .choreo-op-row:hover{border-color:var(--border-1)!important}
 @media(max-width:900px){
   .choreo-triad-card{padding:10px!important}
@@ -1279,6 +1277,9 @@ const I = ({
       r: "1.5",
       fill: "currentColor",
       stroke: "none"
+    })),
+    dodeca: /*#__PURE__*/React.createElement("svg", p, /*#__PURE__*/React.createElement("path", {
+      d: "M12 1L22.46 8.6L18.47 20.9L5.53 20.9L1.54 8.6Z M14.94 7.95L16.76 13.55L12 17L7.24 13.55L9.06 7.95Z M12 1L14.94 7.95 M22.46 8.6L16.76 13.55 M18.47 20.9L12 17 M5.53 20.9L7.24 13.55 M1.54 8.6L9.06 7.95"
     }))
   };
   return /*#__PURE__*/React.createElement("span", {
@@ -1763,7 +1764,7 @@ async function emitOp(roomId, op, target, operand, frame, provenance = []) {
       id: event.id
     };
     // DES(eo.dom_event, {khora:eo, ui_notification})
-    // Dispatch custom DOM event so listeners (ActivityStream, notifications) can react immediately
+    // Dispatch custom DOM event so listeners (ActionLog, notifications) can react immediately
     window.dispatchEvent(new CustomEvent('khora:eo', {
       detail: {
         roomId,
@@ -14073,7 +14074,7 @@ const SchemaView = ({
   }));
 };
 
-/* ═══════════════════ ACTIVITY STREAM ═══════════════════ */
+/* ═══════════════════ ACTION LOG + HELPERS ═══════════════════ */
 const ROOM_COLORS = {
   vault: 'teal',
   bridge: 'blue',
@@ -14581,24 +14582,7 @@ const classifyEvent = (ev, roomInfo) => {
   };
 };
 
-/* ═══════════════════ ACTIVITY STREAM (Choreo-aligned) ═══════════════════
- * Operator Manifest:
- *   All nine operators appear here as classification outputs.
- *   This component is the primary EO *display* layer — read-only rendering
- *   of the operator vocabulary produced by classifyEvent() above.
- *
- * Triad Summary:
- *   All three triads rendered:
- *     Identity  (NUL, DES, INS)  — existence operations
- *     Structure (SEG, CON, SYN)  — relational operations
- *     Time      (ALT, SUP, REC)  — interpretive operations
- *   No mutations — display only. The stream shows EO history, doesn't create it.
- *
- * Displays events in Choreo's EO operation grammar format.
- * Each event is mapped to: { op, target, context, frame }
- * aligned with the nine-operator Emergent Ontology model.
- * See: https://github.com/clovenbradshaw-ctrl/Choreo
- * ═══════════════════════════════════════════════════════════════════════ */
+/* ─── EO constants (used by RecordProvenance and ActionLog) ─── */
 
 const OPERATOR_TRIADS = {
   identity: {
@@ -14656,44 +14640,6 @@ const OP_DESCRIPTIONS = {
   REC: {
     verb: 'Reconfigure',
     desc: 'Reconfiguration / Recursion'
-  }
-};
-const ABSENCE_MAP = {
-  NUL: {
-    label: 'Destroyed',
-    desc: 'Actually gone'
-  },
-  DES: {
-    label: 'Undesignated',
-    desc: 'Exists but unnamed'
-  },
-  INS: {
-    label: 'Unknown',
-    desc: 'Never observed'
-  },
-  SEG: {
-    label: 'Inapplicable',
-    desc: 'Outside current boundary'
-  },
-  CON: {
-    label: 'Unconnected',
-    desc: 'No relationships'
-  },
-  SYN: {
-    label: 'Unfused',
-    desc: 'Components present but unmerged'
-  },
-  ALT: {
-    label: 'Pending',
-    desc: 'Transition incomplete'
-  },
-  SUP: {
-    label: 'Withheld',
-    desc: 'Uncollapsed superposition'
-  },
-  REC: {
-    label: 'Pre-recursive',
-    desc: 'Not yet in feedback loop'
   }
 };
 
@@ -15168,220 +15114,85 @@ const RecordProvenance = ({
   })));
 };
 
-// Map a Matrix event to Choreo operation grammar
-const toChoreoOp = ev => {
-  const content = ev.content || {};
-  const roomType = ev.roomInfo?.type || 'unknown';
-
-  // If it's a native EO operation, extract directly
-  if (ev.type === EVT.OP && content.op) {
-    return {
-      op: content.op,
-      target: content.target || '',
-      operand: {
-        table: roomType,
-        type: content.operand?.type || ev.type,
-        source: content.operand?.source || 'khora',
-        ...(content.operand?.auto_intermediate ? {
-          auto_intermediate: true
-        } : {}),
-        ...Object.fromEntries(Object.entries(content.operand || {}).filter(([k]) => !['type', 'source', 'auto_intermediate'].includes(k)))
-      },
-      frame: {
-        epistemic: (content.frame?.epistemic || content.frame?.type || 'given').toLowerCase(),
-        authority: ev.sender,
-        confidence: content.frame?.confidence || 1.0,
-        ...(content.frame?.audit ? {
-          audit: true
-        } : {})
-      }
-    };
-  }
-
-  // Map Matrix state/timeline events into Choreo grammar — build dot-notation target
-  const targetParts = [roomType];
-  if (ev.stateKey) targetParts.push(ev.stateKey);
-  if (content.name) targetParts.push(content.name);
-  const target = targetParts.filter(Boolean).join('.');
-  const operand = {
-    table: roomType,
-    type: ev.type,
-    source: 'matrix'
-  };
-  const frame = {
-    epistemic: (ev.epistemic || 'given').toLowerCase(),
-    authority: ev.sender,
-    confidence: 1.0
-  };
-
-  // Extract meaningful operand fields from content
-  if (content.account_type) operand.account_type = content.account_type;
-  if (content.fields) operand.fields = Object.keys(content.fields);
-  if (content.providers) operand.providers = (content.providers || []).length;
-  if (content.status) operand.status = content.status;
-  if (content.membership) operand.membership = content.membership;
-  if (content.client) operand.client = content.client;
-  if (content.provider) operand.provider = content.provider;
-  if (content.question) operand.question = content.question.slice(0, 60);
-  if (content.body) operand.body = content.body.slice(0, 80);
-  if (content.quantity != null) operand.quantity = content.quantity;
-  if (content.unit) operand.unit = content.unit;
-  if (content.category) operand.category = content.category;
-  if (content.relationship_type) operand.relationship_type = content.relationship_type;
-  if (content.algorithm) operand.algorithm = content.algorithm;
-  if (content.allocated_to) operand.allocated_to = content.allocated_to;
-  if (content.event) operand.lifecycle_event = content.event;
-  if (content.value != null) operand.value = content.value;
-  if (content.prompt_id) operand.prompt_id = content.prompt_id;
-  return {
-    op: ev.op,
-    target,
-    operand,
-    frame
-  };
-};
-const ActivityStream = ({
+/* ═══════════════════ ACTION LOG (simple) ═══════════════════
+ * Replaces the old ActivityStream. Flat chronological log of actions
+ * across all rooms. Uses classifyEvent() for human-readable labels.
+ * ═══════════════════════════════════════════════════════════════ */
+const ActionLog = ({
   session
 }) => {
   const [events, setEvents] = useState([]);
-  const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(new Set());
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [expandedOps, setExpandedOps] = useState(new Set());
-  const [filter, setFilter] = useState({
-    triad: 'all',
-    operator: 'all',
-    roomType: 'all',
-    epistemic: 'all',
-    sender: 'all'
-  });
-  const [viewMode, setViewMode] = useState('stream'); // stream | table | triads
-  const [jsonExpanded, setJsonExpanded] = useState(new Set());
+  const [filter, setFilter] = useState('all');
   const loadEvents = useCallback(async () => {
     setLoading(true);
     try {
       const scanned = await svc.scanRooms();
       const roomIds = Object.keys(scanned);
-      const allRooms = [];
       const allEvents = [];
-      let skippedRooms = 0;
       for (const rid of roomIds) {
-        if (allEvents.length >= 500) break;
+        if (allEvents.length >= 300) break;
         try {
-        const roomInfo = await classifyRoom(rid, scanned[rid]);
-        allRooms.push({
-          id: rid,
-          ...roomInfo
-        });
-        if (svc.client) {
-          const room = svc.client.getRoom(rid);
-          if (room) {
-            // Paginate backwards to load historical timeline events (EO ops are timeline events)
+          const roomInfo = await classifyRoom(rid, scanned[rid]);
+          if (svc.client) {
+            const room = svc.client.getRoom(rid);
+            if (!room) continue;
             try {
-              for (let i = 0; i < 2; i++) {
-                const canPaginate = room.getLiveTimeline().getPaginationToken('b');
-                if (!canPaginate) break;
-                await svc.client.scrollback(room, 100);
-              }
-            } catch (e) {/* pagination may fail for some rooms — continue with what we have */}
+              const canPag = room.getLiveTimeline().getPaginationToken('b');
+              if (canPag) await svc.client.scrollback(room, 50);
+            } catch (e) {/* pagination may fail */}
             const seenIds = new Set();
-            // Gather events from all available timelines (not just live)
             const timelineSets = room.getTimelineSets ? room.getTimelineSets() : [];
-            const allTimelineEvents = [];
+            const allTlEvents = [];
             if (timelineSets.length > 0) {
               for (const ts of timelineSets) {
                 for (const tl of ts.getTimelines()) {
                   for (const ev of tl.getEvents()) {
-                    if (!seenIds.has(ev.getId())) {
-                      seenIds.add(ev.getId());
-                      allTimelineEvents.push(ev);
-                    }
+                    if (!seenIds.has(ev.getId())) { seenIds.add(ev.getId()); allTlEvents.push(ev); }
                   }
                 }
               }
             } else {
-              // Fallback to live timeline only
               for (const ev of room.getLiveTimeline().getEvents()) {
-                if (!seenIds.has(ev.getId())) {
-                  seenIds.add(ev.getId());
-                  allTimelineEvents.push(ev);
-                }
+                if (!seenIds.has(ev.getId())) { seenIds.add(ev.getId()); allTlEvents.push(ev); }
               }
             }
-            for (const ev of allTimelineEvents) {
+            for (const ev of allTlEvents) {
               const cls = classifyEvent(ev, roomInfo);
               allEvents.push({
-                id: ev.getId(),
-                roomId: rid,
-                roomInfo,
-                sender: ev.getSender(),
-                ts: ev.getTs(),
-                type: ev.getType(),
-                stateKey: ev.isState && ev.isState() ? ev.getStateKey() : null,
-                content: ev.getContent(),
-                isState: ev.isState && ev.isState(),
+                id: ev.getId(), roomId: rid, roomInfo, sender: ev.getSender(),
+                ts: ev.getTs(), type: ev.getType(), content: ev.getContent(),
                 ...cls
               });
             }
-            // Also capture current state events not in the timeline window
-            // (e.g. resource events sent after the last sync but before reload)
             for (const ev of room.currentState.getStateEvents()) {
               if (seenIds.has(ev.getId())) continue;
-              const cls = classifyEvent(ev, roomInfo);
               seenIds.add(ev.getId());
+              const cls = classifyEvent(ev, roomInfo);
               allEvents.push({
-                id: ev.getId(),
-                roomId: rid,
-                roomInfo,
-                sender: ev.getSender(),
-                ts: ev.getTs(),
-                type: ev.getType(),
-                stateKey: ev.getStateKey() ?? null,
-                content: ev.getContent(),
-                isState: true,
+                id: ev.getId(), roomId: rid, roomInfo, sender: ev.getSender(),
+                ts: ev.getTs(), type: ev.getType(), content: ev.getContent(),
                 ...cls
               });
             }
           }
-        }
         } catch (roomErr) {
-          skippedRooms++;
-          console.warn('ActivityStream: skipping room', rid, roomErr.message);
+          console.warn('ActionLog: skipping room', rid, roomErr.message);
         }
       }
       allEvents.sort((a, b) => b.ts - a.ts);
-      setRooms(allRooms);
       setEvents(allEvents);
-      if (skippedRooms > 0) console.warn(`ActivityStream: ${skippedRooms} room(s) skipped due to errors`);
     } catch (e) {
-      console.error('ActivityStream error:', e);
+      console.error('ActionLog error:', e);
     }
     setLoading(false);
   }, []);
+  useEffect(() => { loadEvents(); }, []);
   useEffect(() => {
-    loadEvents();
-  }, []);
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const iv = setInterval(loadEvents, 12000);
-    return () => clearInterval(iv);
-  }, [autoRefresh]);
-  // React instantly to new EO operations and Khora timeline/state events via custom DOM events
-  useEffect(() => {
-    const handleEo = () => {
-      loadEvents();
-    };
-    const handleTimeline = () => {
-      loadEvents();
-    };
-    // Debounce rapid-fire events (e.g. multiple intermediate ops from emitOp)
     let debounce = null;
     const debouncedLoad = () => {
       if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        loadEvents();
-      }, 300);
+      debounce = setTimeout(() => { loadEvents(); }, 400);
     };
     window.addEventListener('khora:eo', debouncedLoad);
     window.addEventListener('khora:timeline', debouncedLoad);
@@ -15393,1366 +15204,87 @@ const ActivityStream = ({
       if (debounce) clearTimeout(debounce);
     };
   }, [loadEvents]);
-
-  // Apply filters (including triad and sender filters)
-  const filtered = useMemo(() => events.filter(ev => {
-    if (filter.roomType !== 'all' && ev.roomInfo.type !== filter.roomType) return false;
-    if (filter.operator !== 'all' && ev.op !== filter.operator) return false;
-    if (filter.epistemic !== 'all' && ev.epistemic !== filter.epistemic) return false;
-    if (filter.sender === 'mine' && ev.sender !== svc.userId) return false;
-    if (filter.triad !== 'all') {
-      const triad = OPERATOR_TRIADS[filter.triad];
-      if (triad && !triad.ops.includes(ev.op)) return false;
-    }
-    return true;
-  }), [events, filter]);
-
-  // Stats per triad
-  const triadStats = useMemo(() => {
-    const stats = {};
-    Object.entries(OPERATOR_TRIADS).forEach(([key, triad]) => {
-      stats[key] = {
-        ...triad,
-        count: 0,
-        ops: {}
-      };
-      triad.ops.forEach(op => {
-        stats[key].ops[op] = 0;
-      });
-    });
-    events.forEach(ev => {
-      Object.entries(OPERATOR_TRIADS).forEach(([key, triad]) => {
-        if (triad.ops.includes(ev.op)) {
-          stats[key].count++;
-          stats[key].ops[ev.op] = (stats[key].ops[ev.op] || 0) + 1;
-        }
-      });
-    });
-    return stats;
-  }, [events]);
-
-  // Group filtered events by operator for the Operators view
-  const eventsByOp = useMemo(() => {
-    const groups = {};
-    OPERATORS.forEach(op => { groups[op] = []; });
-    filtered.forEach(ev => {
-      if (groups[ev.op]) groups[ev.op].push(ev);
-    });
-    return groups;
-  }, [filtered]);
-
-  // Compute reverse adjacency (what operators can transition TO this one)
-  const reverseAdj = useMemo(() => {
-    const rev = {};
-    OPERATORS.forEach(op => { rev[op] = []; });
-    Object.entries(OP_ADJ).forEach(([from, tos]) => {
-      tos.forEach(to => {
-        if (!rev[to].includes(from)) rev[to].push(from);
-      });
-    });
-    return rev;
-  }, []);
-
-  const toggleOp = op => setExpandedOps(p => {
-    const n = new Set(p);
-    n.has(op) ? n.delete(op) : n.add(op);
-    return n;
-  });
-
-  const toggle = id => setExpanded(p => {
-    const n = new Set(p);
-    n.has(id) ? n.delete(id) : n.add(id);
-    return n;
-  });
-  const toggleJson = id => setJsonExpanded(p => {
-    const n = new Set(p);
-    n.has(id) ? n.delete(id) : n.add(id);
-    return n;
-  });
-  if (loading) return /*#__PURE__*/React.createElement("div", {
-    style: {
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }
-  }, /*#__PURE__*/React.createElement(Spin, {
-    s: 28
-  }));
+  const filtered = filter === 'all' ? events : events.filter(ev => ev.roomInfo.type === filter);
+  const roomTypes = [...new Set(events.map(ev => ev.roomInfo.type))].sort();
+  if (loading && events.length === 0) return /*#__PURE__*/React.createElement("div", {
+    style: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+  }, /*#__PURE__*/React.createElement(Spin, { s: 28 }));
   return /*#__PURE__*/React.createElement("div", {
     className: "anim-up",
-    style: {
-      maxWidth: 1060,
-      margin: '0 auto'
-    }
+    style: { maxWidth: 900, margin: '0 auto' }
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 24
-    }
+    style: { marginBottom: 20 }
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10,
-      marginBottom: 6
-    }
-  }, /*#__PURE__*/React.createElement(I, {
-    n: "layers",
-    s: 20,
-    c: "var(--purple)"
-  }), /*#__PURE__*/React.createElement("h2", {
-    style: {
-      fontFamily: 'var(--serif)',
-      fontSize: 24,
-      fontWeight: 700,
-      letterSpacing: '-0.02em'
-    }
-  }, "Activity Stream"), /*#__PURE__*/React.createElement("span", {
-    className: "tag tag-purple"
-  }, "EO")), /*#__PURE__*/React.createElement("p", {
-    style: {
-      color: 'var(--tx-1)',
-      fontSize: 13,
-      lineHeight: 1.6
-    }
-  }, "Operations displayed in EO grammar: ", /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontFamily: 'var(--mono)',
-      color: 'var(--purple)',
-      fontSize: 12
-    }
-  }, "op / target / context / frame"), ". Nine operators, three triads, append-only log with derived projections.")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(3,1fr)',
-      gap: 10,
-      marginBottom: 16
-    }
-  }, Object.entries(triadStats).map(([key, triad]) => /*#__PURE__*/React.createElement("div", {
-    key: key,
-    className: "card choreo-triad-card",
-    onClick: () => setFilter(f => ({
-      ...f,
-      triad: f.triad === key ? 'all' : key
-    })),
-    style: {
-      padding: 14,
-      cursor: 'pointer',
-      borderColor: filter.triad === key ? `var(--${triad.color})` : 'var(--border-0)',
-      transition: 'border-color .2s'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      fontFamily: 'var(--mono)',
-      fontWeight: 600,
-      color: `var(--${triad.color})`,
-      letterSpacing: '.06em'
-    }
-  }, triad.label.toUpperCase()), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 18,
-      fontWeight: 700,
-      color: triad.count > 0 ? `var(--${triad.color})` : 'var(--tx-3)'
-    }
-  }, triad.count)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: 'var(--tx-2)',
-      marginBottom: 8
-    }
-  }, triad.desc), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 4
-    }
-  }, Object.entries(triad.ops).map(([op, count]) => /*#__PURE__*/React.createElement("div", {
-    key: op,
-    style: {
-      flex: 1,
-      textAlign: 'center',
-      padding: '4px 0',
-      borderRadius: 'var(--r)',
-      background: `var(--${OP_COLORS[op] || 'blue'}-dim)`,
-      border: `1px solid var(--${OP_COLORS[op] || 'blue'})18`
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 9,
-      fontFamily: 'var(--mono)',
-      fontWeight: 600,
-      color: `var(--${OP_COLORS[op] || 'blue'})`
-    }
-  }, op), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: count > 0 ? 'var(--tx-0)' : 'var(--tx-3)'
-    }
-  }, count))))))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 8,
-      marginBottom: 12,
-      flexWrap: 'wrap',
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "tabs",
-    style: {
-      marginBottom: 0,
-      flex: 'none'
-    }
-  }, [{
-    id: 'stream',
-    label: 'Stream'
-  }, {
-    id: 'table',
-    label: 'Table'
-  }, {
-    id: 'triads',
-    label: 'Triads'
-  }, {
-    id: 'operators',
-    label: 'Operators'
-  }].map(m => /*#__PURE__*/React.createElement("div", {
-    key: m.id,
-    className: `tab${viewMode === m.id ? ' active' : ''}`,
-    onClick: () => setViewMode(m.id),
-    style: {
-      padding: '6px 14px',
-      fontSize: 11.5
-    }
-  }, m.label))), /*#__PURE__*/React.createElement("select", {
-    value: filter.roomType,
-    onChange: e => setFilter({
-      ...filter,
-      roomType: e.target.value
-    }),
-    style: {
-      width: 'auto',
-      padding: '5px 8px',
-      fontSize: 11
-    }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "all"
-  }, "All Rooms"), ['vault', 'bridge', 'roster', 'org', 'schema', 'metrics', 'network', 'client_record', 'team'].map(t => /*#__PURE__*/React.createElement("option", {
-    key: t,
-    value: t
-  }, t))), /*#__PURE__*/React.createElement("select", {
-    value: filter.operator,
-    onChange: e => setFilter({
-      ...filter,
-      operator: e.target.value
-    }),
-    style: {
-      width: 'auto',
-      padding: '5px 8px',
-      fontSize: 11
-    }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "all"
-  }, "All Operators"), OPERATORS.map(op => /*#__PURE__*/React.createElement("option", {
-    key: op,
-    value: op
-  }, op, " \u2014 ", OP_DESCRIPTIONS[op]?.verb))), /*#__PURE__*/React.createElement("select", {
-    value: filter.epistemic,
-    onChange: e => setFilter({
-      ...filter,
-      epistemic: e.target.value
-    }),
-    style: {
-      width: 'auto',
-      padding: '5px 8px',
-      fontSize: 11
-    }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "all"
-  }, "All Epistemic"), /*#__PURE__*/React.createElement("option", {
-    value: "GIVEN"
-  }, "GIVEN"), /*#__PURE__*/React.createElement("option", {
-    value: "MEANT"
-  }, "MEANT")), /*#__PURE__*/React.createElement("select", {
-    value: filter.sender,
-    onChange: e => setFilter({
-      ...filter,
-      sender: e.target.value
-    }),
-    style: {
-      width: 'auto',
-      padding: '5px 8px',
-      fontSize: 11,
-      fontWeight: filter.sender === 'mine' ? 600 : 'normal',
-      color: filter.sender === 'mine' ? 'var(--teal)' : 'inherit'
-    }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "all"
-  }, "All Actors"), /*#__PURE__*/React.createElement("option", {
-    value: "mine"
-  }, "My Actions")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginLeft: 'auto',
-      display: 'flex',
-      gap: 6,
-      alignItems: 'center'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 9,
-      color: 'var(--tx-3)',
-      fontFamily: 'var(--mono)'
-    }
-  }, "LIVE"), /*#__PURE__*/React.createElement(Toggle, {
-    on: autoRefresh,
-    onChange: () => setAutoRefresh(!autoRefresh)
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: loadEvents,
-    className: "b-gho b-xs"
-  }, /*#__PURE__*/React.createElement(I, {
-    n: "refresh-cw",
-    s: 10
-  })))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: 'var(--tx-3)',
-      fontFamily: 'var(--mono)',
-      marginBottom: 10
-    }
-  }, filtered.length, " operation", filtered.length !== 1 ? 's' : '', " of ", events.length, " total", filter.sender === 'mine' && /*#__PURE__*/React.createElement("span", null, " \xB7 ", /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: 'var(--teal)',
-      fontWeight: 600
-    }
-  }, "my actions only")), filter.triad !== 'all' && /*#__PURE__*/React.createElement("span", null, " \xB7 triad: ", /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: `var(--${OPERATOR_TRIADS[filter.triad]?.color || 'purple'})`
-    }
-  }, OPERATOR_TRIADS[filter.triad]?.label))), viewMode === 'stream' && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 3
-    }
-  }, filtered.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }
+  }, /*#__PURE__*/React.createElement(I, { n: "list", s: 20, c: "var(--purple)" }),
+  /*#__PURE__*/React.createElement("h2", {
+    style: { fontFamily: 'var(--serif)', fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }
+  }, "Action Log"),
+  /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 11, color: 'var(--tx-3)', fontFamily: 'var(--mono)', marginLeft: 'auto' }
+  }, filtered.length, " action", filtered.length !== 1 ? 's' : '')),
+  /*#__PURE__*/React.createElement("p", {
+    style: { color: 'var(--tx-1)', fontSize: 13, lineHeight: 1.6 }
+  }, "Chronological log of all actions across your rooms.")),
+  /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }
+  }, /*#__PURE__*/React.createElement("select", {
+    value: filter,
+    onChange: e => setFilter(e.target.value),
+    style: { width: 'auto', padding: '5px 8px', fontSize: 11 }
+  }, /*#__PURE__*/React.createElement("option", { value: "all" }, "All Rooms"),
+  roomTypes.map(t => /*#__PURE__*/React.createElement("option", { key: t, value: t }, t))),
+  /*#__PURE__*/React.createElement("button", {
+    onClick: loadEvents, className: "b-gho b-xs",
+    style: { display: 'flex', alignItems: 'center', gap: 4 }
+  }, /*#__PURE__*/React.createElement(I, { n: "refresh-cw", s: 10 }), "Refresh")),
+  filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "card",
-    style: {
-      textAlign: 'center',
-      padding: '30px 20px',
-      borderStyle: 'dashed'
-    }
-  }, /*#__PURE__*/React.createElement(I, {
-    n: "layers",
-    s: 24,
-    c: "var(--tx-3)"
-  }), /*#__PURE__*/React.createElement("p", {
-    style: {
-      color: 'var(--tx-3)',
-      marginTop: 8,
-      fontSize: 12
-    }
-  }, "No operations match filters")), filtered.slice(0, 150).map((ev, idx) => {
-    const choreo = toChoreoOp(ev);
-    const isExp = expanded.has(ev.id);
-    const isJsonExp = jsonExpanded.has(ev.id);
+    style: { textAlign: 'center', padding: '40px 20px', borderStyle: 'dashed' }
+  }, /*#__PURE__*/React.createElement(I, { n: "list", s: 24, c: "var(--tx-3)" }),
+  /*#__PURE__*/React.createElement("p", {
+    style: { color: 'var(--tx-3)', marginTop: 8, fontSize: 12 }
+  }, "No actions recorded yet.")) :
+  /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: 2 }
+  }, filtered.slice(0, 200).map((ev, idx) => {
     const opC = OP_COLORS[ev.op] || 'blue';
     const rmC = ROOM_COLORS[ev.roomInfo.type] || 'orange';
-    const triadKey = Object.entries(OPERATOR_TRIADS).find(([, t]) => t.ops.includes(ev.op))?.[0];
-    const triadColor = triadKey ? OPERATOR_TRIADS[triadKey].color : 'purple';
-    const seqId = filtered.length - idx;
+    const username = (ev.sender || '').split(':')[0]?.replace('@', '') || '';
+    const verb = OP_DESCRIPTIONS[ev.op]?.verb || ev.op;
     return /*#__PURE__*/React.createElement("div", {
       key: ev.id || idx,
-      className: "choreo-op-row",
       style: {
-        background: 'var(--bg-2)',
-        border: '1px solid var(--border-0)',
-        borderRadius: 'var(--r)',
-        overflow: 'hidden'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      onClick: () => toggle(ev.id),
-      style: {
-        padding: '8px 12px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        cursor: 'pointer',
-        transition: 'background .1s'
-      },
-      onMouseEnter: e => e.currentTarget.style.background = 'var(--bg-3)',
-      onMouseLeave: e => e.currentTarget.style.background = 'transparent'
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 9,
-        fontFamily: 'var(--mono)',
-        color: 'var(--tx-3)',
-        minWidth: 28,
-        textAlign: 'right'
-      }
-    }, seqId), /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 2,
-        height: 16,
-        borderRadius: 1,
-        background: `var(--${triadColor})`,
-        flexShrink: 0,
-        opacity: .6
-      }
-    }), /*#__PURE__*/React.createElement("span", {
-      className: `tag tag-${opC}`,
-      style: {
-        fontSize: 9.5,
-        minWidth: 30,
-        textAlign: 'center',
-        fontFamily: 'var(--mono)'
-      }
-    }, ev.op), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 10,
-        color: `var(--${triadColor})`,
-        fontFamily: 'var(--mono)',
-        minWidth: 22
-      }
-    }, OP_DESCRIPTIONS[ev.op]?.verb?.slice(0, 5)), /*#__PURE__*/React.createElement("span", {
-      className: `tag tag-${rmC}`,
-      style: {
-        fontSize: 8.5
-      }
-    }, ev.roomInfo.type), /*#__PURE__*/React.createElement("span", {
-      className: `tag ${ev.epistemic === 'GIVEN' ? 'tag-teal' : 'tag-gold'}`,
-      style: {
-        fontSize: 8.5
-      }
-    }, ev.epistemic), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11.5,
-        fontWeight: 500,
-        flex: 1,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
-      }
-    }, ev.label), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 10,
-        color: 'var(--tx-2)',
-        fontFamily: 'var(--mono)',
-        maxWidth: 160,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
-      }
-    }, ev.desc), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 8.5,
-        color: 'var(--tx-3)',
-        fontFamily: 'var(--mono)'
-      }
-    }, ev.ts ? new Date(ev.ts).toLocaleTimeString() : ''), /*#__PURE__*/React.createElement(I, {
-      n: isExp ? 'x' : 'chevR',
-      s: 10,
-      c: "var(--tx-3)"
-    })), isExp && /*#__PURE__*/React.createElement("div", {
-      className: "anim-in",
-      style: {
-        borderTop: '1px solid var(--border-0)',
-        background: 'var(--bg-1)'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'grid',
-        gridTemplateColumns: '100px 1fr 1fr 1fr',
-        gap: 0,
-        fontSize: 11
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '10px 12px',
-        borderRight: '1px solid var(--border-0)'
+        display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px',
+        background: 'var(--bg-2)', border: '1px solid var(--border-0)',
+        borderRadius: 'var(--r)', fontSize: 12
       }
     }, /*#__PURE__*/React.createElement("span", {
-      className: "section-label",
-      style: {
-        fontSize: 8
-      }
-    }, "OPERATOR"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        marginTop: 4
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 8,
-        height: 8,
-        borderRadius: '50%',
-        background: `var(--${opC})`
-      }
-    }), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontWeight: 700,
-        fontSize: 16,
-        color: `var(--${opC})`
-      }
-    }, choreo.op)), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 9.5,
-        color: 'var(--tx-2)',
-        marginTop: 4
-      }
-    }, OP_DESCRIPTIONS[choreo.op]?.desc), /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginTop: 6
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 8,
-        fontFamily: 'var(--mono)',
-        color: `var(--${triadColor})`,
-        padding: '1px 5px',
-        background: `var(--${triadColor}-dim)`,
-        borderRadius: 3
-      }
-    }, OPERATOR_TRIADS[triadKey]?.label)), /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginTop: 6,
-        fontSize: 8.5,
-        color: 'var(--tx-3)'
-      }
-    }, "Absence: ", ABSENCE_MAP[choreo.op]?.label)), /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '10px 12px',
-        borderRight: '1px solid var(--border-0)'
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "section-label",
-      style: {
-        fontSize: 8
-      }
-    }, "TARGET"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: 12,
-        color: 'var(--tx-0)',
-        marginTop: 4,
-        wordBreak: 'break-all',
-        lineHeight: 1.5
-      }
-    }, typeof choreo.target === 'string' ? choreo.target : JSON.stringify(choreo.target, null, 2))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '10px 12px',
-        borderRight: '1px solid var(--border-0)'
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "section-label",
-      style: {
-        fontSize: 8
-      }
-    }, "OPERAND"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginTop: 4,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 3
-      }
-    }, Object.entries(choreo.operand).map(([k, v]) => /*#__PURE__*/React.createElement("div", {
-      key: k,
-      style: {
-        display: 'flex',
-        gap: 6,
-        alignItems: 'baseline'
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: 9,
-        color: 'var(--tx-3)',
-        minWidth: 50
-      }
-    }, k, ":"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: 10,
-        color: 'var(--tx-1)',
-        wordBreak: 'break-all'
-      }
-    }, String(v)))))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '10px 12px'
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "section-label",
-      style: {
-        fontSize: 8
-      }
-    }, "FRAME"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginTop: 4,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 3
-      }
-    }, Object.entries(choreo.frame).map(([k, v]) => /*#__PURE__*/React.createElement("div", {
-      key: k,
-      style: {
-        display: 'flex',
-        gap: 6,
-        alignItems: 'baseline'
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: 9,
-        color: 'var(--tx-3)',
-        minWidth: 60
-      }
-    }, k, ":"), k === 'epistemic' ? /*#__PURE__*/React.createElement("span", {
-      className: `tag ${v === 'given' ? 'tag-teal' : 'tag-gold'}`,
-      style: {
-        fontSize: 8
-      }
-    }, v.toUpperCase()) : k === 'confidence' ? /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: 10,
-        color: v >= 0.8 ? 'var(--green)' : v >= 0.5 ? 'var(--gold)' : 'var(--red)'
-      }
-    }, v) : /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: 10,
-        color: 'var(--tx-1)',
-        wordBreak: 'break-all'
-      }
-    }, String(v))))))), /*#__PURE__*/React.createElement("div", {
-      style: {
-        borderTop: '1px solid var(--border-0)',
-        padding: '8px 12px',
-        display: 'flex',
-        gap: 16,
-        flexWrap: 'wrap',
-        fontSize: 10,
-        color: 'var(--tx-2)'
-      }
-    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: 'var(--tx-3)'
-      }
-    }, "event_type:"), " ", /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)'
-      }
-    }, ev.type)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: 'var(--tx-3)'
-      }
-    }, "sender:"), " ", /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)'
-      }
-    }, ev.sender)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: 'var(--tx-3)'
-      }
-    }, "room:"), " ", /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)'
-      }
-    }, ev.roomId?.slice(0, 24), "...")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: 'var(--tx-3)'
-      }
-    }, "ts:"), " ", /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)'
-      }
-    }, ev.ts ? new Date(ev.ts).toISOString() : '—')), /*#__PURE__*/React.createElement("span", {
-      onClick: () => toggleJson(ev.id),
-      style: {
-        cursor: 'pointer',
-        color: 'var(--purple)',
-        fontFamily: 'var(--mono)',
-        userSelect: 'none'
-      }
-    }, isJsonExp ? 'hide' : 'show', " raw JSON")), isJsonExp && /*#__PURE__*/React.createElement("div", {
-      style: {
-        borderTop: '1px solid var(--border-0)',
-        padding: '10px 12px',
-        background: 'var(--bg-0)'
-      }
-    }, /*#__PURE__*/React.createElement("pre", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: 10,
-        color: 'var(--tx-1)',
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-all',
-        lineHeight: 1.5,
-        maxHeight: 300,
-        overflow: 'auto'
-      }
-    }, JSON.stringify({
-      op: choreo.op,
-      target: choreo.target,
-      operand: choreo.operand,
-      frame: choreo.frame,
-      _meta: {
-        id: ev.id,
-        ts: ev.ts ? new Date(ev.ts).toISOString() : null,
-        sender: ev.sender,
-        room: ev.roomId,
-        matrix_type: ev.type
-      }
-    }, null, 2)))));
-  })), viewMode === 'table' && /*#__PURE__*/React.createElement("div", {
-    style: {
-      overflowX: 'auto'
-    }
-  }, /*#__PURE__*/React.createElement("table", {
-    style: {
-      width: '100%',
-      borderCollapse: 'collapse',
-      fontSize: 11,
-      fontFamily: 'var(--mono)'
-    }
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
-    style: {
-      borderBottom: '2px solid var(--border-1)'
-    }
-  }, ['#', 'OP', 'TABLE', 'EPISTEMIC', 'TARGET', 'OPERAND SOURCE', 'AUTHORITY', 'CONF', 'TIME'].map(h => /*#__PURE__*/React.createElement("th", {
-    key: h,
-    style: {
-      padding: '8px 6px',
-      textAlign: 'left',
-      fontSize: 9,
-      fontWeight: 600,
-      color: 'var(--tx-2)',
-      letterSpacing: '.06em',
-      whiteSpace: 'nowrap'
-    }
-  }, h)))), /*#__PURE__*/React.createElement("tbody", null, filtered.length === 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    colSpan: 9,
-    style: {
-      padding: 20,
-      textAlign: 'center',
-      color: 'var(--tx-3)'
-    }
-  }, "No operations match filters")), filtered.slice(0, 200).map((ev, idx) => {
-    const choreo = toChoreoOp(ev);
-    const opC = OP_COLORS[ev.op] || 'blue';
-    const seqId = filtered.length - idx;
-    return /*#__PURE__*/React.createElement("tr", {
-      key: ev.id || idx,
-      style: {
-        borderBottom: '1px solid var(--border-0)'
-      },
-      onMouseEnter: e => e.currentTarget.style.background = 'var(--bg-2)',
-      onMouseLeave: e => e.currentTarget.style.background = 'transparent'
-    }, /*#__PURE__*/React.createElement("td", {
-      style: {
-        padding: '6px',
-        color: 'var(--tx-3)',
-        fontSize: 9
-      }
-    }, seqId), /*#__PURE__*/React.createElement("td", {
-      style: {
-        padding: '6px'
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      className: `tag tag-${opC}`,
-      style: {
-        fontSize: 9,
-        fontFamily: 'var(--mono)'
-      }
-    }, ev.op)), /*#__PURE__*/React.createElement("td", {
-      style: {
-        padding: '6px',
-        color: 'var(--tx-1)'
-      }
-    }, choreo.operand.table), /*#__PURE__*/React.createElement("td", {
-      style: {
-        padding: '6px'
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      className: `tag ${ev.epistemic === 'GIVEN' ? 'tag-teal' : 'tag-gold'}`,
-      style: {
-        fontSize: 8.5
-      }
-    }, choreo.frame.epistemic)), /*#__PURE__*/React.createElement("td", {
-      style: {
-        padding: '6px',
-        color: 'var(--tx-1)',
-        maxWidth: 200,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
-      }
-    }, ev.desc || ev.label), /*#__PURE__*/React.createElement("td", {
-      style: {
-        padding: '6px',
-        color: 'var(--tx-2)'
-      }
-    }, choreo.operand.source), /*#__PURE__*/React.createElement("td", {
-      style: {
-        padding: '6px',
-        color: 'var(--tx-2)',
-        maxWidth: 120,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
-      }
-    }, choreo.frame.authority), /*#__PURE__*/React.createElement("td", {
-      style: {
-        padding: '6px',
-        color: choreo.frame.confidence >= 0.8 ? 'var(--green)' : choreo.frame.confidence >= 0.5 ? 'var(--gold)' : 'var(--red)'
-      }
-    }, choreo.frame.confidence), /*#__PURE__*/React.createElement("td", {
-      style: {
-        padding: '6px',
-        color: 'var(--tx-3)',
-        fontSize: 9,
-        whiteSpace: 'nowrap'
-      }
-    }, ev.ts ? new Date(ev.ts).toLocaleTimeString() : ''));
-  })))), viewMode === 'triads' && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 16
-    }
-  }, Object.entries(OPERATOR_TRIADS).map(([triadKey, triad]) => {
-    const triadEvents = filtered.filter(ev => triad.ops.includes(ev.op));
-    return /*#__PURE__*/React.createElement("div", {
-      key: triadKey,
-      className: "card",
-      style: {
-        padding: 0,
-        overflow: 'hidden',
-        borderColor: `var(--${triad.color})20`
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '12px 16px',
-        background: `var(--${triad.color}-dim)`,
-        borderBottom: `1px solid var(--${triad.color})20`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: 12,
-        fontWeight: 700,
-        color: `var(--${triad.color})`
-      }
-    }, triad.label.toUpperCase(), " TRIAD"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
-        color: 'var(--tx-2)',
-        marginLeft: 10
-      }
-    }, triad.desc)), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: 14,
-        fontWeight: 700,
-        color: `var(--${triad.color})`
-      }
-    }, triadEvents.length)), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3,1fr)',
-        gap: 0
-      }
-    }, triad.ops.map((op, oi) => {
-      const opEvents = triadEvents.filter(ev => ev.op === op);
-      return /*#__PURE__*/React.createElement("div", {
-        key: op,
-        style: {
-          borderRight: oi < 2 ? '1px solid var(--border-0)' : 'none',
-          padding: 12
-        }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          marginBottom: 8
-        }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          width: 6,
-          height: 6,
-          borderRadius: '50%',
-          background: `var(--${OP_COLORS[op] || 'blue'})`
-        }
-      }), /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontFamily: 'var(--mono)',
-          fontSize: 12,
-          fontWeight: 700,
-          color: `var(--${OP_COLORS[op] || 'blue'})`
-        }
-      }, op), /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 10,
-          color: 'var(--tx-2)'
-        }
-      }, OP_DESCRIPTIONS[op]?.verb), /*#__PURE__*/React.createElement("span", {
-        style: {
-          marginLeft: 'auto',
-          fontFamily: 'var(--mono)',
-          fontSize: 11,
-          fontWeight: 600,
-          color: 'var(--tx-1)'
-        }
-      }, opEvents.length)), /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 9,
-          color: 'var(--tx-3)',
-          marginBottom: 8
-        }
-      }, OP_DESCRIPTIONS[op]?.desc), /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 8.5,
-          color: 'var(--tx-3)',
-          fontFamily: 'var(--mono)',
-          marginBottom: 6
-        }
-      }, "Absence: ", ABSENCE_MAP[op]?.label, " \u2014 ", ABSENCE_MAP[op]?.desc), /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
-          maxHeight: 180,
-          overflow: 'auto'
-        }
-      }, opEvents.slice(0, 15).map((ev, i) => {
-        const rmC = ROOM_COLORS[ev.roomInfo.type] || 'orange';
-        return /*#__PURE__*/React.createElement("div", {
-          key: ev.id || i,
-          style: {
-            padding: '4px 6px',
-            borderRadius: 3,
-            background: 'var(--bg-3)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            fontSize: 10
-          }
-        }, /*#__PURE__*/React.createElement("span", {
-          className: `tag tag-${rmC}`,
-          style: {
-            fontSize: 7.5,
-            padding: '0px 4px'
-          }
-        }, ev.roomInfo.type), /*#__PURE__*/React.createElement("span", {
-          style: {
-            flex: 1,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            color: 'var(--tx-1)'
-          }
-        }, ev.desc || ev.label), /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: 8,
-            color: 'var(--tx-3)',
-            fontFamily: 'var(--mono)'
-          }
-        }, ev.ts ? new Date(ev.ts).toLocaleTimeString() : ''));
-      }), opEvents.length === 0 && /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 10,
-          color: 'var(--tx-3)',
-          fontStyle: 'italic',
-          padding: 4
-        }
-      }, "No operations"), opEvents.length > 15 && /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 9,
-          color: 'var(--tx-3)',
-          fontFamily: 'var(--mono)',
-          padding: 4
-        }
-      }, "+", opEvents.length - 15, " more")));
-    })));
-  })), viewMode === 'operators' && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 16
-    }
-  },
-  /* ── Operator Flow Strip ── */
-  /*#__PURE__*/React.createElement("div", {
-    className: "card",
-    style: {
-      padding: '16px 20px',
-      overflow: 'hidden'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      fontFamily: 'var(--mono)',
-      fontWeight: 600,
-      color: 'var(--tx-3)',
-      letterSpacing: '.06em',
-      marginBottom: 12
-    }
-  }, "OPERATOR ADJACENCY FLOW"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 0,
-      overflowX: 'auto',
-      paddingBottom: 4
-    }
-  }, OPERATORS.map((op, idx) => {
-    const opC = OP_COLORS[op] || 'blue';
-    const count = (eventsByOp[op] || []).length;
-    const triadKey = Object.entries(OPERATOR_TRIADS).find(([, t]) => t.ops.includes(op))?.[0];
-    const triadColor = triadKey ? OPERATOR_TRIADS[triadKey].color : 'purple';
-    return /*#__PURE__*/React.createElement(React.Fragment, {
-      key: op
-    }, idx > 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '0 2px',
-        minWidth: 20
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 10,
-        color: OP_ADJ[OPERATORS[idx - 1]]?.includes(op) ? `var(--${triadColor})` : 'var(--border-0)',
-        fontWeight: OP_ADJ[OPERATORS[idx - 1]]?.includes(op) ? 700 : 400
-      }
-    }, "\u2192")), /*#__PURE__*/React.createElement("div", {
-      onClick: () => toggleOp(op),
-      style: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '8px 10px',
-        borderRadius: 'var(--r)',
-        background: expandedOps.has(op) ? `var(--${opC}-dim)` : 'var(--bg-3)',
-        border: expandedOps.has(op) ? `1px solid var(--${opC})40` : '1px solid var(--border-0)',
-        cursor: 'pointer',
-        transition: 'all .15s',
-        minWidth: 62
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: 11,
-        fontWeight: 700,
-        color: `var(--${opC})`
-      }
-    }, op), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 8.5,
-        color: 'var(--tx-2)',
-        marginTop: 2
-      }
-    }, OP_DESCRIPTIONS[op]?.verb), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: 12,
-        fontWeight: 700,
-        color: count > 0 ? 'var(--tx-0)' : 'var(--tx-3)',
-        marginTop: 4
-      }
-    }, count), /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 20,
-        height: 3,
-        borderRadius: 2,
-        background: `var(--${triadColor})`,
-        marginTop: 4,
-        opacity: 0.5
-      }
-    })));
-  }))),
-  /* ── Per-Operator Cards ── */
-  OPERATORS.map(op => {
-    const opC = OP_COLORS[op] || 'blue';
-    const opEvts = eventsByOp[op] || [];
-    const triadKey = Object.entries(OPERATOR_TRIADS).find(([, t]) => t.ops.includes(op))?.[0];
-    const triadColor = triadKey ? OPERATOR_TRIADS[triadKey].color : 'purple';
-    const triadLabel = triadKey ? OPERATOR_TRIADS[triadKey].label : '';
-    const isExp = expandedOps.has(op);
-    const canFollow = reverseAdj[op] || [];
-    const canLeadTo = OP_ADJ[op] || [];
-    return /*#__PURE__*/React.createElement("div", {
-      key: op,
-      className: "card",
-      style: {
-        padding: 0,
-        overflow: 'hidden',
-        borderColor: isExp ? `var(--${opC})40` : 'var(--border-0)'
-      }
-    },
-    /* Card Header */
-    /*#__PURE__*/React.createElement("div", {
-      onClick: () => toggleOp(op),
-      style: {
-        padding: '12px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        cursor: 'pointer',
-        transition: 'background .1s'
-      },
-      onMouseEnter: e => e.currentTarget.style.background = 'var(--bg-3)',
-      onMouseLeave: e => e.currentTarget.style.background = 'transparent'
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 10,
-        height: 10,
-        borderRadius: '50%',
-        background: `var(--${opC})`,
-        flexShrink: 0
-      }
-    }), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontFamily: 'var(--mono)',
-        fontSize: 15,
-        fontWeight: 700,
-        color: `var(--${opC})`
-      }
-    }, op), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 12,
-        color: 'var(--tx-1)',
-        fontWeight: 500
-      }
-    }, OP_DESCRIPTIONS[op]?.verb), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 10.5,
-        color: 'var(--tx-2)'
-      }
-    }, "\u2014 ", OP_DESCRIPTIONS[op]?.desc), /*#__PURE__*/React.createElement("span", {
-      className: `tag tag-${triadColor}`,
-      style: {
-        fontSize: 8,
-        marginLeft: 4
-      }
-    }, triadLabel), /*#__PURE__*/React.createElement("span", {
-      style: {
-        marginLeft: 'auto',
-        fontFamily: 'var(--mono)',
-        fontSize: 14,
-        fontWeight: 700,
-        color: opEvts.length > 0 ? `var(--${opC})` : 'var(--tx-3)'
-      }
-    }, opEvts.length), /*#__PURE__*/React.createElement(I, {
-      n: isExp ? 'chevD' : 'chevR',
-      s: 12,
-      c: 'var(--tx-3)'
-    })),
-    /* Expanded Content */
-    isExp && /*#__PURE__*/React.createElement("div", {
-      className: "anim-in",
-      style: {
-        borderTop: '1px solid var(--border-0)'
-      }
-    },
-    /* Adjacency + Absence info row */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr 1fr',
-        gap: 0,
-        borderBottom: '1px solid var(--border-0)'
-      }
-    },
-    /* Can follow from */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '10px 14px',
-        borderRight: '1px solid var(--border-0)'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 8,
-        fontFamily: 'var(--mono)',
-        fontWeight: 600,
-        color: 'var(--tx-3)',
-        letterSpacing: '.05em',
-        marginBottom: 6
-      }
-    }, "CAN FOLLOW FROM"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        gap: 4,
-        flexWrap: 'wrap'
-      }
-    }, canFollow.map(f => /*#__PURE__*/React.createElement("span", {
-      key: f,
-      className: `tag tag-${OP_COLORS[f] || 'blue'}`,
-      style: {
-        fontSize: 9,
-        fontFamily: 'var(--mono)'
-      }
-    }, f)))),
-    /* Can lead to */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '10px 14px',
-        borderRight: '1px solid var(--border-0)'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 8,
-        fontFamily: 'var(--mono)',
-        fontWeight: 600,
-        color: 'var(--tx-3)',
-        letterSpacing: '.05em',
-        marginBottom: 6
-      }
-    }, "CAN LEAD TO"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        gap: 4,
-        flexWrap: 'wrap'
-      }
-    }, canLeadTo.map(t => /*#__PURE__*/React.createElement("span", {
-      key: t,
-      className: `tag tag-${OP_COLORS[t] || 'blue'}`,
-      style: {
-        fontSize: 9,
-        fontFamily: 'var(--mono)'
-      }
-    }, t)))),
-    /* Absence semantics */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '10px 14px'
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 8,
-        fontFamily: 'var(--mono)',
-        fontWeight: 600,
-        color: 'var(--tx-3)',
-        letterSpacing: '.05em',
-        marginBottom: 6
-      }
-    }, "WHEN ABSENT"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        fontWeight: 600,
-        color: 'var(--tx-1)'
-      }
-    }, ABSENCE_MAP[op]?.label), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: 'var(--tx-2)',
-        marginTop: 2
-      }
-    }, ABSENCE_MAP[op]?.desc))),
-    /* Events list */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '10px 14px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 2,
-        maxHeight: 320,
-        overflow: 'auto'
-      }
-    }, opEvts.length === 0 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: 'var(--tx-3)',
-        fontStyle: 'italic',
-        padding: '8px 0'
-      }
-    }, "No ", op, " operations in current view"), opEvts.slice(0, 25).map((ev, i) => {
-      const rmC = ROOM_COLORS[ev.roomInfo.type] || 'orange';
-      return /*#__PURE__*/React.createElement("div", {
-        key: ev.id || i,
-        style: {
-          padding: '5px 8px',
-          borderRadius: 3,
-          background: 'var(--bg-3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          fontSize: 10.5
-        }
-      }, /*#__PURE__*/React.createElement("span", {
-        className: `tag tag-${rmC}`,
-        style: {
-          fontSize: 8,
-          padding: '0px 5px'
-        }
-      }, ev.roomInfo.type), /*#__PURE__*/React.createElement("span", {
-        className: `tag ${ev.epistemic === 'GIVEN' ? 'tag-teal' : 'tag-gold'}`,
-        style: {
-          fontSize: 7.5,
-          padding: '0px 4px'
-        }
-      }, ev.epistemic), /*#__PURE__*/React.createElement("span", {
-        style: {
-          flex: 1,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          color: 'var(--tx-1)'
-        }
-      }, ev.label || ev.desc), /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 8.5,
-          color: 'var(--tx-3)',
-          fontFamily: 'var(--mono)',
-          flexShrink: 0
-        }
-      }, ev.ts ? new Date(ev.ts).toLocaleTimeString() : ''));
-    }), opEvts.length > 25 && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 9,
-        color: 'var(--tx-3)',
-        fontFamily: 'var(--mono)',
-        padding: '4px 0'
-      }
-    }, "+", opEvts.length - 25, " more operations"))));
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 20,
-      padding: '12px 16px',
-      background: 'var(--bg-2)',
-      border: '1px solid var(--border-0)',
-      borderRadius: 'var(--r)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10,
-      fontSize: 11,
-      color: 'var(--tx-2)'
-    }
-  }, /*#__PURE__*/React.createElement(I, {
-    n: "layers",
-    s: 14,
-    c: "var(--purple)"
-  }), /*#__PURE__*/React.createElement("span", null, "Aligned with ", /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontFamily: 'var(--mono)',
-      color: 'var(--purple)',
-      fontWeight: 600
-    }
-  }, "Khora"), " \u2014 EO data store. Nine operators, three triads, append-only log. Operations are facts.")));
+      style: { fontSize: 10, color: 'var(--tx-3)', fontFamily: 'var(--mono)', minWidth: 62, flexShrink: 0 }
+    }, ev.ts ? new Date(ev.ts).toLocaleTimeString() : ''),
+    /*#__PURE__*/React.createElement("span", {
+      className: `tag tag-${rmC}`, style: { fontSize: 8.5, flexShrink: 0 }
+    }, ev.roomInfo.type),
+    /*#__PURE__*/React.createElement("span", {
+      className: `tag tag-${opC}`, style: { fontSize: 9, fontFamily: 'var(--mono)', minWidth: 28, textAlign: 'center', flexShrink: 0 }
+    }, ev.op),
+    /*#__PURE__*/React.createElement("span", {
+      style: { fontWeight: 600, flexShrink: 0 }
+    }, verb),
+    ev.label && /*#__PURE__*/React.createElement("span", {
+      style: { color: 'var(--tx-1)' }
+    }, "\u2014 ", ev.label),
+    ev.desc && /*#__PURE__*/React.createElement("span", {
+      style: { color: 'var(--tx-2)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+    }, ev.desc),
+    /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 10, color: 'var(--tx-3)', fontFamily: 'var(--mono)', marginLeft: 'auto', flexShrink: 0 }
+    }, username));
+  })));
 };
+
+// Legacy alias
+const ActivityStream = ActionLog;
 
 /* ═══════════════════ WELCOME / INVITATION SCREEN ═══════════════════ */
 
@@ -19502,14 +18034,14 @@ const ClientApp = ({
       width: 28,
       height: 28,
       borderRadius: 'var(--r)',
-      background: 'var(--teal-dim)',
+      background: 'var(--purple-dim)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      color: 'var(--teal)'
+      color: 'var(--purple)'
     }
   }, /*#__PURE__*/React.createElement(I, {
-    n: "shield",
+    n: "dodeca",
     s: 15
   })), /*#__PURE__*/React.createElement("span", {
     style: {
@@ -19576,8 +18108,8 @@ const ClientApp = ({
     label: 'Metrics'
   }, {
     id: 'activity',
-    icon: 'layers',
-    label: 'Activity Stream'
+    icon: 'list',
+    label: 'Action Log'
   }, {
     id: 'transparency',
     icon: 'eye',
@@ -23786,6 +22318,7 @@ const NoteCreateModal = ({
           });
         }
       }
+      // Emit EO operation to track note creation in the action log
       try {
         await emitOp(targetRoom, 'INS', dot(attachTo ? 'bridge' : 'roster', 'notes', noteData.id), {
           note_id: noteData.id,
@@ -26188,7 +24721,7 @@ const TeamDetailView = ({
       marginTop: 10,
       fontSize: 12
     }
-  }, "Activity stream for team operations will appear here."), /*#__PURE__*/React.createElement("p", {
+  }, "Action log for team operations will appear here."), /*#__PURE__*/React.createElement("p", {
     style: {
       color: 'var(--tx-3)',
       fontSize: 11,
@@ -26652,7 +25185,7 @@ const TeamDetailView = ({
   }, schemaRule.mode === 'lead_decides' && isLead ? 'Save & Add' : 'Propose Field')))));
 };
 
-/* ─── ProfileActivityFeed — loads and displays EO operations for an individual ─── */
+/* ─── ProfileActivityFeed — simple action log for an individual ─── */
 const ProfileActivityFeed = ({
   individual,
   svc
@@ -26666,54 +25199,56 @@ const ProfileActivityFeed = ({
       try {
         const roomId = individual.bridgeRoom || individual._case?.bridgeRoomId || individual.id;
         if (!roomId || !svc.client) {
-          setLoading(false);
+          if (!cancelled) setLoading(false);
           return;
         }
         const room = svc.client.getRoom(roomId);
         if (!room) {
-          setLoading(false);
+          if (!cancelled) setLoading(false);
           return;
         }
+        // Paginate back to load recent historical events
+        try {
+          const canPag = room.getLiveTimeline().getPaginationToken('b');
+          if (canPag) await svc.client.scrollback(room, 50);
+        } catch (e) {/* pagination may fail */}
         const collected = [];
         const seenIds = new Set();
+        const roomInfo = { type: 'bridge' };
 
-        // Collect from timeline events
-        const timeline = room.getLiveTimeline();
-        const timelineEvents = timeline.getEvents();
-        for (const ev of timelineEvents) {
-          if (seenIds.has(ev.getId())) continue;
-          const type = ev.getType();
-          if (!type.startsWith('io.khora.') && !type.startsWith('m.room.')) continue;
-          const classified = classifyEvent(ev);
-          if (classified) {
-            seenIds.add(ev.getId());
-            collected.push({
-              id: ev.getId(),
-              ...classified,
-              sender: ev.getSender(),
-              ts: ev.getTs()
-            });
+        // Collect from ALL timeline sets (not just live)
+        const timelineSets = room.getTimelineSets ? room.getTimelineSets() : [];
+        const allTlEvents = [];
+        if (timelineSets.length > 0) {
+          for (const ts of timelineSets) {
+            for (const tl of ts.getTimelines()) {
+              for (const ev of tl.getEvents()) {
+                if (!seenIds.has(ev.getId())) { seenIds.add(ev.getId()); allTlEvents.push(ev); }
+              }
+            }
+          }
+        } else {
+          for (const ev of room.getLiveTimeline().getEvents()) {
+            if (!seenIds.has(ev.getId())) { seenIds.add(ev.getId()); allTlEvents.push(ev); }
           }
         }
-
-        // Collect from state events (EO ops stored as state)
-        const opEvents = room.currentState.getStateEvents(EVT.OP);
-        if (opEvents) {
-          for (const ev of Array.isArray(opEvents) ? opEvents : [opEvents]) {
-            if (seenIds.has(ev.getId())) continue;
-            const content = ev.getContent();
-            if (content.op) {
-              seenIds.add(ev.getId());
-              collected.push({
-                id: ev.getId(),
-                op: content.op,
-                epistemic: content.frame?.epistemic || 'MEANT',
-                label: content.target || content.op + ' Operation',
-                desc: [content.operand?.from, content.operand?.to].filter(Boolean).join(' → ') || content.operand?.edit_source || '',
-                sender: ev.getSender(),
-                ts: ev.getTs()
-              });
-            }
+        for (const ev of allTlEvents) {
+          const type = ev.getType();
+          if (!type.startsWith('io.khora.') && !type.startsWith('m.room.')) continue;
+          const classified = classifyEvent(ev, roomInfo);
+          if (classified) {
+            collected.push({ id: ev.getId(), ...classified, sender: ev.getSender(), ts: ev.getTs() });
+          }
+        }
+        // Also collect state events not in timeline
+        for (const ev of room.currentState.getStateEvents()) {
+          if (seenIds.has(ev.getId())) continue;
+          seenIds.add(ev.getId());
+          const type = ev.getType();
+          if (!type.startsWith('io.khora.')) continue;
+          const classified = classifyEvent(ev, roomInfo);
+          if (classified) {
+            collected.push({ id: ev.getId(), ...classified, sender: ev.getSender(), ts: ev.getTs() });
           }
         }
         collected.sort((a, b) => b.ts - a.ts);
@@ -26724,32 +25259,29 @@ const ProfileActivityFeed = ({
       if (!cancelled) setLoading(false);
     };
     load();
-
-    // Listen for new EO events
-    const handler = () => load();
+    let debounce = null;
+    const handler = () => {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(() => load(), 300);
+    };
     window.addEventListener('khora:eo', handler);
     window.addEventListener('khora:timeline', handler);
+    window.addEventListener('khora:state', handler);
     return () => {
       cancelled = true;
       window.removeEventListener('khora:eo', handler);
       window.removeEventListener('khora:timeline', handler);
+      window.removeEventListener('khora:state', handler);
+      if (debounce) clearTimeout(debounce);
     };
   }, [individual.id, individual.bridgeRoom]);
   if (loading) return /*#__PURE__*/React.createElement("div", {
     className: "card",
-    style: {
-      textAlign: 'center',
-      padding: '30px 20px',
-      color: 'var(--tx-3)'
-    }
+    style: { textAlign: 'center', padding: '30px 20px', color: 'var(--tx-3)' }
   }, "Loading activity...");
   if (events.length === 0) return /*#__PURE__*/React.createElement("div", {
     className: "card",
-    style: {
-      textAlign: 'center',
-      padding: '30px 20px',
-      color: 'var(--tx-3)'
-    }
+    style: { textAlign: 'center', padding: '30px 20px', color: 'var(--tx-3)' }
   }, "No activity recorded yet for this individual.");
   return /*#__PURE__*/React.createElement("div", null, events.map(ev => {
     const opColor = OP_COLORS[ev.op] || 'blue';
@@ -26757,54 +25289,21 @@ const ProfileActivityFeed = ({
     const username = (ev.sender || '').split(':')[0]?.replace('@', '') || 'unknown';
     return /*#__PURE__*/React.createElement("div", {
       key: ev.id,
-      style: {
-        display: 'flex',
-        gap: 10,
-        padding: '10px 0',
-        borderBottom: '1px solid var(--border-0)'
-      }
+      style: { display: 'flex', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border-0)' }
     }, /*#__PURE__*/React.createElement("span", {
       className: "dt-eo",
-      style: {
-        background: `var(--${opColor}-dim)`,
-        color: `var(--${opColor})`,
-        flexShrink: 0
-      }
+      style: { background: `var(--${opColor}-dim)`, color: `var(--${opColor})`, flexShrink: 0 }
     }, ev.op), /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1,
-        minWidth: 0
-      }
+      style: { flex: 1, minWidth: 0 }
     }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 13
-      }
+      style: { fontSize: 13 }
     }, /*#__PURE__*/React.createElement("strong", null, verb), ev.label && /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: 'var(--tx-1)'
-      }
+      style: { color: 'var(--tx-1)' }
     }, " \u2014 ", ev.label)), ev.desc && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: 'var(--tx-2)',
-        marginTop: 2
-      }
+      style: { fontSize: 11, color: 'var(--tx-2)', marginTop: 2 }
     }, ev.desc), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: 'var(--tx-3)',
-        marginTop: 3
-      }
-    }, username, " \xB7 ", new Date(ev.ts).toLocaleString(), ev.epistemic && /*#__PURE__*/React.createElement("span", {
-      className: "dt-eo",
-      style: {
-        marginLeft: 6,
-        fontSize: 8,
-        padding: '1px 5px',
-        background: ev.epistemic === 'GIVEN' ? 'var(--teal-dim)' : 'var(--gold-dim)',
-        color: ev.epistemic === 'GIVEN' ? 'var(--teal)' : 'var(--gold)'
-      }
-    }, ev.epistemic))));
+      style: { fontSize: 10, color: 'var(--tx-3)', marginTop: 3 }
+    }, username, " \xB7 ", new Date(ev.ts).toLocaleString())));
   }));
 };
 
@@ -31281,14 +29780,14 @@ const ProviderApp = ({
       width: 28,
       height: 28,
       borderRadius: 'var(--r)',
-      background: 'var(--gold-dim)',
+      background: 'var(--purple-dim)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      color: 'var(--gold)'
+      color: 'var(--purple)'
     }
   }, /*#__PURE__*/React.createElement(I, {
-    n: "briefcase",
+    n: "dodeca",
     s: 15
   })), /*#__PURE__*/React.createElement("span", {
     style: {
@@ -31502,8 +30001,8 @@ const ProviderApp = ({
       label: 'Metrics'
     }, {
       id: 'activity',
-      icon: 'layers',
-      label: 'Activity Stream',
+      icon: 'list',
+      label: 'Action Log',
       badge: activityNotifCount,
       badgeClass: 'nav-badge-teal'
     }, {
@@ -39355,7 +37854,7 @@ const TransparencyPage = ({ onBack }) => {
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 } },
         React.createElement('span', { className: 'section-label', style: { marginBottom: 0 } }, 'EO OPERATION VOCABULARY'),
         React.createElement('span', { style: { fontSize: 10, color: 'var(--tx-3)', fontFamily: 'var(--mono)' } }, '9 canonical operators × 3 triads')),
-      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 } },
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 } },
         eoExplainer.map(op => React.createElement('div', {
           key: op.op,
           style: { padding: '10px 12px', border: '1px solid var(--border-0)', borderRadius: 'var(--r)', background: 'var(--bg-1)' }
