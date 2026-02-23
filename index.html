@@ -15119,83 +15119,162 @@ const RecordProvenance = ({
   })));
 };
 
-/* ═══════════════════ ACTION LOG (simple) ═══════════════════
- * Replaces the old ActivityStream. Flat chronological log of actions
- * across all rooms. Uses classifyEvent() for human-readable labels.
+/* ═══════════════════ ACTION LOG ═══════════════════════════
+ * Records state changes to any given room, or across all rooms.
+ * Uses classifyEvent() for human-readable labels.
+ * Accepts optional roomId prop for per-room scoping.
  * ═══════════════════════════════════════════════════════════════ */
+const _isActionLogRelevant = (ev) => {
+  const type = ev.getType();
+  if (type.startsWith('io.khora.')) return true;
+  if (type === 'm.room.create' || type === 'm.room.member' ||
+      type === 'm.room.encryption' || type === 'm.room.tombstone') return true;
+  return false;
+};
+const _collectRoomEvents = (room, roomInfo) => {
+  const seenIds = new Set();
+  const events = [];
+  const timelineSets = room.getTimelineSets ? room.getTimelineSets() : [];
+  const allTlEvents = [];
+  if (timelineSets.length > 0) {
+    for (const ts of timelineSets) {
+      for (const tl of ts.getTimelines()) {
+        for (const ev of tl.getEvents()) {
+          if (!seenIds.has(ev.getId())) { seenIds.add(ev.getId()); allTlEvents.push(ev); }
+        }
+      }
+    }
+  } else {
+    for (const ev of room.getLiveTimeline().getEvents()) {
+      if (!seenIds.has(ev.getId())) { seenIds.add(ev.getId()); allTlEvents.push(ev); }
+    }
+  }
+  for (const ev of allTlEvents) {
+    if (!_isActionLogRelevant(ev)) continue;
+    const cls = classifyEvent(ev, roomInfo);
+    events.push({
+      id: ev.getId(), roomId: room.roomId, roomInfo, sender: ev.getSender(),
+      ts: ev.getTs(), type: ev.getType(), content: ev.getContent(),
+      ...cls
+    });
+  }
+  for (const ev of room.currentState.getStateEvents()) {
+    if (seenIds.has(ev.getId())) continue;
+    seenIds.add(ev.getId());
+    if (!_isActionLogRelevant(ev)) continue;
+    const cls = classifyEvent(ev, roomInfo);
+    events.push({
+      id: ev.getId(), roomId: room.roomId, roomInfo, sender: ev.getSender(),
+      ts: ev.getTs(), type: ev.getType(), content: ev.getContent(),
+      ...cls
+    });
+  }
+  return events;
+};
 const ActionLog = ({
-  session
+  session,
+  roomId
 }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [roomFilter, setRoomFilter] = useState('all');
   const loadEvents = useCallback(async () => {
     setLoading(true);
+    setError(null);
+    const allEvents = [];
     try {
-      const scanned = await svc.scanRooms();
-      const roomIds = Object.keys(scanned);
-      const allEvents = [];
-      for (const rid of roomIds) {
-        if (allEvents.length >= 300) break;
-        try {
-          const roomInfo = await classifyRoom(rid, scanned[rid]);
-          if (svc.client) {
-            const room = svc.client.getRoom(rid);
-            if (!room) continue;
+      if (roomId) {
+        // ── Per-room mode: load events from a single room directly ──
+        const roomInfo = await classifyRoom(roomId);
+        if (svc.client) {
+          const room = svc.client.getRoom(roomId);
+          if (room) {
             try {
               const canPag = room.getLiveTimeline().getPaginationToken('b');
               if (canPag) await svc.client.scrollback(room, 50);
             } catch (e) {/* pagination may fail */}
-            const seenIds = new Set();
-            const timelineSets = room.getTimelineSets ? room.getTimelineSets() : [];
-            const allTlEvents = [];
-            if (timelineSets.length > 0) {
-              for (const ts of timelineSets) {
-                for (const tl of ts.getTimelines()) {
-                  for (const ev of tl.getEvents()) {
-                    if (!seenIds.has(ev.getId())) { seenIds.add(ev.getId()); allTlEvents.push(ev); }
+            allEvents.push(..._collectRoomEvents(room, roomInfo));
+          }
+        } else {
+          // HTTP-only fallback for single room
+          try {
+            const stateEvts = await svc._api('GET', `/rooms/${encodeURIComponent(roomId)}/state`);
+            if (Array.isArray(stateEvts)) {
+              for (const raw of stateEvts) {
+                const type = raw.type || '';
+                if (!type.startsWith('io.khora.') && type !== 'm.room.create' && type !== 'm.room.member' && type !== 'm.room.encryption' && type !== 'm.room.tombstone') continue;
+                const fakeEv = {
+                  getType: () => type, getContent: () => raw.content || {},
+                  getId: () => raw.event_id || `state_${roomId}_${type}_${raw.state_key || ''}`,
+                  getSender: () => raw.sender || '', getTs: () => raw.origin_server_ts || 0, isState: () => true
+                };
+                const cls = classifyEvent(fakeEv, roomInfo);
+                allEvents.push({ id: fakeEv.getId(), roomId, roomInfo, sender: fakeEv.getSender(),
+                  ts: fakeEv.getTs(), type, content: fakeEv.getContent(), ...cls });
+              }
+            }
+          } catch (apiErr) {
+            console.warn('ActionLog: HTTP state fetch failed for room', roomId, apiErr.message);
+          }
+        }
+      } else {
+        // ── Global mode: scan all rooms ──
+        const scanned = await svc.scanRooms();
+        const roomIds = Object.keys(scanned);
+        for (const rid of roomIds) {
+          try {
+            const roomInfo = await classifyRoom(rid, scanned[rid]);
+            if (svc.client) {
+              const room = svc.client.getRoom(rid);
+              if (!room) continue;
+              try {
+                const canPag = room.getLiveTimeline().getPaginationToken('b');
+                if (canPag) await svc.client.scrollback(room, 50);
+              } catch (e) {/* pagination may fail */}
+              allEvents.push(..._collectRoomEvents(room, roomInfo));
+            } else {
+              // HTTP-only fallback: fetch state events via REST API
+              try {
+                const stateEvts = await svc._api('GET', `/rooms/${encodeURIComponent(rid)}/state`);
+                if (Array.isArray(stateEvts)) {
+                  for (const raw of stateEvts) {
+                    const type = raw.type || '';
+                    if (!type.startsWith('io.khora.') && type !== 'm.room.create' && type !== 'm.room.member' && type !== 'm.room.encryption' && type !== 'm.room.tombstone') continue;
+                    const fakeEv = {
+                      getType: () => type, getContent: () => raw.content || {},
+                      getId: () => raw.event_id || `state_${rid}_${type}_${raw.state_key || ''}`,
+                      getSender: () => raw.sender || '', getTs: () => raw.origin_server_ts || 0, isState: () => true
+                    };
+                    const cls = classifyEvent(fakeEv, roomInfo);
+                    allEvents.push({ id: fakeEv.getId(), roomId: rid, roomInfo, sender: fakeEv.getSender(),
+                      ts: fakeEv.getTs(), type, content: fakeEv.getContent(), ...cls });
                   }
                 }
-              }
-            } else {
-              for (const ev of room.getLiveTimeline().getEvents()) {
-                if (!seenIds.has(ev.getId())) { seenIds.add(ev.getId()); allTlEvents.push(ev); }
+              } catch (apiErr) {
+                console.warn('ActionLog: HTTP state fetch failed for room', rid, apiErr.message);
               }
             }
-            for (const ev of allTlEvents) {
-              const cls = classifyEvent(ev, roomInfo);
-              allEvents.push({
-                id: ev.getId(), roomId: rid, roomInfo, sender: ev.getSender(),
-                ts: ev.getTs(), type: ev.getType(), content: ev.getContent(),
-                ...cls
-              });
-            }
-            for (const ev of room.currentState.getStateEvents()) {
-              if (seenIds.has(ev.getId())) continue;
-              seenIds.add(ev.getId());
-              const cls = classifyEvent(ev, roomInfo);
-              allEvents.push({
-                id: ev.getId(), roomId: rid, roomInfo, sender: ev.getSender(),
-                ts: ev.getTs(), type: ev.getType(), content: ev.getContent(),
-                ...cls
-              });
-            }
+          } catch (roomErr) {
+            console.warn('ActionLog: skipping room', rid, roomErr.message);
           }
-        } catch (roomErr) {
-          console.warn('ActionLog: skipping room', rid, roomErr.message);
         }
       }
       allEvents.sort((a, b) => b.ts - a.ts);
       setEvents(allEvents);
     } catch (e) {
       console.error('ActionLog error:', e);
+      setError(e.message || 'Failed to load events');
+      setEvents(allEvents);
     }
     setLoading(false);
-  }, []);
-  useEffect(() => { loadEvents(); }, []);
+  }, [roomId]);
+  useEffect(() => { loadEvents(); }, [loadEvents]);
   useEffect(() => {
     let debounce = null;
-    const debouncedLoad = () => {
+    const debouncedLoad = (e) => {
+      if (roomId && e?.detail?.roomId && e.detail.roomId !== roomId) return;
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(() => { loadEvents(); }, 400);
     };
@@ -15208,9 +15287,12 @@ const ActionLog = ({
       window.removeEventListener('khora:state', debouncedLoad);
       if (debounce) clearTimeout(debounce);
     };
-  }, [loadEvents]);
-  const filtered = filter === 'all' ? events : events.filter(ev => ev.roomInfo.type === filter);
+  }, [loadEvents, roomId]);
   const roomTypes = [...new Set(events.map(ev => ev.roomInfo.type))].sort();
+  const roomEntries = [...new Map(events.map(ev => [ev.roomId, ev.roomInfo])).entries()];
+  let filtered = events;
+  if (filter !== 'all') filtered = filtered.filter(ev => ev.roomInfo.type === filter);
+  if (roomFilter !== 'all') filtered = filtered.filter(ev => ev.roomId === roomFilter);
   if (loading && events.length === 0) return /*#__PURE__*/React.createElement("div", {
     style: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }
   }, /*#__PURE__*/React.createElement(Spin, { s: 28 }));
@@ -15224,35 +15306,51 @@ const ActionLog = ({
   }, /*#__PURE__*/React.createElement(I, { n: "list", s: 20, c: "var(--purple)" }),
   /*#__PURE__*/React.createElement("h2", {
     style: { fontFamily: 'var(--serif)', fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }
-  }, "Action Log"),
+  }, roomId ? "Room Log" : "Action Log"),
   /*#__PURE__*/React.createElement("span", {
     style: { fontSize: 11, color: 'var(--tx-3)', fontFamily: 'var(--mono)', marginLeft: 'auto' }
   }, filtered.length, " action", filtered.length !== 1 ? 's' : '')),
   /*#__PURE__*/React.createElement("p", {
     style: { color: 'var(--tx-1)', fontSize: 13, lineHeight: 1.6 }
-  }, "Chronological log of all actions across your rooms.")),
+  }, roomId ? "State changes for this room." : "Chronological log of state changes across your rooms.")),
+  error && /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: { marginBottom: 14, padding: '10px 14px', border: '1px solid var(--red)', background: 'var(--bg-2)' }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: 8 }
+  }, /*#__PURE__*/React.createElement(I, { n: "alert-triangle", s: 14, c: "var(--red)" }),
+  /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: 'var(--red)' } }, error),
+  /*#__PURE__*/React.createElement("button", {
+    onClick: loadEvents, className: "b-gho b-xs", style: { marginLeft: 'auto' }
+  }, "Retry"))),
   /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }
-  }, /*#__PURE__*/React.createElement("select", {
+    style: { display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }
+  }, !roomId && /*#__PURE__*/React.createElement("select", {
     value: filter,
     onChange: e => setFilter(e.target.value),
     style: { width: 'auto', padding: '5px 8px', fontSize: 11 }
-  }, /*#__PURE__*/React.createElement("option", { value: "all" }, "All Rooms"),
+  }, /*#__PURE__*/React.createElement("option", { value: "all" }, "All Types"),
   roomTypes.map(t => /*#__PURE__*/React.createElement("option", { key: t, value: t }, t))),
+  !roomId && roomEntries.length > 1 && /*#__PURE__*/React.createElement("select", {
+    value: roomFilter,
+    onChange: e => setRoomFilter(e.target.value),
+    style: { width: 'auto', padding: '5px 8px', fontSize: 11 }
+  }, /*#__PURE__*/React.createElement("option", { value: "all" }, "All Rooms"),
+  roomEntries.map(([rid, info]) => /*#__PURE__*/React.createElement("option", { key: rid, value: rid }, info.label + ' ' + rid.slice(0, 12)))),
   /*#__PURE__*/React.createElement("button", {
     onClick: loadEvents, className: "b-gho b-xs",
     style: { display: 'flex', alignItems: 'center', gap: 4 }
   }, /*#__PURE__*/React.createElement(I, { n: "refresh-cw", s: 10 }), "Refresh")),
-  filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  filtered.length === 0 && !error ? /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: { textAlign: 'center', padding: '40px 20px', borderStyle: 'dashed' }
   }, /*#__PURE__*/React.createElement(I, { n: "list", s: 24, c: "var(--tx-3)" }),
   /*#__PURE__*/React.createElement("p", {
     style: { color: 'var(--tx-3)', marginTop: 8, fontSize: 12 }
-  }, "No actions recorded yet.")) :
+  }, "No state changes recorded yet.")) :
   /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: 2 }
-  }, filtered.slice(0, 200).map((ev, idx) => {
+  }, filtered.slice(0, 500).map((ev, idx) => {
     const opC = OP_COLORS[ev.op] || 'blue';
     const rmC = ROOM_COLORS[ev.roomInfo.type] || 'orange';
     const username = (ev.sender || '').split(':')[0]?.replace('@', '') || '';
@@ -15267,7 +15365,7 @@ const ActionLog = ({
     }, /*#__PURE__*/React.createElement("span", {
       style: { fontSize: 10, color: 'var(--tx-3)', fontFamily: 'var(--mono)', minWidth: 62, flexShrink: 0 }
     }, ev.ts ? new Date(ev.ts).toLocaleTimeString() : ''),
-    /*#__PURE__*/React.createElement("span", {
+    !roomId && /*#__PURE__*/React.createElement("span", {
       className: `tag tag-${rmC}`, style: { fontSize: 8.5, flexShrink: 0 }
     }, ev.roomInfo.type),
     /*#__PURE__*/React.createElement("span", {
