@@ -671,6 +671,15 @@ table.dt td.dt-drag-handle:active{cursor:grabbing}
 .profile-info{flex:1;min-width:0}
 .profile-name{font-family:var(--serif);font-size:22px;font-weight:700;margin-bottom:4px}
 .profile-badges{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+/* ═══ Connection / Identity Badges ═══ */
+.conn-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:600;font-family:var(--mono);letter-spacing:.02em;white-space:nowrap;line-height:1.4}
+.conn-badge-client{background:var(--teal-dim);color:var(--teal)}
+.conn-badge-provider{background:var(--gold-dim);color:var(--gold)}
+.conn-badge-org{background:var(--blue-dim);color:var(--blue)}
+.conn-badge-team{background:var(--purple-dim);color:var(--purple)}
+.conn-badge-network{background:var(--green-dim);color:var(--green)}
+.conn-badge-admin{background:var(--orange-dim);color:var(--orange)}
+.conn-badges{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center}
 .profile-tabs{display:flex;border-bottom:2px solid var(--border-0);margin-bottom:20px}
 .profile-tab{padding:9px 18px;font-size:12.5px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--tx-2);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--sans);transition:all .15s}
 .profile-tab.active{color:var(--green);border-bottom-color:var(--green)}
@@ -2034,7 +2043,9 @@ const EVT = {
   // per-relation visibility controls
   RESOURCE_VAULT: `${NS}.resource.vault_record`,
   // client vault shadow record
-  RESOURCE_PERM: `${NS}.resource.permissions` // per-type permission grants
+  RESOURCE_PERM: `${NS}.resource.permissions`, // per-type permission grants
+  // Direct messaging between connected users
+  DM_META: `${NS}.dm.meta`
 };
 
 /* ═══════════════════ MATURITY LEVELS (MVP §Screen 4) ═══════════════════ */
@@ -8471,6 +8482,46 @@ const Toast = ({
     }
   }, msg);
 };
+/* ═══════════════════ CONNECTION BADGES ═══════════════════
+ * Shows user type, org affiliation, and team membership badges.
+ * Used in messaging views to clarify who you're talking to.
+ * ═══════════════════════════════════════════════════════════ */
+const ConnectionBadges = ({ userType, orgName, orgType, teamName, teamNames, role, verified, size = 'sm' }) => {
+  const badges = [];
+  const sz = size === 'xs' ? 8 : 9;
+  const iconSz = size === 'xs' ? 7 : 9;
+  // User type badge
+  if (userType) {
+    const typeMap = {
+      client: { cls: 'conn-badge-client', icon: 'shield', label: ROLES.client.label },
+      provider: { cls: 'conn-badge-provider', icon: 'briefcase', label: ROLES.provider.label },
+      org_admin: { cls: 'conn-badge-admin', icon: 'users', label: 'Org Admin' },
+      network: { cls: 'conn-badge-network', icon: 'globe', label: 'Network Coordinator' }
+    };
+    const t = typeMap[userType] || typeMap.provider;
+    badges.push(React.createElement("span", { key: "type", className: `conn-badge ${t.cls}`, style: { fontSize: sz } },
+      React.createElement(I, { n: t.icon, s: iconSz }), t.label));
+  }
+  // Org badge
+  if (orgName) {
+    badges.push(React.createElement("span", { key: "org", className: `conn-badge conn-badge-org`, style: { fontSize: sz } },
+      verified ? React.createElement(I, { n: "shieldCheck", s: iconSz }) : React.createElement(I, { n: "users", s: iconSz }),
+      orgName, orgType ? ` \u00B7 ${ORG_TYPE_LABELS[orgType] || orgType}` : ''));
+  }
+  // Team badge(s)
+  const allTeams = teamNames || (teamName ? [teamName] : []);
+  allTeams.forEach((tn, i) => {
+    badges.push(React.createElement("span", { key: `team-${i}`, className: `conn-badge conn-badge-team`, style: { fontSize: sz } },
+      React.createElement(I, { n: "users", s: iconSz }), tn));
+  });
+  // Role badge (if within an org)
+  if (role && orgName) {
+    badges.push(React.createElement("span", { key: "role", className: `conn-badge conn-badge-provider`, style: { fontSize: sz } }, role));
+  }
+  if (badges.length === 0) return null;
+  return React.createElement("span", { className: "conn-badges" }, ...badges);
+};
+
 /* ═══════════════════ STORAGE TRANSPARENCY BADGE ═══════════════════
  * Shows users exactly where their data is stored, encryption status,
  * which Matrix server hosts it, and who has access.
@@ -17045,6 +17096,11 @@ const ClientApp = ({
   const [inboxConvo, setInboxConvo] = useState(null); // provider index for active inbox conversation
   const [inboxMessages, setInboxMessages] = useState([]);
   const [inboxMsgText, setInboxMsgText] = useState('');
+  const [inboxTab, setInboxTab] = useState('providers'); // 'providers' | 'team'
+  // ─── Team member DM state (client-side) ───
+  const [clientTeamDMs, setClientTeamDMs] = useState([]); // [{roomId, peerId, peerName, teamName, peerType}]
+  const [newTeamDMModal, setNewTeamDMModal] = useState(false);
+  const [newDMTarget, setNewDMTarget] = useState(null);
   const [hardRevokeTarget, setHardRevokeTarget] = useState(null);
   const [obsModal, setObsModal] = useState(null); // prompt object or null
   const [obsValue, setObsValue] = useState('');
@@ -17167,7 +17223,7 @@ const ClientApp = ({
       }
 
       // Phase 2: Scan joined rooms (now includes any rooms we just auto-joined)
-      const scanned = await svc.scanRooms([EVT.PROVIDER_PROFILE, EVT.TEAM_META, EVT.TEAM_MEMBERS, EVT.FIELD_DEF]);
+      const scanned = await svc.scanRooms([EVT.PROVIDER_PROFILE, EVT.TEAM_META, EVT.TEAM_MEMBERS, EVT.FIELD_DEF, EVT.DM_META]);
       let vault = null,
         schema = null;
       const detectedPending = [],
@@ -17288,6 +17344,23 @@ const ClientApp = ({
       setPendingClaims(detectedPending);
       setClaimedRooms(detectedClaimed);
       if (detectedTeams.length > 0) setMyTeams(detectedTeams);
+      // Detect existing DM rooms (client side)
+      const detectedClientDMs = [];
+      for (const [rid, state] of Object.entries(scanned)) {
+        const dmMeta = state[EVT.DM_META];
+        if (dmMeta && (dmMeta.initiator === svc.userId || dmMeta.target === svc.userId)) {
+          const peerId = dmMeta.initiator === svc.userId ? dmMeta.target : dmMeta.initiator;
+          detectedClientDMs.push({
+            roomId: rid,
+            peerId,
+            peerName: dmMeta.peer_names?.[peerId] || peerId,
+            teamName: dmMeta.team_name || null,
+            teamRoomId: dmMeta.team_room_id || null,
+            peerType: dmMeta.peer_type || 'provider'
+          });
+        }
+      }
+      if (detectedClientDMs.length > 0) setClientTeamDMs(detectedClientDMs);
     } catch (e) {
       console.error('Vault init failed:', e);
       setInitError(e.message || 'Failed to initialize vault.');
@@ -17839,13 +17912,27 @@ const ClientApp = ({
   const loadInboxMessages = async bid => {
     setInboxMessages(await svc.getMessages(bid));
   };
-  const openInboxConvo = providerIdx => {
-    setInboxConvo(providerIdx);
-    const prov = providers[providerIdx];
-    if (prov) loadInboxMessages(prov.bridgeRoomId);
+  const openInboxConvo = providerIdxOrRoomId => {
+    setInboxConvo(providerIdxOrRoomId);
+    if (typeof providerIdxOrRoomId === 'number') {
+      const prov = providers[providerIdxOrRoomId];
+      if (prov) loadInboxMessages(prov.bridgeRoomId);
+    } else if (typeof providerIdxOrRoomId === 'string') {
+      loadInboxMessages(providerIdxOrRoomId);
+    }
   };
   const handleSendInboxMsg = async () => {
     if (!inboxMsgText.trim() || inboxConvo === null) return;
+    // Team DM (room ID string)
+    if (typeof inboxConvo === 'string') {
+      await svc.sendMessage(inboxConvo, inboxMsgText, {
+        [`${NS}.type`]: 'team_dm'
+      });
+      setInboxMsgText('');
+      setTimeout(() => loadInboxMessages(inboxConvo), 500);
+      return;
+    }
+    // Provider bridge message (index number)
     const prov = providers[inboxConvo];
     if (!prov) return;
     await svc.sendMessage(prov.bridgeRoomId, inboxMsgText, {
@@ -17857,6 +17944,62 @@ const ClientApp = ({
     setInboxMsgText('');
     setTimeout(() => loadInboxMessages(prov.bridgeRoomId), 500);
   };
+  // ─── Client-side team DM functions ───
+  const startClientTeamDM = async (peerId, peerName, teamName, teamRoomId) => {
+    const existing = clientTeamDMs.find(d => d.peerId === peerId);
+    if (existing) {
+      setInboxTab('team');
+      openInboxConvo(existing.roomId);
+      return;
+    }
+    try {
+      const roomId = await svc.createRoom(`[Khora DM] ${svc.userId} ↔ ${peerId}`, 'Direct message between connected users', [{
+        type: EVT.DM_META,
+        state_key: '',
+        content: {
+          initiator: svc.userId,
+          target: peerId,
+          team_name: teamName || null,
+          team_room_id: teamRoomId || null,
+          peer_names: {
+            [svc.userId]: vaultData.full_name || svc.userId,
+            [peerId]: peerName || peerId
+          },
+          peer_type: 'provider',
+          created: Date.now()
+        }
+      }]);
+      await svc.invite(roomId, peerId);
+      const newDM = { roomId, peerId, peerName: peerName || peerId, teamName: teamName || null, teamRoomId: teamRoomId || null, peerType: 'provider' };
+      setClientTeamDMs(prev => [...prev, newDM]);
+      setNewTeamDMModal(false);
+      setNewDMTarget(null);
+      setInboxTab('team');
+      openInboxConvo(roomId);
+      showToast(`DM created — invite sent to ${peerName || peerId}`, 'success');
+    } catch (e) {
+      showToast('Failed to create DM: ' + e.message, 'error');
+    }
+  };
+  const clientTeamMemberContacts = useMemo(() => {
+    const contacts = [];
+    const seen = new Set();
+    for (const team of myTeams) {
+      for (const m of (team.members || [])) {
+        if (m.userId === svc.userId || seen.has(m.userId)) continue;
+        seen.add(m.userId);
+        contacts.push({
+          userId: m.userId,
+          displayName: m.display_name || m.userId,
+          teamName: team.name,
+          teamRoomId: team.roomId,
+          role: m.role,
+          hasDM: clientTeamDMs.some(d => d.peerId === m.userId)
+        });
+      }
+    }
+    return contacts;
+  }, [myTeams, clientTeamDMs]);
   const activeProviderIdx = providers.findIndex(p => p.bridgeRoomId === activeBridge);
   const activeProvider = activeProviderIdx >= 0 ? providers[activeProviderIdx] : null;
   const filledFields = allFields.filter(f => vaultData[f.key]);
@@ -19174,6 +19317,10 @@ const ClientApp = ({
         gap: 4
       }
     }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => { setView('inbox'); openInboxConvo(pi); },
+      className: "b-pri b-sm",
+      style: { display: 'flex', alignItems: 'center', gap: 4 }
+    }, /*#__PURE__*/React.createElement(I, { n: "msg", s: 11 }), "Message"), /*#__PURE__*/React.createElement("button", {
       onClick: () => openBridge(prov.bridgeRoomId),
       className: "b-gho b-sm"
     }, "Open Bridge"), /*#__PURE__*/React.createElement("button", {
@@ -19411,7 +19558,11 @@ const ClientApp = ({
         borderRadius: 'var(--r)',
         color: 'var(--tx-1)'
       }
-    }, m.display_name || m.userId?.split(':')[0]?.replace('@', ''))), team.members.length > 4 && /*#__PURE__*/React.createElement("span", {
+    }, m.display_name || m.userId?.split(':')[0]?.replace('@', ''), m.userId !== svc.userId && /*#__PURE__*/React.createElement("button", {
+      onClick: e => { e.stopPropagation(); startClientTeamDM(m.userId, m.display_name || m.userId, team.name, team.roomId); },
+      style: { background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 3px', color: 'var(--purple)', display: 'inline-flex' },
+      title: `Message ${m.display_name || m.userId}`
+    }, /*#__PURE__*/React.createElement(I, { n: "msg", s: 8 })))), team.members.length > 4 && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
         color: 'var(--tx-3)'
@@ -20036,27 +20187,41 @@ const ClientApp = ({
       fontSize: 12.5,
       marginTop: 4
     }
-  }, "Encrypted conversations with your providers. Messages are end-to-end encrypted."), /*#__PURE__*/React.createElement(StorageTransparencyBadge, {
+  }, "Encrypted conversations with your connections. Messages are end-to-end encrypted."), /*#__PURE__*/React.createElement(StorageTransparencyBadge, {
     storageType: "matrix",
-    roomId: inboxConvo || (providers[0] || {}).bridgeRoomId,
+    roomId: typeof inboxConvo === 'number' ? (providers[inboxConvo] || {}).bridgeRoomId : inboxConvo || (providers[0] || {}).bridgeRoomId,
     encrypted: true,
     encLabel: "Megolm E2EE",
     label: "Messages",
-    members: inboxConvo ? providers.filter(p => p.bridgeRoomId === inboxConvo).map(p => ({ userId: p.providerUserId, role: 'provider' })).concat([{ userId: svc.userId, role: 'client (you)' }]) : undefined,
-    extra: [{ label: 'Privacy', value: 'Each conversation is a separate encrypted Matrix room. Only you and your provider can read messages.' }]
-  })), /*#__PURE__*/React.createElement("button", {
+    members: typeof inboxConvo === 'number' && inboxConvo !== null ? providers.filter(p => p.bridgeRoomId === providers[inboxConvo]?.bridgeRoomId).map(p => ({ userId: p.providerUserId, role: 'provider' })).concat([{ userId: svc.userId, role: 'client (you)' }]) : undefined,
+    extra: [{ label: 'Privacy', value: 'Each conversation is a separate encrypted Matrix room. Only you and your connection can read messages.' }]
+  })), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 6, flexShrink: 0 }
+  }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setAddProviderModal(true),
     className: "b-pri",
     style: {
       display: 'flex',
       alignItems: 'center',
-      gap: 6,
-      flexShrink: 0
+      gap: 6
     }
   }, /*#__PURE__*/React.createElement(I, {
     n: "plus",
     s: 14
-  }), "New Conversation")), /*#__PURE__*/React.createElement("div", {
+  }), "New Conversation"), clientTeamMemberContacts.length > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setNewTeamDMModal(true),
+    className: "b-gho",
+    style: { display: 'flex', alignItems: 'center', gap: 6 }
+  }, /*#__PURE__*/React.createElement(I, { n: "msg", s: 14 }), "New DM"))), myTeams.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "tabs",
+    style: { marginBottom: 0 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: `tab${inboxTab === 'providers' ? ' active' : ''}`,
+    onClick: () => { setInboxTab('providers'); setInboxConvo(null); setInboxMessages([]); }
+  }, "Providers (", providers.length, ")"), /*#__PURE__*/React.createElement("div", {
+    className: `tab${inboxTab === 'team' ? ' active' : ''}`,
+    onClick: () => { setInboxTab('team'); setInboxConvo(null); setInboxMessages([]); }
+  }, "Team DMs (", clientTeamDMs.length, ")")), /*#__PURE__*/React.createElement("div", {
     className: "inbox-panel"
   }, /*#__PURE__*/React.createElement("div", {
     className: "inbox-list"
@@ -20070,12 +20235,12 @@ const ClientApp = ({
     style: {
       marginBottom: 0
     }
-  }, "CONVERSATIONS (", providers.length, ")")), /*#__PURE__*/React.createElement("div", {
+  }, inboxTab === 'providers' ? `PROVIDERS (${providers.length})` : `TEAM DMs (${clientTeamDMs.length})`)), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       overflow: 'auto'
     }
-  }, providers.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, inboxTab === 'providers' || !myTeams.length ? (providers.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '40px 16px',
       textAlign: 'center'
@@ -20157,32 +20322,64 @@ const ClientApp = ({
       display: 'flex',
       alignItems: 'center',
       gap: 4,
-      marginTop: 2
+      marginTop: 2,
+      flexWrap: 'wrap'
     }
-  }, p.providerProfile?.org_membership?.verified && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(I, {
-    n: "shieldCheck",
-    s: 9,
-    c: "var(--blue)"
+  }, /*#__PURE__*/React.createElement(ConnectionBadges, {
+    userType: "provider",
+    orgName: p.providerProfile?.org_membership?.verified ? p.providerProfile.org_membership.org_name : null,
+    orgType: p.providerProfile?.org_membership?.org_type,
+    teamName: (() => { const t = myTeams.find(t => (t.members || []).some(m => m.userId === p.providerUserId)); return t?.name || null; })(),
+    verified: p.providerProfile?.org_membership?.verified,
+    role: p.providerProfile?.org_membership?.role,
+    size: "xs"
   }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 9,
-      color: 'var(--blue)',
-      fontWeight: 600,
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap',
-      maxWidth: 120
-    }
-  }, p.providerProfile.org_membership.org_name)), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 9.5,
       color: 'var(--tx-3)',
       fontFamily: 'var(--mono)'
     }
-  }, Object.values(p.sharedFields || {}).filter(Boolean).length, " shared")))))))), /*#__PURE__*/React.createElement("div", {
+  }, Object.values(p.sharedFields || {}).filter(Boolean).length, " shared")))))))) : /*#__PURE__*/React.createElement(React.Fragment, null, clientTeamDMs.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { padding: '40px 16px', textAlign: 'center' }
+  }, /*#__PURE__*/React.createElement(I, { n: "users", s: 28, c: "var(--tx-3)" }),
+  /*#__PURE__*/React.createElement("p", { style: { color: 'var(--tx-3)', fontSize: 11.5, marginTop: 10 } }, "No team DMs yet"),
+  /*#__PURE__*/React.createElement("p", { style: { color: 'var(--tx-3)', fontSize: 10.5, marginTop: 4 } }, "Start a conversation with a team member"),
+  clientTeamMemberContacts.length > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setNewTeamDMModal(true),
+    className: "b-pri b-sm",
+    style: { marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }
+  }, /*#__PURE__*/React.createElement(I, { n: "plus", s: 11 }), "New DM")) : clientTeamDMs.map(dm => /*#__PURE__*/React.createElement("div", {
+    key: dm.roomId,
+    onClick: () => openInboxConvo(dm.roomId),
+    style: {
+      padding: '12px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border-0)',
+      background: inboxConvo === dm.roomId ? 'var(--bg-4)' : 'transparent',
+      borderLeft: inboxConvo === dm.roomId ? '3px solid var(--purple)' : '3px solid transparent',
+      transition: 'all .15s'
+    },
+    onMouseEnter: e => { if (inboxConvo !== dm.roomId) e.currentTarget.style.background = 'var(--bg-3)'; },
+    onMouseLeave: e => { if (inboxConvo !== dm.roomId) e.currentTarget.style.background = inboxConvo === dm.roomId ? 'var(--bg-4)' : 'transparent'; }
+  }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+    /*#__PURE__*/React.createElement("div", {
+      style: { width: 36, height: 36, borderRadius: '50%', background: 'var(--purple-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--purple)', border: '2px solid var(--purple)', flexShrink: 0 }
+    }, /*#__PURE__*/React.createElement(I, { n: "user", s: 16 })),
+    /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+      /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: 13, fontWeight: inboxConvo === dm.roomId ? 700 : 500, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+      }, dm.peerName || dm.peerId),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, flexWrap: 'wrap' } },
+        /*#__PURE__*/React.createElement(ConnectionBadges, {
+          userType: dm.peerType || 'provider',
+          teamName: dm.teamName,
+          size: "xs"
+        })))))))), /*#__PURE__*/React.createElement("div", {
     className: "inbox-chat"
-  }, inboxConvo !== null && providers[inboxConvo] ? (() => {
-    const p = providers[inboxConvo];
+  }, inboxConvo !== null && (typeof inboxConvo === 'string' || providers[inboxConvo]) ? (() => {
+    const isTeamDM = typeof inboxConvo === 'string';
+    const p = isTeamDM ? null : providers[inboxConvo];
+    const dm = isTeamDM ? clientTeamDMs.find(d => d.roomId === inboxConvo) : null;
+    const chatName = isTeamDM ? (dm?.peerName || dm?.peerId || 'Team Member') : (p?.providerName || p?.providerUserId || 'Unknown');
+    const avatarClr = isTeamDM ? 'purple' : 'gold';
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       className: "inbox-chat-hdr"
     }, /*#__PURE__*/React.createElement("div", {
@@ -20190,14 +20387,14 @@ const ClientApp = ({
         width: 32,
         height: 32,
         borderRadius: '50%',
-        background: 'var(--gold-dim)',
+        background: `var(--${avatarClr}-dim)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: 'var(--gold)',
-        border: '2px solid var(--gold)'
+        color: `var(--${avatarClr})`,
+        border: `2px solid var(--${avatarClr})`
       }
-    }, p.providerProfile?.org_membership?.verified ? /*#__PURE__*/React.createElement(I, {
+    }, !isTeamDM && p?.providerProfile?.org_membership?.verified ? /*#__PURE__*/React.createElement(I, {
       n: "shieldCheck",
       s: 14
     }) : /*#__PURE__*/React.createElement(I, {
@@ -20214,7 +20411,7 @@ const ClientApp = ({
         fontWeight: 700,
         display: 'block'
       }
-    }, p.providerName || p.providerUserId), /*#__PURE__*/React.createElement("div", {
+    }, chatName), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         alignItems: 'center',
@@ -20229,17 +20426,24 @@ const ClientApp = ({
     }, /*#__PURE__*/React.createElement(I, {
       n: "lock",
       s: 8
-    }), "E2EE"), p.providerProfile?.title && /*#__PURE__*/React.createElement("span", {
+    }), "E2EE"), isTeamDM ? /*#__PURE__*/React.createElement(ConnectionBadges, {
+      userType: dm?.peerType || 'provider',
+      teamName: dm?.teamName,
+      size: "xs"
+    }) : /*#__PURE__*/React.createElement(ConnectionBadges, {
+      userType: "provider",
+      orgName: p?.providerProfile?.org_membership?.verified ? p.providerProfile.org_membership.org_name : null,
+      orgType: p?.providerProfile?.org_membership?.org_type,
+      teamName: (() => { const t = myTeams.find(t => (t.members || []).some(m => m.userId === p?.providerUserId)); return t?.name || null; })(),
+      verified: p?.providerProfile?.org_membership?.verified,
+      role: p?.providerProfile?.org_membership?.role,
+      size: "xs"
+    }), !isTeamDM && p?.providerProfile?.title && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10,
         color: 'var(--tx-2)'
       }
-    }, p.providerProfile.title), p.providerProfile?.org_membership?.verified && /*#__PURE__*/React.createElement("span", {
-      className: "tag tag-blue",
-      style: {
-        fontSize: 8
-      }
-    }, p.providerProfile.org_membership.org_name))), /*#__PURE__*/React.createElement("button", {
+    }, p.providerProfile.title))), !isTeamDM && p && /*#__PURE__*/React.createElement("button", {
       onClick: () => openBridge(p.bridgeRoomId),
       className: "b-gho b-xs",
       style: {
@@ -20251,7 +20455,7 @@ const ClientApp = ({
       n: "share",
       s: 11
     }), "Bridge"), /*#__PURE__*/React.createElement("button", {
-      onClick: () => loadInboxMessages(p.bridgeRoomId),
+      onClick: () => loadInboxMessages(isTeamDM ? inboxConvo : p.bridgeRoomId),
       className: "b-gho b-xs",
       style: {
         display: 'flex',
@@ -20791,6 +20995,35 @@ const ClientApp = ({
       width: '100%'
     }
   }, "Create Bridge Room")), /*#__PURE__*/React.createElement(Modal, {
+    open: newTeamDMModal,
+    onClose: () => { setNewTeamDMModal(false); setNewDMTarget(null); },
+    title: "New Team Member DM",
+    w: 480
+  }, /*#__PURE__*/React.createElement("p", {
+    style: { fontSize: 12, color: 'var(--tx-1)', marginBottom: 14, lineHeight: 1.6 }
+  }, "Start an encrypted direct conversation with a team member."),
+  clientTeamMemberContacts.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: 'center', padding: '20px 0', color: 'var(--tx-3)', fontSize: 12 }
+  }, "No team members found. Join a team first.") : /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflow: 'auto', marginBottom: 16 }
+  }, clientTeamMemberContacts.map(c => /*#__PURE__*/React.createElement("div", {
+    key: c.userId,
+    onClick: () => setNewDMTarget(c),
+    style: {
+      padding: '10px 14px', borderRadius: 'var(--r)', border: `1px solid ${newDMTarget?.userId === c.userId ? 'var(--purple)' : 'var(--border-0)'}`,
+      background: newDMTarget?.userId === c.userId ? 'var(--purple-dim)' : 'var(--bg-2)', cursor: 'pointer', transition: 'all .15s'
+    }
+  }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' } },
+    /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 600, display: 'block' } }, c.displayName),
+      /*#__PURE__*/React.createElement("div", { style: { marginTop: 3 } },
+        /*#__PURE__*/React.createElement(ConnectionBadges, { userType: "provider", teamName: c.teamName, role: c.role, size: "xs" }))),
+    c.hasDM && /*#__PURE__*/React.createElement("span", { className: "tag tag-green", style: { fontSize: 8 } }, "DM exists"))))),
+  newDMTarget && /*#__PURE__*/React.createElement("button", {
+    onClick: () => startClientTeamDM(newDMTarget.userId, newDMTarget.displayName, newDMTarget.teamName, newDMTarget.teamRoomId),
+    className: "b-pri",
+    style: { width: '100%', padding: 12, fontSize: 14 }
+  }, /*#__PURE__*/React.createElement(I, { n: "msg", s: 16 }), " Start Conversation with ", newDMTarget.displayName)), /*#__PURE__*/React.createElement(Modal, {
     open: !!obsModal,
     onClose: () => setObsModal(null),
     title: obsModal?.question || 'Record Observation',
@@ -27120,7 +27353,13 @@ const ProviderApp = ({
   const [inboxConvo, setInboxConvo] = useState(null); // room ID of active inbox conversation
   const [inboxMessages, setInboxMessages] = useState([]);
   const [inboxMsgText, setInboxMsgText] = useState('');
-  const [inboxTab, setInboxTab] = useState('direct'); // 'direct' | 'channels'
+  const [inboxTab, setInboxTab] = useState('direct'); // 'direct' | 'channels' | 'team'
+  // ─── Team member DM state ───
+  const [teamDMs, setTeamDMs] = useState([]); // [{roomId, peerId, peerName, teamName, teamRoomId}]
+  const [teamDMMessages, setTeamDMMessages] = useState([]);
+  const [teamDMMsgText, setTeamDMMsgText] = useState('');
+  const [newTeamDMModal, setNewTeamDMModal] = useState(false);
+  const [newDMTarget, setNewDMTarget] = useState(null); // {userId, displayName, teamName}
   // ─── Notifications state ───
   const [notifications, setNotifications] = useState([]);
   // ─── Resource tracking state ───
@@ -27289,7 +27528,7 @@ const ProviderApp = ({
     setInitError(null);
     try {
       // Single-pass scan: fetch all Khora state across rooms in one request
-      const scanned = await svc.scanRooms([EVT.ORG_METADATA, EVT.ORG_ROSTER, EVT.PROVIDER_PROFILE, EVT.ORG_OPACITY, EVT.ORG_MSG_ACCESS, EVT.ORG_MSG_CHANNEL, EVT.ORG_TERMINOLOGY, EVT.TEAM_META, EVT.TEAM_MEMBERS, EVT.TEAM_SCHEMA, EVT.TEAM_SCHEMA_RULE, EVT.FIELD_DEF, EVT.FIELD_CROSSWALK]);
+      const scanned = await svc.scanRooms([EVT.ORG_METADATA, EVT.ORG_ROSTER, EVT.PROVIDER_PROFILE, EVT.ORG_OPACITY, EVT.ORG_MSG_ACCESS, EVT.ORG_MSG_CHANNEL, EVT.ORG_TERMINOLOGY, EVT.TEAM_META, EVT.TEAM_MEMBERS, EVT.TEAM_SCHEMA, EVT.TEAM_SCHEMA_RULE, EVT.FIELD_DEF, EVT.FIELD_CROSSWALK, EVT.DM_META]);
       let roster = null,
         metricsR = null,
         schema = null,
@@ -27489,6 +27728,24 @@ const ProviderApp = ({
       }
       // Load teams detected during scan
       if (detectedTeams.length > 0) setTeams(detectedTeams);
+      // Detect existing team member DM rooms from scan
+      const detectedDMs = [];
+      for (const [rid, state] of Object.entries(scanned)) {
+        const dmMeta = state[EVT.DM_META];
+        if (dmMeta && (dmMeta.initiator === svc.userId || dmMeta.target === svc.userId)) {
+          const peerId = dmMeta.initiator === svc.userId ? dmMeta.target : dmMeta.initiator;
+          detectedDMs.push({
+            roomId: rid,
+            peerId,
+            peerName: dmMeta.peer_names?.[peerId] || peerId,
+            teamName: dmMeta.team_name || null,
+            teamRoomId: dmMeta.team_room_id || null,
+            orgName: dmMeta.org_name || null,
+            peerType: dmMeta.peer_type || 'provider'
+          });
+        }
+      }
+      if (detectedDMs.length > 0) setTeamDMs(detectedDMs);
       // Load field definitions and crosswalks
       // Seed vault field defs if schema room exists and no defs stored yet
       if (schema && Object.keys(detectedFieldDefs).length === 0) {
@@ -29707,6 +29964,11 @@ const ProviderApp = ({
         opacity: orgOpacity,
         body_length: inboxMsgText.length
       }, orgFrame());
+    } else if (teamDMs.some(d => d.roomId === inboxConvo)) {
+      await svc.sendMessage(inboxConvo, inboxMsgText, {
+        [`${NS}.type`]: 'team_dm',
+        [`${NS}.sender_name`]: providerProfile.display_name || svc.userId
+      });
     } else {
       await svc.sendMessage(inboxConvo, inboxMsgText, {
         [`${NS}.type`]: 'note'
@@ -29718,6 +29980,74 @@ const ProviderApp = ({
     setInboxMsgText('');
     setTimeout(() => loadInboxMessages(inboxConvo), 500);
   };
+  // ─── Team member DM functions ───
+  const startTeamDM = async (peerId, peerName, teamName, teamRoomId) => {
+    // Check if DM room already exists
+    const existing = teamDMs.find(d => d.peerId === peerId);
+    if (existing) {
+      setInboxTab('team');
+      openInboxConvo(existing.roomId);
+      return;
+    }
+    try {
+      const roomId = await svc.createRoom(`[Khora DM] ${svc.userId} ↔ ${peerId}`, 'Direct message between connected users', [{
+        type: EVT.DM_META,
+        state_key: '',
+        content: {
+          initiator: svc.userId,
+          target: peerId,
+          team_name: teamName || null,
+          team_room_id: teamRoomId || null,
+          org_name: orgMeta?.name || null,
+          peer_names: {
+            [svc.userId]: providerProfile.display_name || svc.userId,
+            [peerId]: peerName || peerId
+          },
+          peer_type: 'provider',
+          created: Date.now()
+        }
+      }]);
+      await svc.invite(roomId, peerId);
+      const newDM = {
+        roomId,
+        peerId,
+        peerName: peerName || peerId,
+        teamName: teamName || null,
+        teamRoomId: teamRoomId || null,
+        orgName: orgMeta?.name || null,
+        peerType: 'provider'
+      };
+      setTeamDMs(prev => [...prev, newDM]);
+      setNewTeamDMModal(false);
+      setNewDMTarget(null);
+      setInboxTab('team');
+      openInboxConvo(roomId);
+      showToast(`DM created — invite sent to ${peerName || peerId}`, 'success');
+    } catch (e) {
+      showToast('Failed to create DM: ' + e.message, 'error');
+    }
+  };
+  // Build list of all messageable team members (excluding self)
+  const teamMemberContacts = useMemo(() => {
+    const contacts = [];
+    const seen = new Set();
+    for (const team of teams) {
+      for (const m of (team.members || [])) {
+        if (m.userId === svc.userId || seen.has(m.userId)) continue;
+        seen.add(m.userId);
+        contacts.push({
+          userId: m.userId,
+          displayName: m.display_name || m.userId,
+          teamName: team.name,
+          teamRoomId: team.roomId,
+          role: m.role,
+          hasDM: teamDMs.some(d => d.peerId === m.userId)
+        });
+      }
+    }
+    return contacts;
+  }, [teams, teamDMs]);
+
   const getInboxConvoName = useCallback(roomId => {
     const c = cases.find(c => c.bridgeRoomId === roomId);
     if (c) return c.sharedData.full_name || c.clientUserId;
@@ -29726,13 +30056,16 @@ const ProviderApp = ({
       const peerOrgId = ch.orgs?.find(o => o !== orgRoom);
       return ch.org_names?.[peerOrgId] || peerOrgId?.slice(0, 20) || 'Organization';
     }
+    const dm = teamDMs.find(d => d.roomId === roomId);
+    if (dm) return dm.peerName || dm.peerId;
     return roomId?.slice(0, 20) || 'Unknown';
-  }, [cases, orgChannels, orgRoom]);
+  }, [cases, orgChannels, orgRoom, teamDMs]);
   const getInboxConvoType = useCallback(roomId => {
     if (cases.some(c => c.bridgeRoomId === roomId)) return 'case';
     if (orgChannels.some(ch => ch.roomId === roomId)) return 'channel';
+    if (teamDMs.some(d => d.roomId === roomId)) return 'team_dm';
     return 'unknown';
-  }, [cases, orgChannels]);
+  }, [cases, orgChannels, teamDMs]);
 
   // Determine network role based on org membership
   const networkRole = useMemo(() => {
@@ -30734,7 +31067,11 @@ const ProviderApp = ({
   }, /*#__PURE__*/React.createElement(I, {
     n: "plus",
     s: 14
-  }), "New Channel"))), orgRoom && hasOrgMsgPermission('read') && /*#__PURE__*/React.createElement("div", {
+  }), "New Channel"), teamMemberContacts.length > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setNewTeamDMModal(true),
+    className: "b-gho",
+    style: { display: 'flex', alignItems: 'center', gap: 6 }
+  }, /*#__PURE__*/React.createElement(I, { n: "msg", s: 14 }), "New DM"))), (orgRoom && hasOrgMsgPermission('read') || teams.length > 0) && /*#__PURE__*/React.createElement("div", {
     className: "tabs",
     style: {
       marginBottom: 16
@@ -30753,7 +31090,14 @@ const ProviderApp = ({
       setInboxConvo(null);
       setInboxMessages([]);
     }
-  }, "Org Channels (", orgChannels.length, ")")), /*#__PURE__*/React.createElement("div", {
+  }, "Org Channels (", orgChannels.length, ")"), /*#__PURE__*/React.createElement("div", {
+    className: `tab${inboxTab === 'team' ? ' active' : ''}`,
+    onClick: () => {
+      setInboxTab('team');
+      setInboxConvo(null);
+      setInboxMessages([]);
+    }
+  }, "Team DMs (", teamDMs.length, ")")), /*#__PURE__*/React.createElement("div", {
     className: "inbox-panel"
   }, /*#__PURE__*/React.createElement("div", {
     className: "inbox-list"
@@ -30767,7 +31111,7 @@ const ProviderApp = ({
     style: {
       marginBottom: 0
     }
-  }, inboxTab === 'direct' ? `DIRECT (${cases.length})` : `CHANNELS (${orgChannels.length})`)), /*#__PURE__*/React.createElement("div", {
+  }, inboxTab === 'direct' ? `DIRECT (${cases.length})` : inboxTab === 'channels' ? `CHANNELS (${orgChannels.length})` : `TEAM DMs (${teamDMs.length})`)), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1,
       overflow: 'auto'
@@ -30851,9 +31195,14 @@ const ProviderApp = ({
       display: 'flex',
       alignItems: 'center',
       gap: 4,
-      marginTop: 2
+      marginTop: 2,
+      flexWrap: 'wrap'
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement(ConnectionBadges, {
+    userType: "client",
+    teamName: (() => { const t = teams.find(t => (t.members || []).some(m => m.userId === c.clientUserId)); return t?.name || null; })(),
+    size: "xs"
+  }), /*#__PURE__*/React.createElement("span", {
     className: "tag tag-green",
     style: {
       fontSize: 8
@@ -30867,7 +31216,7 @@ const ProviderApp = ({
       color: 'var(--tx-3)',
       fontFamily: 'var(--mono)'
     }
-  }, Object.keys(c.sharedData).length, " fields"))))))) : /*#__PURE__*/React.createElement(React.Fragment, null, orgChannels.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, Object.keys(c.sharedData).length, " fields"))))))) : inboxTab === 'channels' ? /*#__PURE__*/React.createElement(React.Fragment, null, orgChannels.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '40px 16px',
       textAlign: 'center'
@@ -30963,13 +31312,49 @@ const ProviderApp = ({
         fontFamily: 'var(--mono)'
       }
     }, "org channel")))));
-  })))), /*#__PURE__*/React.createElement("div", {
+  }))) : /*#__PURE__*/React.createElement(React.Fragment, null, teamDMs.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { padding: '40px 16px', textAlign: 'center' }
+  }, /*#__PURE__*/React.createElement(I, { n: "users", s: 28, c: "var(--tx-3)" }),
+  /*#__PURE__*/React.createElement("p", { style: { color: 'var(--tx-3)', fontSize: 11.5, marginTop: 10 } }, "No team DMs yet"),
+  /*#__PURE__*/React.createElement("p", { style: { color: 'var(--tx-3)', fontSize: 10.5, marginTop: 4 } }, "Start a conversation with a team member"),
+  teamMemberContacts.length > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setNewTeamDMModal(true),
+    className: "b-pri b-sm",
+    style: { marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }
+  }, /*#__PURE__*/React.createElement(I, { n: "plus", s: 11 }), "New DM")) : teamDMs.map(dm => /*#__PURE__*/React.createElement("div", {
+    key: dm.roomId,
+    onClick: () => openInboxConvo(dm.roomId),
+    style: {
+      padding: '12px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border-0)',
+      background: inboxConvo === dm.roomId ? 'var(--bg-4)' : 'transparent',
+      borderLeft: inboxConvo === dm.roomId ? '3px solid var(--purple)' : '3px solid transparent',
+      transition: 'all .15s'
+    },
+    onMouseEnter: e => { if (inboxConvo !== dm.roomId) e.currentTarget.style.background = 'var(--bg-3)'; },
+    onMouseLeave: e => { if (inboxConvo !== dm.roomId) e.currentTarget.style.background = inboxConvo === dm.roomId ? 'var(--bg-4)' : 'transparent'; }
+  }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+    /*#__PURE__*/React.createElement("div", {
+      style: { width: 36, height: 36, borderRadius: '50%', background: 'var(--purple-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--purple)', border: '2px solid var(--purple)', flexShrink: 0 }
+    }, /*#__PURE__*/React.createElement(I, { n: "user", s: 16 })),
+    /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+      /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: 13, fontWeight: inboxConvo === dm.roomId ? 700 : 500, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+      }, dm.peerName || dm.peerId),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 2, flexWrap: 'wrap' } },
+        /*#__PURE__*/React.createElement(ConnectionBadges, {
+          userType: dm.peerType || 'provider',
+          orgName: dm.orgName,
+          teamName: dm.teamName,
+          size: "xs"
+        })))))))), /*#__PURE__*/React.createElement("div", {
     className: "inbox-chat"
   }, inboxConvo ? (() => {
     const convoType = getInboxConvoType(inboxConvo);
     const convoName = getInboxConvoName(inboxConvo);
     const caseData = cases.find(c => c.bridgeRoomId === inboxConvo);
     const channelData = orgChannels.find(ch => ch.roomId === inboxConvo);
+    const dmData = teamDMs.find(d => d.roomId === inboxConvo);
+    const avatarColor = convoType === 'case' ? 'teal' : convoType === 'team_dm' ? 'purple' : 'blue';
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       className: "inbox-chat-hdr"
     }, /*#__PURE__*/React.createElement("div", {
@@ -30977,15 +31362,15 @@ const ProviderApp = ({
         width: 32,
         height: 32,
         borderRadius: '50%',
-        background: convoType === 'case' ? 'var(--teal-dim)' : 'var(--blue-dim)',
+        background: `var(--${avatarColor}-dim)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: convoType === 'case' ? 'var(--teal)' : 'var(--blue)',
-        border: `2px solid ${convoType === 'case' ? 'var(--teal)' : 'var(--blue)'}`
+        color: `var(--${avatarColor})`,
+        border: `2px solid var(--${avatarColor})`
       }
     }, /*#__PURE__*/React.createElement(I, {
-      n: convoType === 'case' ? 'user' : 'users',
+      n: convoType === 'case' ? 'user' : convoType === 'team_dm' ? 'user' : 'users',
       s: 14
     })), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -31013,7 +31398,11 @@ const ProviderApp = ({
     }, /*#__PURE__*/React.createElement(I, {
       n: "lock",
       s: 8
-    }), "E2EE"), convoType === 'case' && caseData && /*#__PURE__*/React.createElement("span", {
+    }), "E2EE"), convoType === 'case' && /*#__PURE__*/React.createElement(ConnectionBadges, {
+      userType: "client",
+      teamName: caseData ? (() => { const t = teams.find(t => (t.members || []).some(m => m.userId === caseData.clientUserId)); return t?.name || null; })() : null,
+      size: "xs"
+    }), convoType === 'case' && caseData && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 10,
         color: 'var(--tx-2)'
@@ -31023,7 +31412,12 @@ const ProviderApp = ({
       style: {
         fontSize: 8
       }
-    }, "OUTGOING: ", orgOpacity))), convoType === 'case' && /*#__PURE__*/React.createElement("button", {
+    }, "OUTGOING: ", orgOpacity), convoType === 'team_dm' && dmData && /*#__PURE__*/React.createElement(ConnectionBadges, {
+      userType: dmData.peerType || 'provider',
+      orgName: dmData.orgName,
+      teamName: dmData.teamName,
+      size: "xs"
+    }))), convoType === 'case' && /*#__PURE__*/React.createElement("button", {
       onClick: () => openCase(inboxConvo),
       className: "b-gho b-xs",
       style: {
@@ -37453,6 +37847,35 @@ const ProviderApp = ({
     n: "msg",
     s: 16
   }), " Create Channel")), /*#__PURE__*/React.createElement(Modal, {
+    open: newTeamDMModal,
+    onClose: () => { setNewTeamDMModal(false); setNewDMTarget(null); },
+    title: "New Team Member DM",
+    w: 480
+  }, /*#__PURE__*/React.createElement("p", {
+    style: { fontSize: 12, color: 'var(--tx-1)', marginBottom: 14, lineHeight: 1.6 }
+  }, "Start an encrypted direct conversation with a team member. Select someone from your teams below."),
+  teamMemberContacts.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: 'center', padding: '20px 0', color: 'var(--tx-3)', fontSize: 12 }
+  }, "No team members found. Join a team first.") : /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflow: 'auto', marginBottom: 16 }
+  }, teamMemberContacts.map(c => /*#__PURE__*/React.createElement("div", {
+    key: c.userId,
+    onClick: () => setNewDMTarget(c),
+    style: {
+      padding: '10px 14px', borderRadius: 'var(--r)', border: `1px solid ${newDMTarget?.userId === c.userId ? 'var(--purple)' : 'var(--border-0)'}`,
+      background: newDMTarget?.userId === c.userId ? 'var(--purple-dim)' : 'var(--bg-2)', cursor: 'pointer', transition: 'all .15s'
+    }
+  }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' } },
+    /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 600, display: 'block' } }, c.displayName),
+      /*#__PURE__*/React.createElement("div", { style: { marginTop: 3 } },
+        /*#__PURE__*/React.createElement(ConnectionBadges, { userType: "provider", teamName: c.teamName, orgName: orgMeta?.name, role: c.role, size: "xs" }))),
+    c.hasDM && /*#__PURE__*/React.createElement("span", { className: "tag tag-green", style: { fontSize: 8 } }, "DM exists"))))),
+  newDMTarget && /*#__PURE__*/React.createElement("button", {
+    onClick: () => startTeamDM(newDMTarget.userId, newDMTarget.displayName, newDMTarget.teamName, newDMTarget.teamRoomId),
+    className: "b-pri",
+    style: { width: '100%', padding: 12, fontSize: 14 }
+  }, /*#__PURE__*/React.createElement(I, { n: "msg", s: 16 }), " Start Conversation with ", newDMTarget.displayName)), /*#__PURE__*/React.createElement(Modal, {
     open: msgAccessModal,
     onClose: () => setMsgAccessModal(false),
     title: "Configure Message Access",
