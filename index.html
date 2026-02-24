@@ -551,6 +551,247 @@ button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r)
 .cf-migrate-badge.outdated{background:var(--orange-dim);color:var(--orange)}
 .cf-migrate-badge.current{background:var(--green-dim);color:var(--green)}
 
+/* ═══ Schema Workbench (Redesigned) ═══ */
+.sw-wrap{display:flex;flex-direction:column;height:calc(100vh - 104px);margin:-24px;border-radius:var(--r-lg);border:1px solid var(--border-0);overflow:hidden;background:var(--bg-1)}
+.sw-header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px 0;flex-shrink:0}
+.sw-title{font-size:16px;font-weight:700;font-family:var(--serif);color:var(--tx-0);display:flex;align-items:center;gap:8px}
+.sw-tabs{display:flex;gap:0;border-bottom:1px solid var(--border-0);padding:0 24px;flex-shrink:0;margin-top:10px}
+.sw-tab{padding:10px 20px;font-size:12.5px;font-weight:500;font-family:var(--sans);color:var(--tx-2);cursor:pointer;
+  border:none;background:none;border-bottom:2px solid transparent;transition:all .15s;display:flex;align-items:center;gap:6px}
+.sw-tab:hover{color:var(--tx-0)}
+.sw-tab.active{color:var(--teal);border-bottom-color:var(--teal);font-weight:600}
+.sw-tab .sw-tab-count{font-size:10px;font-family:var(--mono);padding:1px 6px;border-radius:8px;background:var(--bg-3);color:var(--tx-3)}
+.sw-tab.active .sw-tab-count{background:var(--teal-dim);color:var(--teal)}
+.sw-canvas{flex:1;overflow:hidden;position:relative}
+.sw-canvas-inner{height:100%;overflow-y:auto;overflow-x:hidden;padding:20px 24px}
+
+/* ── Dictionary Tab ── */
+.sw-dict-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.sw-dict-search{flex:1;min-width:200px;position:relative}
+.sw-dict-search input{width:100%;padding:9px 14px 9px 34px;border-radius:8px;border:1px solid var(--border-0);
+  background:var(--bg-2);color:var(--tx-0);font-size:13px;font-family:var(--sans);outline:none;transition:border .2s}
+.sw-dict-search input:focus{border-color:var(--teal)}
+.sw-dict-search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none}
+.sw-dict-filters{display:flex;gap:4px;flex-wrap:wrap}
+.sw-dict-filter{padding:5px 12px;border-radius:14px;font-size:11px;font-weight:500;cursor:pointer;
+  border:1px solid var(--border-0);background:var(--bg-2);color:var(--tx-2);transition:all .15s;font-family:var(--sans)}
+.sw-dict-filter:hover{border-color:var(--border-2);color:var(--tx-0)}
+.sw-dict-filter.active{border-color:var(--teal);background:var(--teal-dim);color:var(--teal)}
+.sw-dict-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px}
+.sw-dict-card{border:1px solid var(--border-0);border-radius:var(--r-lg);background:var(--bg-2);
+  padding:14px 18px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.sw-dict-card:hover{border-color:var(--border-2);background:var(--bg-3)}
+.sw-dict-card.expanded{border-color:var(--teal);background:var(--bg-2)}
+.sw-dict-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.sw-dict-card-name{font-size:14px;font-weight:600;color:var(--tx-0)}
+.sw-dict-card-uri{font-size:10px;font-family:var(--mono);color:var(--teal);margin-top:2px;opacity:.7}
+.sw-dict-card-badges{display:flex;gap:4px;flex-shrink:0;align-items:center}
+.sw-dict-card-def{font-size:12px;color:var(--tx-2);margin-top:8px;line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sw-dict-card.expanded .sw-dict-card-def{-webkit-line-clamp:unset}
+.sw-dict-card-scope{font-size:11px;color:var(--tx-3);margin-top:6px;line-height:1.5;font-style:italic;
+  padding:8px 12px;background:var(--bg-0);border-radius:6px;border:1px solid var(--border-0)}
+.sw-dict-card-usage{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
+.sw-dict-card-form-tag{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:4px;
+  background:var(--bg-3);color:var(--tx-2);border:1px solid var(--border-0)}
+.sw-dict-card-editor{margin-top:12px;padding-top:12px;border-top:1px solid var(--border-0);display:flex;flex-direction:column;gap:8px}
+.sw-dict-card-editor label{font-size:10px;font-weight:600;color:var(--tx-2);letter-spacing:.03em;text-transform:uppercase}
+.sw-dict-card-editor input,.sw-dict-card-editor textarea{padding:8px 12px;border-radius:6px;
+  border:1px solid var(--border-0);background:var(--bg-0);color:var(--tx-0);font-size:12px;font-family:var(--sans);outline:none;resize:vertical}
+.sw-dict-card-editor textarea{min-height:60px}
+.sw-dict-card-editor input:focus,.sw-dict-card-editor textarea:focus{border-color:var(--teal)}
+.sw-dict-empty{padding:40px 20px;text-align:center;border:1px dashed var(--border-1);border-radius:var(--r-lg);color:var(--tx-3)}
+.sw-dict-stats{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.sw-dict-stat{font-size:12px;color:var(--tx-2);display:flex;align-items:center;gap:4px}
+.sw-dict-stat strong{color:var(--tx-0);font-family:var(--mono)}
+
+/* ── Forms Tab (split panel) ── */
+.sw-forms-split{display:flex;height:100%;overflow:hidden;margin:-20px -24px;/* negate canvas-inner padding */}
+.sw-forms-list{width:300px;min-width:300px;border-right:1px solid var(--border-0);display:flex;flex-direction:column;
+  background:var(--bg-2);flex-shrink:0;overflow:hidden}
+.sw-forms-list-header{padding:14px 16px 10px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;justify-content:space-between}
+.sw-forms-list-search{margin:6px 12px 8px;position:relative}
+.sw-forms-list-search input{width:100%;padding:8px 12px 8px 30px;border-radius:6px;border:1px solid var(--border-0);
+  background:var(--bg-0);color:var(--tx-0);font-size:12px;font-family:var(--sans);outline:none}
+.sw-forms-list-search input:focus{border-color:var(--teal)}
+.sw-forms-list-search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none}
+.sw-forms-list-scroll{flex:1;overflow-y:auto}
+.sw-forms-group-header{padding:8px 16px;cursor:pointer;user-select:none;display:flex;align-items:center;
+  justify-content:space-between;border-bottom:1px solid var(--border-0);transition:background .15s}
+.sw-forms-group-header:hover{background:var(--bg-3)}
+.sw-forms-group-label{font-size:10px;font-family:var(--mono);font-weight:600;color:var(--tx-2);
+  letter-spacing:.08em;display:flex;align-items:center;gap:6px}
+.sw-forms-group-count{font-size:10px;font-family:var(--mono);color:var(--tx-3)}
+.sw-forms-item{padding:8px 16px 8px 14px;cursor:pointer;border-left:3px solid transparent;
+  border-bottom:1px solid var(--border-0);transition:all .12s;display:flex;gap:8px;align-items:flex-start}
+.sw-forms-item:hover{background:var(--bg-3)}
+.sw-forms-item.active{background:var(--bg-3);border-left-color:var(--teal)}
+.sw-forms-item-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:5px;background:var(--tx-3);opacity:.4}
+.sw-forms-item-dot.active{background:var(--teal);opacity:1;border-radius:2px}
+.sw-forms-item-name{font-size:12.5px;font-weight:500;color:var(--tx-0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sw-forms-item.active .sw-forms-item-name{font-weight:600}
+.sw-forms-item-meta{font-size:10px;font-family:var(--mono);color:var(--tx-3);margin-top:2px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.sw-forms-item-status{font-size:9px;font-weight:600;letter-spacing:.03em;padding:1px 6px;border-radius:3px;text-transform:uppercase}
+.sw-forms-item-status.draft{background:var(--bg-3);color:var(--tx-3)}
+.sw-forms-item-status.trial{background:rgba(224,148,58,.12);color:var(--orange)}
+.sw-forms-item-status.normative{background:var(--green-dim);color:var(--green)}
+.sw-forms-item-status.deprecated{background:var(--red-dim);color:var(--red)}
+.sw-forms-item-status.de_facto{background:rgba(167,139,250,.12);color:var(--purple)}
+.sw-forms-editor{flex:1;overflow-y:auto;padding:20px 28px}
+.sw-forms-editor-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}
+.sw-forms-editor-name{font-size:22px;font-weight:700;font-family:var(--serif);letter-spacing:-.02em;color:var(--tx-0);
+  border:none;background:transparent;outline:none;width:100%;padding:2px 0;border-bottom:2px solid transparent;transition:border-color .2s}
+.sw-forms-editor-name:focus{border-bottom-color:var(--teal)}
+.sw-forms-editor-badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.sw-forms-editor-actions{display:flex;gap:6px;flex-shrink:0;align-items:flex-start}
+.sw-forms-editor-desc{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--border-0);
+  background:var(--bg-2);color:var(--tx-1);font-size:12px;font-family:var(--sans);outline:none;margin-bottom:16px;resize:none}
+.sw-forms-editor-desc:focus{border-color:var(--teal)}
+
+/* ── Form section & question (reuses some .fb-* patterns) ── */
+.sw-f-section{border:1px solid var(--border-0);border-radius:var(--r-lg);margin-bottom:14px;overflow:hidden;background:var(--bg-2)}
+.sw-f-section-header{padding:10px 18px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;
+  justify-content:space-between;cursor:pointer;transition:background .15s}
+.sw-f-section-header:hover{background:var(--bg-3)}
+.sw-f-section-title{font-size:11px;font-weight:600;color:var(--tx-2);display:flex;align-items:center;gap:8px;
+  letter-spacing:.04em;text-transform:uppercase;font-family:var(--mono)}
+.sw-f-section-count{font-size:10px;color:var(--tx-3);font-family:var(--mono)}
+.sw-f-q{padding:14px 18px;border-bottom:1px solid var(--border-0);transition:background .12s;position:relative}
+.sw-f-q:last-child{border-bottom:none}
+.sw-f-q:hover{background:var(--bg-3)}
+.sw-f-q-meta{font-size:10px;color:var(--tx-3);margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.sw-f-q-prompt{font-size:14px;font-weight:500;color:var(--tx-0);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.sw-f-q-actions{position:absolute;top:12px;right:14px;display:flex;gap:2px;opacity:0;transition:opacity .12s}
+.sw-f-q:hover .sw-f-q-actions{opacity:1}
+.sw-f-q-field-link{font-size:9px;font-family:var(--mono);color:var(--teal);padding:1px 6px;border-radius:3px;
+  background:var(--teal-dim);cursor:pointer;display:inline-flex;align-items:center;gap:3px}
+.sw-f-q-field-link:hover{background:rgba(62,201,176,.15)}
+
+/* ── Answer options with inline binding ── */
+.sw-f-opt{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;
+  transition:all .1s;cursor:default;border:1px solid transparent;margin-bottom:2px}
+.sw-f-opt:hover{background:var(--bg-3);border-color:var(--border-0)}
+.sw-f-opt-radio{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--border-2);flex-shrink:0}
+.sw-f-opt-check{width:14px;height:14px;border-radius:3px;border:1.5px solid var(--border-2);flex-shrink:0}
+.sw-f-opt-label{font-size:13px;color:var(--tx-0);flex:1;min-width:0}
+.sw-f-opt-bindings{display:flex;gap:3px;align-items:center;flex-shrink:0}
+.sw-f-opt-dot{width:8px;height:8px;border-radius:50%;cursor:pointer;transition:all .15s;position:relative}
+.sw-f-opt-dot.bound{box-shadow:0 0 3px currentColor}
+.sw-f-opt-dot.unbound{background:var(--border-2);border:1.5px solid var(--tx-3);box-sizing:border-box}
+.sw-f-opt-dot:hover{transform:scale(1.4)}
+.sw-f-opt-rm{background:none;border:none;color:var(--tx-3);cursor:pointer;font-size:13px;padding:2px 4px;opacity:0;transition:opacity .12s}
+.sw-f-opt:hover .sw-f-opt-rm{opacity:.6}
+.sw-f-opt-rm:hover{opacity:1!important;color:var(--red)}
+
+/* ── Inline binding dropdown ── */
+.sw-f-bind-drop{position:absolute;right:0;top:100%;z-index:30;min-width:220px;background:var(--bg-1);
+  border:1px solid var(--border-1);border-radius:var(--r-lg);box-shadow:0 8px 24px rgba(0,0,0,.4);
+  padding:8px;animation:fadeUp .15s ease both}
+.sw-f-bind-drop-item{padding:8px 12px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:8px;
+  font-size:12px;color:var(--tx-1);transition:background .1s}
+.sw-f-bind-drop-item:hover{background:var(--bg-3)}
+.sw-f-bind-drop-item.selected{background:var(--green-dim);border:1px solid rgba(62,201,176,.2)}
+
+/* ── Add question/section/answer buttons ── */
+.sw-f-add{display:flex;align-items:center;gap:6px;padding:10px 16px;color:var(--tx-3);font-size:12px;
+  cursor:pointer;transition:color .12s;border:none;background:none;font-family:var(--sans);width:100%}
+.sw-f-add:hover{color:var(--teal)}
+.sw-f-add-section{border:1px dashed var(--border-1);border-radius:var(--r-lg);justify-content:center;padding:12px;margin-bottom:14px}
+.sw-f-add-section:hover{border-color:var(--teal);color:var(--teal);background:var(--teal-dim)}
+
+/* ── Framework bar (bottom of form) ── */
+.sw-f-fw-bar{margin-top:20px;padding:14px 18px;border:1px solid var(--border-0);border-radius:var(--r-lg);background:var(--bg-2)}
+.sw-f-fw-bar-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.sw-f-fw-bar-label{font-size:11px;font-weight:600;color:var(--tx-2);letter-spacing:.04em;text-transform:uppercase;font-family:var(--mono);display:flex;align-items:center;gap:6px}
+.sw-f-fw-list{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.sw-f-fw-card{padding:10px 14px;border:1px solid var(--border-0);border-radius:8px;background:var(--bg-0)}
+.sw-f-fw-card-header{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.sw-f-fw-card-name{font-size:13px;font-weight:600}
+.sw-f-fw-card-codes{display:flex;flex-direction:column;gap:3px}
+.sw-f-fw-code{display:flex;align-items:center;gap:6px;padding:4px 8px;font-size:12px}
+
+/* ── Preview overlay ── */
+.sw-f-preview-overlay{position:absolute;inset:0;background:var(--bg-1);z-index:20;overflow-y:auto;padding:24px;animation:fadeUp .2s ease both}
+.sw-f-preview-close{position:sticky;top:0;display:flex;justify-content:flex-end;padding-bottom:12px;z-index:21}
+.sw-f-preview-q{margin-bottom:22px}
+.sw-f-preview-prompt{font-size:16px;font-weight:500;color:var(--tx-0);margin-bottom:10px}
+.sw-f-preview-opt{padding:10px 14px;border:1px solid var(--border-0);border-radius:var(--r);margin-bottom:6px;
+  cursor:pointer;transition:all .12s;display:flex;align-items:center;gap:10px}
+.sw-f-preview-opt:hover{border-color:var(--teal);background:var(--teal-dim)}
+
+/* ── Columns Tab ── */
+.sw-cols-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.sw-cols-stats{display:flex;gap:16px;margin-bottom:12px}
+.sw-cols-stat{font-size:12px;color:var(--tx-2);display:flex;align-items:center;gap:4px}
+.sw-cols-stat strong{color:var(--tx-0);font-family:var(--mono)}
+.sw-cols-table-wrap{overflow-x:auto;border:1px solid var(--border-0);border-radius:var(--r-lg);background:var(--bg-2)}
+.sw-cols-table{width:100%;border-collapse:collapse;font-size:12px}
+.sw-cols-table th{padding:10px 14px;text-align:left;font-size:10px;font-weight:600;font-family:var(--mono);
+  color:var(--tx-2);letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--border-0);
+  background:var(--bg-3);position:sticky;top:0;z-index:2}
+.sw-cols-table th.sw-cols-form-th{text-align:center;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  writing-mode:vertical-lr;text-orientation:mixed;padding:14px 6px;font-size:9px;min-width:36px}
+.sw-cols-table td{padding:8px 14px;border-bottom:1px solid var(--border-0);color:var(--tx-1);vertical-align:middle}
+.sw-cols-table tr:hover td{background:var(--bg-3)}
+.sw-cols-table td.sw-cols-cell{text-align:center;cursor:pointer;transition:background .1s}
+.sw-cols-cell-present{color:var(--teal);font-size:14px}
+.sw-cols-cell-bound{color:var(--green);font-size:14px}
+.sw-cols-cell-absent{color:var(--tx-3);font-size:14px;opacity:.3}
+.sw-cols-field-name{font-weight:500;color:var(--tx-0)}
+.sw-cols-field-cat{font-size:9px;font-family:var(--mono);padding:1px 6px;border-radius:3px;margin-left:6px}
+.sw-cols-usage-bar{width:40px;height:4px;border-radius:2px;background:var(--border-0);overflow:hidden;display:inline-block;vertical-align:middle;margin-left:6px}
+.sw-cols-usage-fill{height:100%;border-radius:2px;background:var(--teal);transition:width .3s}
+
+/* ── Governance Tab ── */
+.sw-gov-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+@media(max-width:900px){.sw-gov-grid{grid-template-columns:1fr}}
+.sw-gov-card{border:1px solid var(--border-0);border-radius:var(--r-lg);background:var(--bg-2);padding:16px 20px;overflow:hidden}
+.sw-gov-card-title{font-size:11px;font-weight:600;font-family:var(--mono);color:var(--tx-2);letter-spacing:.06em;
+  text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.sw-gov-pipeline{display:flex;gap:12px;flex-wrap:wrap}
+.sw-gov-lane{flex:1;min-width:140px;border:1px solid var(--border-0);border-radius:8px;background:var(--bg-0);padding:10px;overflow:hidden}
+.sw-gov-lane-header{font-size:10px;font-weight:600;font-family:var(--mono);letter-spacing:.04em;text-transform:uppercase;
+  margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.sw-gov-lane-items{display:flex;flex-direction:column;gap:4px;min-height:40px}
+.sw-gov-lane-item{padding:6px 10px;border-radius:6px;border:1px solid var(--border-0);background:var(--bg-2);
+  font-size:11px;color:var(--tx-1);cursor:pointer;transition:all .12s;display:flex;align-items:center;gap:6px}
+.sw-gov-lane-item:hover{border-color:var(--border-2);background:var(--bg-3)}
+.sw-gov-propagation{display:flex;flex-direction:column;gap:6px}
+.sw-gov-prop-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;
+  border:1px solid var(--border-0);background:var(--bg-0);font-size:11px}
+.sw-gov-prop-arrow{color:var(--tx-3);font-size:10px;padding:0 4px}
+.sw-gov-adopt-row{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:11px;color:var(--tx-1)}
+.sw-gov-adopt-bar{flex:1;height:4px;border-radius:2px;background:var(--border-0);overflow:hidden}
+.sw-gov-adopt-fill{height:100%;border-radius:2px;background:var(--teal);transition:width .3s}
+.sw-gov-timeline{position:relative;padding-left:20px}
+.sw-gov-timeline::before{content:'';position:absolute;left:14px;top:0;bottom:0;width:1px;background:var(--border-0)}
+.sw-gov-tl-node{position:relative;padding:6px 0 14px 16px}
+.sw-gov-tl-dot{position:absolute;left:-8px;top:8px;width:9px;height:9px;border-radius:50%}
+.sw-gov-tl-dot.current{background:var(--teal);box-shadow:0 0 6px rgba(62,201,176,.3)}
+.sw-gov-tl-dot.past{background:transparent;border:2px solid var(--tx-3)}
+.sw-gov-activity{display:flex;flex-direction:column;gap:6px}
+.sw-gov-activity-item{display:flex;align-items:flex-start;gap:10px;padding:6px 10px;border-radius:6px;
+  font-size:11px;color:var(--tx-1);transition:background .1s}
+.sw-gov-activity-item:hover{background:var(--bg-3)}
+.sw-gov-activity-time{font-size:10px;font-family:var(--mono);color:var(--tx-3);flex-shrink:0;min-width:60px}
+.sw-gov-empty{padding:20px;text-align:center;font-size:12px;color:var(--tx-3);border:1px dashed var(--border-1);border-radius:8px}
+
+/* ── Schema Workbench Responsive ── */
+@media(max-width:900px){
+  .sw-forms-split{flex-direction:column}
+  .sw-forms-list{width:100%;min-width:100%;max-height:240px;border-right:none;border-bottom:1px solid var(--border-0)}
+  .sw-dict-grid{grid-template-columns:1fr}
+  .sw-tabs{overflow-x:auto;gap:0}
+  .sw-tab{padding:10px 14px;font-size:11px;white-space:nowrap}
+}
+@media(max-width:600px){
+  .sw-header{padding:10px 16px 0}
+  .sw-canvas-inner{padding:14px 16px}
+  .sw-tabs{padding:0 16px}
+  .sw-forms-editor{padding:14px 16px}
+  .sw-cols-table-wrap{font-size:10px}
+}
+
 /* ── Field picker for FormBuilder ── */
 .fp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:45;display:flex;align-items:center;justify-content:center}
 .fp-modal{background:var(--bg-1);border:1px solid var(--border-1);border-radius:var(--r-lg);width:500px;max-width:90vw;max-height:80vh;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.5);display:flex;flex-direction:column;animation:fadeUp .2s ease both}
@@ -14321,6 +14562,1265 @@ const SchemaView = ({
       zIndex: 39
     }
   }));
+};
+
+/* ═══════════════════ SCHEMA WORKBENCH (Redesigned) ═══════════════════ */
+
+/* ── DictionaryTab — unified field catalog ── */
+const DictionaryTab = ({ fieldDefs, allForms, catLabels, catColors, catIcons, onSaveFieldDef }) => {
+  const [search, setSearch] = useState('');
+  const [filterCat, setFilterCat] = useState('all');
+  const [expandedUri, setExpandedUri] = useState(null);
+  const [editDraft, setEditDraft] = useState({});
+
+  // Collect ALL field definitions: vault fields + fieldDefs dictionary + form-generated
+  const allFieldEntries = useMemo(() => {
+    const map = {};
+    // Start with vault fields
+    VAULT_FIELDS.forEach(vf => {
+      map[vf.uri] = { ...vf, source: 'vault' };
+    });
+    // Merge fieldDefs (may override/extend vault)
+    if (fieldDefs) {
+      Object.entries(fieldDefs).forEach(([uri, def]) => {
+        if (map[uri]) {
+          map[uri] = { ...map[uri], ...def, source: map[uri].source || 'custom' };
+        } else {
+          map[uri] = { ...def, uri, source: 'custom' };
+        }
+      });
+    }
+    // Auto-register fields from forms
+    (allForms || []).forEach(f => {
+      (f.fields || []).forEach(field => {
+        const uri = field.field_uri || `khora:form/${f.id}/${field.key}`;
+        if (!map[uri]) {
+          map[uri] = {
+            uri,
+            key: field.key,
+            label: field.question || field.key,
+            category: field.category || 'case',
+            data_type: field.type === 'single_select' ? 'select' : field.type || 'text',
+            definition: field.helpText || '',
+            scope: '',
+            sensitive: field.sensitive || false,
+            source: 'form',
+            form_name: f.name,
+            form_id: f.id
+          };
+        }
+      });
+    });
+    return Object.values(map);
+  }, [fieldDefs, allForms]);
+
+  // Which forms use each field
+  const fieldUsage = useMemo(() => {
+    const usage = {};
+    (allForms || []).forEach(f => {
+      (f.fields || []).forEach(field => {
+        const uri = field.field_uri || `khora:form/${f.id}/${field.key}`;
+        if (!usage[uri]) usage[uri] = [];
+        usage[uri].push({ id: f.id, name: f.name });
+      });
+    });
+    return usage;
+  }, [allForms]);
+
+  const categories = useMemo(() => [...new Set(allFieldEntries.map(f => f.category).filter(Boolean))], [allFieldEntries]);
+
+  const filtered = useMemo(() => {
+    let list = allFieldEntries;
+    if (filterCat !== 'all') list = list.filter(f => f.category === filterCat);
+    if (search.length >= 2) {
+      const q = search.toLowerCase();
+      list = list.filter(f =>
+        (f.label || '').toLowerCase().includes(q) ||
+        (f.key || '').toLowerCase().includes(q) ||
+        (f.definition || '').toLowerCase().includes(q) ||
+        (f.uri || '').toLowerCase().includes(q)
+      );
+    }
+    return list.sort((a, b) => (a.label || '').localeCompare(b.label || ''));
+  }, [allFieldEntries, filterCat, search]);
+
+  const toggleExpand = (uri) => {
+    if (expandedUri === uri) {
+      setExpandedUri(null);
+      setEditDraft({});
+    } else {
+      const f = allFieldEntries.find(x => x.uri === uri);
+      setExpandedUri(uri);
+      setEditDraft(f ? { definition: f.definition || '', scope: f.scope || '' } : {});
+    }
+  };
+
+  const doSave = () => {
+    if (!expandedUri || !onSaveFieldDef) return;
+    const f = allFieldEntries.find(x => x.uri === expandedUri);
+    if (f) {
+      onSaveFieldDef({ ...f, ...editDraft });
+    }
+    setExpandedUri(null);
+  };
+
+  const typeColor = (dt) => {
+    const m = { text: 'blue', select: 'teal', date: 'gold', number: 'orange', boolean: 'green',
+      email: 'blue', phone: 'blue', address: 'gold', text_long: 'purple', document: 'orange',
+      single_select: 'teal', multi_select: 'teal', duration: 'gold' };
+    return m[dt] || 'blue';
+  };
+
+  return React.createElement('div', null,
+    // Stats row
+    React.createElement('div', { className: 'sw-dict-stats' },
+      React.createElement('span', { className: 'sw-dict-stat' }, React.createElement('strong', null, allFieldEntries.length), ' total fields'),
+      React.createElement('span', { className: 'sw-dict-stat' }, React.createElement('strong', null, allFieldEntries.filter(f => f.source === 'vault').length), ' vault'),
+      React.createElement('span', { className: 'sw-dict-stat' }, React.createElement('strong', null, allFieldEntries.filter(f => f.sensitive).length), ' sensitive')
+    ),
+    // Toolbar
+    React.createElement('div', { className: 'sw-dict-toolbar' },
+      React.createElement('div', { className: 'sw-dict-search' },
+        React.createElement('span', { className: 'sw-dict-search-icon' }, React.createElement(I, { n: 'search', s: 13, c: 'var(--tx-3)' })),
+        React.createElement('input', { value: search, onChange: e => setSearch(e.target.value), placeholder: 'Search fields by name, key, or definition...' })
+      ),
+      React.createElement('div', { className: 'sw-dict-filters' },
+        React.createElement('button', { className: `sw-dict-filter${filterCat === 'all' ? ' active' : ''}`, onClick: () => setFilterCat('all') }, 'All'),
+        categories.map(c => React.createElement('button', {
+          key: c,
+          className: `sw-dict-filter${filterCat === c ? ' active' : ''}`,
+          onClick: () => setFilterCat(c)
+        }, (catLabels || {})[c] || c))
+      )
+    ),
+    // Grid
+    filtered.length === 0
+      ? React.createElement('div', { className: 'sw-dict-empty' }, search ? `No fields matching "${search}"` : 'No fields in this category.')
+      : React.createElement('div', { className: 'sw-dict-grid' },
+          filtered.map(f => {
+            const isExpanded = expandedUri === f.uri;
+            const uses = fieldUsage[f.uri] || [];
+            const catColor = (catColors || {})[f.category] || 'blue';
+            return React.createElement('div', {
+              key: f.uri,
+              className: `sw-dict-card${isExpanded ? ' expanded' : ''}`,
+              onClick: () => toggleExpand(f.uri)
+            },
+              React.createElement('div', { className: 'sw-dict-card-header' },
+                React.createElement('div', null,
+                  React.createElement('div', { className: 'sw-dict-card-name' }, f.label || f.key),
+                  React.createElement('div', { className: 'sw-dict-card-uri' }, f.uri)
+                ),
+                React.createElement('div', { className: 'sw-dict-card-badges' },
+                  f.sensitive && React.createElement('span', { className: 'tag tag-orange', style: { fontSize: 8 } }, 'SENSITIVE'),
+                  React.createElement('span', { className: `tag tag-${catColor}`, style: { fontSize: 8 } }, (catLabels || {})[f.category] || f.category),
+                  React.createElement('span', { className: `tag tag-${typeColor(f.data_type)}`, style: { fontSize: 8 } }, (f.data_type || 'text').toUpperCase())
+                )
+              ),
+              React.createElement('div', { className: 'sw-dict-card-def' }, f.definition || 'No definition yet.'),
+              // Usage tags
+              uses.length > 0 && React.createElement('div', { className: 'sw-dict-card-usage' },
+                React.createElement('span', { style: { fontSize: 10, color: 'var(--tx-3)', fontFamily: 'var(--mono)' } }, 'Used in:'),
+                uses.map(u => React.createElement('span', { key: u.id, className: 'sw-dict-card-form-tag' }, u.name))
+              ),
+              // Expanded: scope + editor
+              isExpanded && React.createElement('div', null,
+                f.scope && React.createElement('div', { className: 'sw-dict-card-scope' },
+                  React.createElement('strong', { style: { color: 'var(--tx-2)', fontSize: 10 } }, 'SCOPE: '), f.scope
+                ),
+                onSaveFieldDef && React.createElement('div', { className: 'sw-dict-card-editor', onClick: e => e.stopPropagation() },
+                  React.createElement('label', null, 'Definition'),
+                  React.createElement('textarea', {
+                    value: editDraft.definition || '',
+                    onChange: e => setEditDraft(d => ({ ...d, definition: e.target.value })),
+                    placeholder: 'What this field means...'
+                  }),
+                  React.createElement('label', null, 'Scope'),
+                  React.createElement('textarea', {
+                    value: editDraft.scope || '',
+                    onChange: e => setEditDraft(d => ({ ...d, scope: e.target.value })),
+                    placeholder: 'What is included and excluded...'
+                  }),
+                  React.createElement('div', { style: { display: 'flex', gap: 6, justifyContent: 'flex-end' } },
+                    React.createElement(SwBtn, { ghost: true, onClick: (e) => { e.stopPropagation(); setExpandedUri(null); } }, 'Cancel'),
+                    React.createElement(SwBtn, { accent: SWC.given, onClick: (e) => { e.stopPropagation(); doSave(); } }, 'Save')
+                  )
+                )
+              )
+            );
+          })
+        )
+  );
+};
+
+/* ── ColumnsTab — field × form matrix ── */
+const ColumnsTab = ({ allForms, fieldDefs, onNavigateToForm }) => {
+  const [filterCat, setFilterCat] = useState('all');
+  const [sortBy, setSortBy] = useState('name'); // name | usage | category
+
+  // Build the matrix data
+  const matrixData = useMemo(() => {
+    const fieldMap = {};
+    // Collect all unique fields across all forms
+    (allForms || []).forEach(f => {
+      (f.fields || []).forEach(field => {
+        const key = field.key;
+        if (!fieldMap[key]) {
+          fieldMap[key] = {
+            key,
+            label: field.question || field.key,
+            category: field.category || field.section || 'general',
+            uri: field.field_uri || `khora:form/${f.id}/${key}`,
+            forms: {},
+            usageCount: 0
+          };
+        }
+        fieldMap[key].forms[f.id] = {
+          present: true,
+          bound: !!(field.eo && field.eo.chain && field.eo.chain.some(c => c.op === 'CON')),
+          type: field.type
+        };
+        fieldMap[key].usageCount++;
+      });
+    });
+    return Object.values(fieldMap);
+  }, [allForms]);
+
+  const categories = useMemo(() => [...new Set(matrixData.map(f => f.category).filter(Boolean))], [matrixData]);
+  const forms = allForms || [];
+
+  const filtered = useMemo(() => {
+    let list = matrixData;
+    if (filterCat !== 'all') list = list.filter(f => f.category === filterCat);
+    if (sortBy === 'usage') list = [...list].sort((a, b) => b.usageCount - a.usageCount);
+    else if (sortBy === 'category') list = [...list].sort((a, b) => (a.category || '').localeCompare(b.category || ''));
+    else list = [...list].sort((a, b) => (a.label || '').localeCompare(b.label || ''));
+    return list;
+  }, [matrixData, filterCat, sortBy]);
+
+  const totalFields = matrixData.length;
+  const multiFormFields = matrixData.filter(f => f.usageCount >= 2).length;
+  const singleFormFields = matrixData.filter(f => f.usageCount === 1).length;
+
+  return React.createElement('div', null,
+    // Stats
+    React.createElement('div', { className: 'sw-cols-stats' },
+      React.createElement('span', { className: 'sw-cols-stat' }, React.createElement('strong', null, totalFields), ' total fields'),
+      React.createElement('span', { className: 'sw-cols-stat' }, React.createElement('strong', null, multiFormFields), ' shared across forms'),
+      React.createElement('span', { className: 'sw-cols-stat' }, React.createElement('strong', null, singleFormFields), ' unique to one form')
+    ),
+    // Toolbar
+    React.createElement('div', { className: 'sw-cols-toolbar' },
+      React.createElement('div', { className: 'sw-dict-filters' },
+        React.createElement('button', { className: `sw-dict-filter${filterCat === 'all' ? ' active' : ''}`, onClick: () => setFilterCat('all') }, 'All'),
+        categories.map(c => React.createElement('button', {
+          key: c,
+          className: `sw-dict-filter${filterCat === c ? ' active' : ''}`,
+          onClick: () => setFilterCat(c)
+        }, c))
+      ),
+      React.createElement('div', { style: { display: 'flex', gap: 4, marginLeft: 'auto' } },
+        ['name', 'usage', 'category'].map(s => React.createElement('button', {
+          key: s,
+          className: `sw-dict-filter${sortBy === s ? ' active' : ''}`,
+          onClick: () => setSortBy(s)
+        }, s === 'name' ? 'A-Z' : s === 'usage' ? 'Usage' : 'Category'))
+      )
+    ),
+    // Table
+    forms.length === 0 || filtered.length === 0
+      ? React.createElement('div', { className: 'sw-dict-empty' }, 'No fields to show. Create forms with fields to see the column mapping.')
+      : React.createElement('div', { className: 'sw-cols-table-wrap' },
+          React.createElement('table', { className: 'sw-cols-table' },
+            React.createElement('thead', null,
+              React.createElement('tr', null,
+                React.createElement('th', { style: { minWidth: 180 } }, 'Field'),
+                React.createElement('th', { style: { width: 70 } }, 'Category'),
+                React.createElement('th', { style: { width: 50 } }, 'Usage'),
+                forms.map(f => React.createElement('th', { key: f.id, className: 'sw-cols-form-th', title: f.name }, f.name))
+              )
+            ),
+            React.createElement('tbody', null,
+              filtered.map(field => React.createElement('tr', { key: field.key },
+                React.createElement('td', null,
+                  React.createElement('span', { className: 'sw-cols-field-name' }, field.label),
+                  React.createElement('div', { style: { fontSize: 9, fontFamily: 'var(--mono)', color: 'var(--tx-3)', marginTop: 1 } }, field.key)
+                ),
+                React.createElement('td', null,
+                  React.createElement('span', {
+                    className: 'sw-cols-field-cat',
+                    style: { background: `var(--${OBS_CAT_COLORS[field.category] || 'blue'}-dim)`, color: `var(--${OBS_CAT_COLORS[field.category] || 'blue'})` }
+                  }, field.category)
+                ),
+                React.createElement('td', null,
+                  React.createElement('span', { style: { fontFamily: 'var(--mono)', fontSize: 11 } }, field.usageCount),
+                  React.createElement('span', { className: 'sw-cols-usage-bar' },
+                    React.createElement('span', { className: 'sw-cols-usage-fill', style: { width: `${Math.min(100, (field.usageCount / Math.max(forms.length, 1)) * 100)}%` } })
+                  )
+                ),
+                forms.map(f => {
+                  const cell = field.forms[f.id];
+                  return React.createElement('td', {
+                    key: f.id,
+                    className: 'sw-cols-cell',
+                    onClick: () => cell && onNavigateToForm && onNavigateToForm(f.id, field.key),
+                    title: cell ? (cell.bound ? 'Present + bound to framework' : 'Present') : 'Not in this form'
+                  },
+                    cell
+                      ? React.createElement('span', { className: cell.bound ? 'sw-cols-cell-bound' : 'sw-cols-cell-present' }, cell.bound ? '\u25CF' : '\u2713')
+                      : React.createElement('span', { className: 'sw-cols-cell-absent' }, '\u2013')
+                  );
+                })
+              ))
+            )
+          )
+        )
+  );
+};
+
+/* ── GovernanceTab — maturity pipeline, propagation, adoption, activity ── */
+const GovernanceTab = ({ allForms, onNavigateToForm }) => {
+  // Group forms by maturity for the pipeline
+  const pipeline = useMemo(() => {
+    const lanes = { draft: [], trial: [], normative: [], de_facto: [], deprecated: [] };
+    (allForms || []).forEach(f => {
+      const m = f.maturity || 'draft';
+      if (lanes[m]) lanes[m].push(f);
+    });
+    return lanes;
+  }, [allForms]);
+
+  // Propagation data
+  const propagationData = useMemo(() => {
+    return (allForms || []).filter(f => f.source && f.source.level === 'network').map(f => ({
+      id: f.id,
+      name: f.name,
+      propagation: f.source.propagation || 'optional',
+      maturity: f.maturity || 'draft'
+    }));
+  }, [allForms]);
+
+  // Version timeline — combine all forms' versions
+  const timeline = useMemo(() => {
+    const entries = [];
+    (allForms || []).forEach(f => {
+      entries.push({
+        form_id: f.id,
+        form_name: f.name,
+        version: f.version || 1,
+        maturity: f.maturity || 'draft',
+        date: f.savedAt || Date.now(),
+        type: 'version'
+      });
+    });
+    return entries.sort((a, b) => b.date - a.date).slice(0, 20);
+  }, [allForms]);
+
+  const laneConfig = {
+    draft: { label: 'Draft', color: 'var(--blue)', bg: 'var(--blue-dim)' },
+    trial: { label: 'Trial', color: 'var(--orange)', bg: 'rgba(224,148,58,.1)' },
+    normative: { label: 'Normative', color: 'var(--green)', bg: 'var(--green-dim)' },
+    de_facto: { label: 'De facto', color: 'var(--purple)', bg: 'rgba(167,139,250,.1)' },
+    deprecated: { label: 'Deprecated', color: 'var(--red)', bg: 'var(--red-dim)' }
+  };
+
+  const propConfig = {
+    required: { label: 'Required', color: 'var(--red)' },
+    standard: { label: 'Standard', color: 'var(--gold)' },
+    recommended: { label: 'Recommended', color: 'var(--blue)' },
+    optional: { label: 'Optional', color: 'var(--tx-3)' }
+  };
+
+  return React.createElement('div', null,
+    // Top grid: pipeline + propagation
+    React.createElement('div', { className: 'sw-gov-grid' },
+      // Maturity Pipeline
+      React.createElement('div', { className: 'sw-gov-card', style: { gridColumn: '1 / -1' } },
+        React.createElement('div', { className: 'sw-gov-card-title' },
+          React.createElement(I, { n: 'layers', s: 13 }), 'Maturity Pipeline'
+        ),
+        React.createElement('div', { className: 'sw-gov-pipeline' },
+          ['draft', 'trial', 'normative', 'de_facto', 'deprecated'].map(stage => {
+            const cfg = laneConfig[stage];
+            const items = pipeline[stage] || [];
+            return React.createElement('div', { key: stage, className: 'sw-gov-lane' },
+              React.createElement('div', { className: 'sw-gov-lane-header', style: { color: cfg.color } },
+                React.createElement('span', null, cfg.label),
+                React.createElement('span', { style: { fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--tx-3)' } }, items.length)
+              ),
+              React.createElement('div', { className: 'sw-gov-lane-items' },
+                items.length === 0
+                  ? React.createElement('div', { style: { fontSize: 10, color: 'var(--tx-3)', fontStyle: 'italic', padding: 8 } }, 'None')
+                  : items.map(f => React.createElement('div', {
+                      key: f.id,
+                      className: 'sw-gov-lane-item',
+                      onClick: () => onNavigateToForm && onNavigateToForm(f.id)
+                    },
+                    React.createElement('span', { style: { width: 6, height: 6, borderRadius: '50%', background: cfg.color, flexShrink: 0 } }),
+                    React.createElement('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.name),
+                    React.createElement('span', { style: { fontSize: 9, fontFamily: 'var(--mono)', color: 'var(--tx-3)', marginLeft: 'auto' } }, `v${f.version || 1}`)
+                  ))
+              )
+            );
+          })
+        )
+      ),
+
+      // Propagation Map
+      React.createElement('div', { className: 'sw-gov-card' },
+        React.createElement('div', { className: 'sw-gov-card-title' },
+          React.createElement(I, { n: 'globe', s: 13 }), 'Network Propagation'
+        ),
+        propagationData.length === 0
+          ? React.createElement('div', { className: 'sw-gov-empty' }, 'No network forms. Forms authored at the network level will show their propagation rules here.')
+          : React.createElement('div', { className: 'sw-gov-propagation' },
+              propagationData.map(f => {
+                const pcfg = propConfig[f.propagation] || propConfig.optional;
+                return React.createElement('div', { key: f.id, className: 'sw-gov-prop-row' },
+                  React.createElement('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--tx-0)' } }, f.name),
+                  React.createElement('span', { className: 'sw-gov-prop-arrow' }, '\u2192'),
+                  React.createElement('span', {
+                    className: 'tag',
+                    style: { fontSize: 8, color: pcfg.color, background: `${pcfg.color}18`, border: `1px solid ${pcfg.color}30` }
+                  }, pcfg.label)
+                );
+              })
+            )
+      ),
+
+      // Version Timeline
+      React.createElement('div', { className: 'sw-gov-card' },
+        React.createElement('div', { className: 'sw-gov-card-title' },
+          React.createElement(I, { n: 'clock', s: 13 }), 'Recent Versions'
+        ),
+        timeline.length === 0
+          ? React.createElement('div', { className: 'sw-gov-empty' }, 'No version history yet.')
+          : React.createElement('div', { className: 'sw-gov-timeline' },
+              timeline.slice(0, 10).map((entry, i) => {
+                const mcfg = laneConfig[entry.maturity] || laneConfig.draft;
+                return React.createElement('div', { key: `${entry.form_id}-${i}`, className: 'sw-gov-tl-node' },
+                  React.createElement('div', { className: `sw-gov-tl-dot ${i === 0 ? 'current' : 'past'}` }),
+                  React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                    React.createElement('span', { style: { fontSize: 11, fontFamily: 'var(--mono)', fontWeight: 600, color: mcfg.color } }, `v${entry.version}`),
+                    React.createElement('span', { style: { fontSize: 11, color: 'var(--tx-0)', fontWeight: 500 } }, entry.form_name)
+                  ),
+                  React.createElement('div', { style: { fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--tx-3)', marginTop: 2 } },
+                    new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  )
+                );
+              })
+            )
+      )
+    ),
+
+    // Activity Feed
+    React.createElement('div', { className: 'sw-gov-card' },
+      React.createElement('div', { className: 'sw-gov-card-title' },
+        React.createElement(I, { n: 'activity', s: 13 }), 'Schema Activity'
+      ),
+      React.createElement('div', { className: 'sw-gov-activity' },
+        (allForms || []).length === 0
+          ? React.createElement('div', { className: 'sw-gov-empty' }, 'No schema activity yet. Create and save forms to see activity here.')
+          : (allForms || []).slice(0, 8).map((f, i) => React.createElement('div', { key: f.id, className: 'sw-gov-activity-item' },
+              React.createElement('span', { className: 'sw-gov-activity-time' }, f.savedAt ? new Date(f.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Recent'),
+              React.createElement('span', { style: { width: 5, height: 5, borderRadius: '50%', background: i === 0 ? 'var(--teal)' : 'var(--tx-3)', flexShrink: 0, marginTop: 4 } }),
+              React.createElement('span', null,
+                React.createElement('span', { style: { color: 'var(--tx-0)', fontWeight: 500 } }, f.name),
+                React.createElement('span', { style: { color: 'var(--tx-3)' } }, ` \u2014 v${f.version || 1} \u00B7 ${(MATURITY_LEVELS[f.maturity] || MATURITY_LEVELS.draft).label}`)
+              )
+            ))
+      )
+    )
+  );
+};
+
+/* ── FormsTab — restructured form builder with split panel ── */
+const FormsTab = ({
+  allForms,
+  savedForms,
+  form, setForm,
+  frameworks, bindings, crosswalks,
+  setFrameworks, setBindings, setCrosswalks,
+  fieldDefs, catLabels, catColors,
+  onSaveFieldDef,
+  onSave, onLoad, onNewForm, onVersionBump,
+  showToast,
+  isOrg, orgMeta, networkMembers
+}) => {
+  const [selectedFormId, setSelectedFormId] = useState(null);
+  const [formSearch, setFormSearch] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState(new Set(['my', 'network']));
+  const [showPreview, setShowPreview] = useState(false);
+  const [expandedSections, setExpandedSections] = useState(new Set());
+  const [showFwBar, setShowFwBar] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState(null);
+  const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
+  const [fieldPickerSection, setFieldPickerSection] = useState(null);
+
+  // Categorize forms
+  const myForms = useMemo(() => (savedForms || []).filter(f => !f.sourceType || f.sourceType === 'local'), [savedForms]);
+  const orgForms = useMemo(() => (savedForms || []).filter(f => f.sourceType === 'org'), [savedForms]);
+  const networkForms = useMemo(() => {
+    const saved = (savedForms || []).filter(f => f.sourceType === 'network');
+    // Also include DEFAULT_FORMS that aren't in savedForms
+    const savedIds = new Set(saved.map(f => f.id));
+    const defaults = (DEFAULT_FORMS || []).filter(f => !savedIds.has(f.id)).map(f => ({
+      id: f.id,
+      name: f.name,
+      version: f.version,
+      maturity: f.maturity,
+      sourceType: 'network',
+      source: f.source,
+      form: f
+    }));
+    return [...saved, ...defaults];
+  }, [savedForms]);
+
+  const toggleGroup = g => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      next.has(g) ? next.delete(g) : next.add(g);
+      return next;
+    });
+  };
+
+  const doLoadForm = (formData) => {
+    if (onLoad && formData) {
+      onLoad(formData);
+      setSelectedFormId(formData.id);
+    }
+  };
+
+  const doLoadNetworkForm = (nf) => {
+    // For network forms that haven't been saved locally, load from DEFAULT_FORMS
+    if (nf.form) {
+      // Build form structure compatible with FormBuilder
+      const loaded = {
+        name: nf.form.name || nf.name,
+        key: nf.form.key || formNameToKey(nf.name),
+        version: nf.form.version || nf.version || 1,
+        maturity: nf.form.maturity || nf.maturity || 'draft',
+        description: nf.form.description || '',
+        source: nf.form.source || nf.source,
+        sections: []
+      };
+      // Convert fields to sections/questions format
+      if (nf.form.fields) {
+        const sectionMap = {};
+        nf.form.fields.forEach(field => {
+          const secKey = field.section || 'general';
+          if (!sectionMap[secKey]) {
+            sectionMap[secKey] = {
+              id: `sec_${secKey}`,
+              title: (OBS_CAT_LABELS[secKey] || secKey).charAt(0).toUpperCase() + (OBS_CAT_LABELS[secKey] || secKey).slice(1),
+              questions: []
+            };
+          }
+          sectionMap[secKey].questions.push({
+            id: field.id,
+            key: field.key,
+            prompt: field.question,
+            type: field.type || 'single_select',
+            options: (field.options || []).map((opt, oi) => ({
+              id: `${field.id}_opt_${oi}`,
+              value: opt.v,
+              label: opt.l
+            })),
+            helpText: field.helpText || '',
+            field_uri: field.field_uri || `khora:form/${nf.id}/${field.key}`,
+            maturity: field.maturity,
+            sensitive: field.sensitive,
+            eo: field.eo
+          });
+        });
+        loaded.sections = Object.values(sectionMap);
+      }
+      if (setForm) setForm(loaded);
+      setSelectedFormId(nf.id);
+    }
+  };
+
+  // Filter forms by search
+  const filterForms = (list) => {
+    if (!formSearch || formSearch.length < 2) return list;
+    const q = formSearch.toLowerCase();
+    return list.filter(f => (f.name || '').toLowerCase().includes(q));
+  };
+
+  // Toggle section collapse
+  const toggleSection = (secId) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      next.has(secId) ? next.delete(secId) : next.add(secId);
+      return next;
+    });
+  };
+
+  // Form mutations (delegated to parent FormBuilder logic)
+  const updateFormName = (name) => {
+    if (setForm) setForm(prev => ({ ...prev, name }));
+  };
+
+  const updateFormDescription = (description) => {
+    if (setForm) setForm(prev => ({ ...prev, description }));
+  };
+
+  const updateFormMaturity = (maturity) => {
+    if (setForm) setForm(prev => ({ ...prev, maturity }));
+  };
+
+  const addSection = () => {
+    if (!setForm) return;
+    setForm(prev => ({
+      ...prev,
+      sections: [...(prev.sections || []), {
+        id: `sec_${Date.now()}`,
+        title: 'New Section',
+        questions: []
+      }]
+    }));
+  };
+
+  const addQuestion = (secId) => {
+    if (!setForm) return;
+    setForm(prev => ({
+      ...prev,
+      sections: (prev.sections || []).map(s => s.id === secId ? {
+        ...s,
+        questions: [...s.questions, {
+          id: `q_${Date.now()}`,
+          prompt: 'New question',
+          type: 'single_select',
+          options: [],
+          key: `field_${Date.now()}`
+        }]
+      } : s)
+    }));
+  };
+
+  const addOption = (secId, qId) => {
+    if (!setForm) return;
+    setForm(prev => ({
+      ...prev,
+      sections: (prev.sections || []).map(s => s.id === secId ? {
+        ...s,
+        questions: s.questions.map(q => q.id === qId ? {
+          ...q,
+          options: [...(q.options || []), {
+            id: `opt_${Date.now()}`,
+            value: `option_${(q.options || []).length + 1}`,
+            label: 'New option'
+          }]
+        } : q)
+      } : s)
+    }));
+  };
+
+  const updateQuestion = (secId, qId, updates) => {
+    if (!setForm) return;
+    setForm(prev => ({
+      ...prev,
+      sections: (prev.sections || []).map(s => s.id === secId ? {
+        ...s,
+        questions: s.questions.map(q => q.id === qId ? { ...q, ...updates } : q)
+      } : s)
+    }));
+  };
+
+  const updateOption = (secId, qId, optId, updates) => {
+    if (!setForm) return;
+    setForm(prev => ({
+      ...prev,
+      sections: (prev.sections || []).map(s => s.id === secId ? {
+        ...s,
+        questions: s.questions.map(q => q.id === qId ? {
+          ...q,
+          options: (q.options || []).map(o => o.id === optId ? { ...o, ...updates } : o)
+        } : q)
+      } : s)
+    }));
+  };
+
+  const removeQuestion = (secId, qId) => {
+    if (!setForm) return;
+    setForm(prev => ({
+      ...prev,
+      sections: (prev.sections || []).map(s => s.id === secId ? {
+        ...s,
+        questions: s.questions.filter(q => q.id !== qId)
+      } : s)
+    }));
+  };
+
+  const removeOption = (secId, qId, optId) => {
+    if (!setForm) return;
+    setForm(prev => ({
+      ...prev,
+      sections: (prev.sections || []).map(s => s.id === secId ? {
+        ...s,
+        questions: s.questions.map(q => q.id === qId ? {
+          ...q,
+          options: (q.options || []).filter(o => o.id !== optId)
+        } : q)
+      } : s)
+    }));
+  };
+
+  const removeSection = (secId) => {
+    if (!setForm) return;
+    setForm(prev => ({
+      ...prev,
+      sections: (prev.sections || []).filter(s => s.id !== secId)
+    }));
+  };
+
+  const updateSectionTitle = (secId, title) => {
+    if (!setForm) return;
+    setForm(prev => ({
+      ...prev,
+      sections: (prev.sections || []).map(s => s.id === secId ? { ...s, title } : s)
+    }));
+  };
+
+  // Insert from dictionary
+  const doInsertFromDictionary = (fieldDef, secId) => {
+    const typeMap = { text: 'text', text_long: 'text', number: 'number', date: 'date', boolean: 'boolean', email: 'text', phone: 'text', address: 'text', document: 'text', select: 'single_select' };
+    const qType = typeMap[fieldDef.data_type] || 'single_select';
+    const options = qType === 'single_select' && fieldDef.data_type === 'boolean'
+      ? [{ id: `opt_y_${Date.now()}`, value: 'yes', label: 'Yes' }, { id: `opt_n_${Date.now()}`, value: 'no', label: 'No' }]
+      : [];
+    if (!setForm) return;
+    setForm(prev => ({
+      ...prev,
+      sections: (prev.sections || []).map(s => s.id === secId ? {
+        ...s,
+        questions: [...s.questions, {
+          id: `q_${Date.now()}`,
+          key: fieldDef.key,
+          prompt: fieldDef.label,
+          type: qType,
+          options,
+          helpText: fieldDef.definition || '',
+          field_uri: fieldDef.uri
+        }]
+      } : s)
+    }));
+    setFieldPickerOpen(false);
+    setFieldPickerSection(null);
+  };
+
+  // Render form list group
+  const renderFormGroup = (label, items, groupKey, icon) => {
+    const isOpen = expandedGroups.has(groupKey);
+    const filteredItems = filterForms(items);
+    return React.createElement('div', { key: groupKey },
+      React.createElement('div', {
+        className: 'sw-forms-group-header',
+        onClick: () => toggleGroup(groupKey)
+      },
+        React.createElement('span', { className: 'sw-forms-group-label' },
+          React.createElement(I, { n: isOpen ? 'chevronDown' : 'chevronRight', s: 10 }),
+          React.createElement(I, { n: icon, s: 11 }),
+          label
+        ),
+        React.createElement('span', { className: 'sw-forms-group-count' }, items.length)
+      ),
+      isOpen && filteredItems.map(f => React.createElement('div', {
+        key: f.id,
+        className: `sw-forms-item${selectedFormId === f.id ? ' active' : ''}`,
+        onClick: () => f.form ? doLoadNetworkForm(f) : doLoadForm(f)
+      },
+        React.createElement('div', { className: `sw-forms-item-dot${selectedFormId === f.id ? ' active' : ''}` }),
+        React.createElement('div', { style: { flex: 1, minWidth: 0 } },
+          React.createElement('div', { className: 'sw-forms-item-name' }, f.name),
+          React.createElement('div', { className: 'sw-forms-item-meta' },
+            React.createElement('span', null, `v${f.version || 1}`),
+            React.createElement('span', null, '\u00B7'),
+            React.createElement('span', {
+              className: `sw-forms-item-status ${f.maturity || 'draft'}`
+            }, (MATURITY_LEVELS[f.maturity] || MATURITY_LEVELS.draft).label)
+          )
+        )
+      )),
+      isOpen && filteredItems.length === 0 && React.createElement('div', {
+        style: { padding: '12px 16px', fontSize: 11, color: 'var(--tx-3)', fontStyle: 'italic' }
+      }, formSearch ? 'No matches' : 'No forms yet')
+    );
+  };
+
+  // Maturity color
+  const matColor = (m) => {
+    const mc = { draft: 'blue', trial: 'orange', normative: 'green', de_facto: 'purple', deprecated: 'red' };
+    return mc[m] || 'blue';
+  };
+
+  const sections = (form && form.sections) || [];
+
+  return React.createElement('div', { className: 'sw-forms-split' },
+    // LEFT: Form list
+    React.createElement('div', { className: 'sw-forms-list' },
+      React.createElement('div', { className: 'sw-forms-list-header' },
+        React.createElement('span', { style: { fontSize: 11, fontWeight: 600, fontFamily: 'var(--mono)', color: 'var(--tx-2)', letterSpacing: '.06em' } }, 'FORMS'),
+        React.createElement('button', {
+          className: 'b-gho b-xs',
+          onClick: onNewForm,
+          style: { fontSize: 12, padding: '3px 10px' }
+        }, '+ New')
+      ),
+      React.createElement('div', { className: 'sw-forms-list-search' },
+        React.createElement('span', { className: 'sw-forms-list-search-icon' }, React.createElement(I, { n: 'search', s: 12, c: 'var(--tx-3)' })),
+        React.createElement('input', { value: formSearch, onChange: e => setFormSearch(e.target.value), placeholder: 'Search forms...' })
+      ),
+      React.createElement('div', { className: 'sw-forms-list-scroll' },
+        renderFormGroup('MY FORMS', myForms, 'my', 'folder'),
+        renderFormGroup('ORG FORMS', orgForms, 'org', 'shieldCheck'),
+        renderFormGroup('NETWORK', networkForms, 'network', 'globe')
+      )
+    ),
+
+    // RIGHT: Form editor
+    React.createElement('div', { className: 'sw-forms-editor', style: { position: 'relative' } },
+      !form
+        ? React.createElement('div', { style: { padding: 40, textAlign: 'center' } },
+            React.createElement('div', { style: { fontSize: 40, opacity: .3, marginBottom: 12 } }, '\u25C7'),
+            React.createElement('div', { style: { fontSize: 14, color: 'var(--tx-2)', marginBottom: 8 } }, 'Select a form from the list or create a new one'),
+            React.createElement(SwBtn, { accent: SWC.given, onClick: onNewForm }, '+ New form')
+          )
+        : React.createElement('div', null,
+            // Form header
+            React.createElement('div', { className: 'sw-forms-editor-header' },
+              React.createElement('div', { style: { flex: 1 } },
+                React.createElement('input', {
+                  className: 'sw-forms-editor-name',
+                  value: form.name || '',
+                  onChange: e => updateFormName(e.target.value),
+                  placeholder: 'Form name...'
+                }),
+                React.createElement('div', { className: 'sw-forms-editor-badges' },
+                  React.createElement('span', {
+                    className: `tag tag-${matColor(form.maturity)}`,
+                    style: { fontSize: 9, cursor: 'pointer' },
+                    onClick: () => {
+                      const mats = Object.keys(MATURITY_LEVELS);
+                      const idx = mats.indexOf(form.maturity || 'draft');
+                      updateFormMaturity(mats[(idx + 1) % mats.length]);
+                    },
+                    title: 'Click to cycle maturity'
+                  }, (MATURITY_LEVELS[form.maturity] || MATURITY_LEVELS.draft).label),
+                  React.createElement('span', {
+                    className: 'tag tag-blue',
+                    style: { fontSize: 9 }
+                  }, `v${form.version || 1}`),
+                  form.key && React.createElement('span', {
+                    style: { fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--tx-3)' }
+                  }, form.key),
+                  form.source && form.source.propagation && React.createElement('span', {
+                    className: `tag tag-${form.source.propagation === 'required' ? 'red' : form.source.propagation === 'standard' ? 'gold' : 'blue'}`,
+                    style: { fontSize: 8 }
+                  }, (PROPAGATION_LEVELS[form.source.propagation] || {}).label || form.source.propagation)
+                )
+              ),
+              React.createElement('div', { className: 'sw-forms-editor-actions' },
+                React.createElement(SwBtn, { ghost: true, onClick: () => setShowPreview(!showPreview) },
+                  React.createElement(I, { n: showPreview ? 'x' : 'eye', s: 13 }),
+                  showPreview ? 'Edit' : 'Preview'
+                ),
+                onSave && React.createElement(SwBtn, { accent: SWC.given, onClick: onSave },
+                  React.createElement(I, { n: 'save', s: 13 }),
+                  'Save'
+                )
+              )
+            ),
+
+            // Description
+            React.createElement('textarea', {
+              className: 'sw-forms-editor-desc',
+              value: form.description || '',
+              onChange: e => updateFormDescription(e.target.value),
+              placeholder: 'Form description...',
+              rows: 2
+            }),
+
+            // Preview overlay
+            showPreview && React.createElement('div', { className: 'sw-f-preview-overlay' },
+              React.createElement('div', { className: 'sw-f-preview-close' },
+                React.createElement(SwBtn, { ghost: true, onClick: () => setShowPreview(false) }, '\u2715 Close preview')
+              ),
+              React.createElement('div', { style: { maxWidth: 640, margin: '0 auto' } },
+                React.createElement('div', {
+                  style: { marginBottom: 16, padding: 12, borderRadius: 8, border: '1px solid var(--border-0)', background: 'var(--bg-2)', fontSize: 12, color: 'var(--tx-2)' }
+                }, React.createElement('strong', { style: { color: 'var(--tx-0)' } }, 'Preview:'), ' This is how the form appears to a person filling it out.'),
+                sections.map(sec => React.createElement('div', { key: sec.id, style: { marginBottom: 20 } },
+                  React.createElement('div', { style: { fontSize: 15, fontWeight: 600, color: 'var(--tx-0)', marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid var(--border-0)' } }, sec.title),
+                  sec.questions.map(q => React.createElement('div', { key: q.id, className: 'sw-f-preview-q' },
+                    React.createElement('div', { className: 'sw-f-preview-prompt' }, q.prompt),
+                    (q.type === 'single_select' || q.type === 'multi_select') && (q.options || []).map(opt => React.createElement('div', {
+                      key: opt.id, className: 'sw-f-preview-opt'
+                    },
+                      React.createElement('div', { className: q.type === 'single_select' ? 'sw-f-opt-radio' : 'sw-f-opt-check' }),
+                      React.createElement('span', { style: { fontSize: 13 } }, opt.label)
+                    )),
+                    q.type === 'text' && React.createElement('input', {
+                      placeholder: 'Type your answer...', readOnly: true,
+                      style: { width: '100%', padding: '10px 14px', borderRadius: 6, border: '1px solid var(--border-0)', background: 'var(--bg-2)', color: 'var(--tx-0)', fontSize: 13, fontFamily: 'inherit' }
+                    }),
+                    (q.type === 'number' || q.type === 'date' || q.type === 'boolean' || q.type === 'duration') && React.createElement('input', {
+                      placeholder: q.type === 'number' ? '0' : q.type === 'date' ? 'yyyy-mm-dd' : q.type === 'boolean' ? 'Yes / No' : 'e.g. 3 months',
+                      readOnly: true,
+                      style: { width: q.type === 'number' ? 120 : 200, padding: '10px 14px', borderRadius: 6, border: '1px solid var(--border-0)', background: 'var(--bg-2)', color: 'var(--tx-0)', fontSize: 13, fontFamily: 'inherit' }
+                    })
+                  ))
+                ))
+              )
+            ),
+
+            // Sections + Questions (compose view)
+            !showPreview && sections.map(sec => {
+              const isSecOpen = !expandedSections.has(sec.id); // open by default
+              return React.createElement('div', { key: sec.id, className: 'sw-f-section' },
+                React.createElement('div', {
+                  className: 'sw-f-section-header',
+                  onClick: () => toggleSection(sec.id)
+                },
+                  React.createElement('span', { className: 'sw-f-section-title' },
+                    React.createElement(I, { n: isSecOpen ? 'chevronDown' : 'chevronRight', s: 10 }),
+                    React.createElement('input', {
+                      value: sec.title,
+                      onChange: e => { e.stopPropagation(); updateSectionTitle(sec.id, e.target.value); },
+                      onClick: e => e.stopPropagation(),
+                      style: { background: 'transparent', border: 'none', color: 'var(--tx-2)', fontSize: 11, fontWeight: 600, fontFamily: 'var(--mono)', letterSpacing: '.04em', textTransform: 'uppercase', outline: 'none', width: '100%' }
+                    })
+                  ),
+                  React.createElement('div', { style: { display: 'flex', gap: 4, alignItems: 'center' } },
+                    React.createElement('span', { className: 'sw-f-section-count' }, `${sec.questions.length}q`),
+                    React.createElement('button', {
+                      className: 'b-gho b-xs',
+                      onClick: e => { e.stopPropagation(); removeSection(sec.id); },
+                      style: { fontSize: 11, padding: '1px 6px', color: 'var(--tx-3)' }
+                    }, '\u2715')
+                  )
+                ),
+                isSecOpen && React.createElement('div', null,
+                  sec.questions.map((q, qi) => React.createElement('div', { key: q.id, className: 'sw-f-q' },
+                    // Meta line
+                    React.createElement('div', { className: 'sw-f-q-meta' },
+                      React.createElement('span', null, `Q${qi + 1}`),
+                      React.createElement('span', {
+                        style: { padding: '1px 6px', borderRadius: 3, background: 'var(--bg-3)', fontFamily: 'var(--mono)', fontSize: 10 }
+                      }, q.type),
+                      q.field_uri && React.createElement('span', {
+                        className: 'sw-f-q-field-link',
+                        title: q.field_uri
+                      }, React.createElement(I, { n: 'link', s: 9 }), q.field_uri.split('/').pop()),
+                      q.maturity && React.createElement('span', {
+                        className: `tag tag-${matColor(q.maturity)}`,
+                        style: { fontSize: 7 }
+                      }, q.maturity)
+                    ),
+                    // Prompt (editable)
+                    React.createElement('div', { className: 'sw-f-q-prompt' },
+                      editingQuestion === q.id
+                        ? React.createElement('input', {
+                            value: q.prompt,
+                            onChange: e => updateQuestion(sec.id, q.id, { prompt: e.target.value }),
+                            onBlur: () => setEditingQuestion(null),
+                            onKeyDown: e => e.key === 'Enter' && setEditingQuestion(null),
+                            autoFocus: true,
+                            style: { flex: 1, fontSize: 14, fontWeight: 500, background: 'transparent', border: 'none', borderBottom: '1px solid var(--teal)', color: 'var(--tx-0)', outline: 'none', fontFamily: 'inherit' }
+                          })
+                        : React.createElement('span', {
+                            onClick: () => setEditingQuestion(q.id),
+                            style: { cursor: 'text', flex: 1 }
+                          }, q.prompt)
+                    ),
+                    // Actions (hover)
+                    React.createElement('div', { className: 'sw-f-q-actions' },
+                      React.createElement('button', {
+                        className: 'b-gho b-xs',
+                        onClick: () => setEditingQuestion(q.id),
+                        style: { fontSize: 10, padding: '2px 6px' }
+                      }, React.createElement(I, { n: 'edit', s: 10 })),
+                      React.createElement('button', {
+                        className: 'b-gho b-xs',
+                        onClick: () => removeQuestion(sec.id, q.id),
+                        style: { fontSize: 10, padding: '2px 6px', color: 'var(--red)' }
+                      }, React.createElement(I, { n: 'trash', s: 10 }))
+                    ),
+                    // Type selector
+                    React.createElement('select', {
+                      value: q.type,
+                      onChange: e => updateQuestion(sec.id, q.id, { type: e.target.value }),
+                      style: { fontSize: 10, padding: '3px 8px', borderRadius: 4, border: '1px solid var(--border-0)', background: 'var(--bg-2)', color: 'var(--tx-2)', outline: 'none', marginBottom: 6, fontFamily: 'var(--mono)' }
+                    },
+                      ['single_select', 'multi_select', 'text', 'number', 'date', 'boolean', 'duration'].map(t =>
+                        React.createElement('option', { key: t, value: t }, t)
+                      )
+                    ),
+                    // Answer options (with inline binding dots)
+                    (q.type === 'single_select' || q.type === 'multi_select') && React.createElement('div', { style: { marginTop: 4 } },
+                      (q.options || []).map(opt => React.createElement('div', { key: opt.id, className: 'sw-f-opt' },
+                        React.createElement('div', { className: q.type === 'single_select' ? 'sw-f-opt-radio' : 'sw-f-opt-check' }),
+                        React.createElement('input', {
+                          className: 'sw-f-opt-label',
+                          value: opt.label,
+                          onChange: e => updateOption(sec.id, q.id, opt.id, { label: e.target.value }),
+                          style: { background: 'transparent', border: 'none', color: 'var(--tx-0)', fontSize: 13, outline: 'none', fontFamily: 'inherit', flex: 1, minWidth: 0 }
+                        }),
+                        // Inline binding dots (show framework connection status)
+                        React.createElement('div', { className: 'sw-f-opt-bindings' },
+                          (frameworks || []).map(fw => {
+                            const isBound = (bindings || []).some(b => b.optionId === opt.id && b.frameworkId === fw.id);
+                            return React.createElement('div', {
+                              key: fw.id,
+                              className: `sw-f-opt-dot ${isBound ? 'bound' : 'unbound'}`,
+                              style: isBound ? { background: fw.color || 'var(--green)' } : {},
+                              title: `${fw.name}: ${isBound ? 'Bound' : 'Unbound'}`
+                            });
+                          })
+                        ),
+                        React.createElement('button', {
+                          className: 'sw-f-opt-rm',
+                          onClick: () => removeOption(sec.id, q.id, opt.id)
+                        }, '\u2715')
+                      )),
+                      React.createElement('button', {
+                        className: 'sw-f-add',
+                        onClick: () => addOption(sec.id, q.id)
+                      }, React.createElement(I, { n: 'plus', s: 11 }), 'Add option')
+                    ),
+                    // Help text
+                    q.helpText && React.createElement('div', {
+                      style: { fontSize: 11, color: 'var(--tx-3)', marginTop: 4, fontStyle: 'italic' }
+                    }, q.helpText)
+                  )),
+                  // Add question / insert from dictionary
+                  React.createElement('div', { style: { display: 'flex', gap: 4 } },
+                    React.createElement('button', {
+                      className: 'sw-f-add',
+                      onClick: () => addQuestion(sec.id)
+                    }, React.createElement(I, { n: 'plus', s: 11 }), 'Add question'),
+                    fieldDefs && Object.keys(fieldDefs).length > 0 && React.createElement('button', {
+                      className: 'sw-f-add',
+                      onClick: () => { setFieldPickerSection(sec.id); setFieldPickerOpen(true); },
+                      style: { color: 'var(--teal)' }
+                    }, React.createElement(I, { n: 'book', s: 11 }), 'From dictionary')
+                  ),
+                  fieldPickerOpen && fieldPickerSection === sec.id && React.createElement(FieldPicker, {
+                    open: true,
+                    onClose: () => { setFieldPickerOpen(false); setFieldPickerSection(null); },
+                    onSelect: def => doInsertFromDictionary(def, sec.id),
+                    fieldDefs: fieldDefs,
+                    catLabels: catLabels,
+                    catColors: catColors
+                  })
+                )
+              );
+            }),
+
+            // Add section button
+            !showPreview && React.createElement('button', {
+              className: 'sw-f-add sw-f-add-section',
+              onClick: addSection
+            }, React.createElement(I, { n: 'plus', s: 13 }), 'Add section'),
+
+            // Framework bar (collapsed by default)
+            !showPreview && (frameworks || []).length > 0 && React.createElement('div', { className: 'sw-f-fw-bar' },
+              React.createElement('div', {
+                className: 'sw-f-fw-bar-header',
+                onClick: () => setShowFwBar(!showFwBar)
+              },
+                React.createElement('span', { className: 'sw-f-fw-bar-label' },
+                  React.createElement(I, { n: showFwBar ? 'chevronDown' : 'chevronRight', s: 10 }),
+                  `Frameworks (${(frameworks || []).length})`
+                )
+              ),
+              showFwBar && React.createElement('div', { className: 'sw-f-fw-list' },
+                (frameworks || []).map(fw => React.createElement('div', { key: fw.id, className: 'sw-f-fw-card' },
+                  React.createElement('div', { className: 'sw-f-fw-card-header' },
+                    React.createElement('span', { style: { width: 8, height: 8, borderRadius: '50%', background: fw.color || 'var(--teal)', flexShrink: 0 } }),
+                    React.createElement('span', { className: 'sw-f-fw-card-name', style: { color: 'var(--tx-0)' } }, fw.name)
+                  ),
+                  fw.codes && React.createElement('div', { className: 'sw-f-fw-card-codes' },
+                    fw.codes.slice(0, 5).map((code, ci) => React.createElement('div', {
+                      key: ci, className: 'sw-f-fw-code', style: { color: 'var(--tx-2)' }
+                    },
+                      React.createElement('span', { style: { fontFamily: 'var(--mono)', fontSize: 10, color: fw.color || 'var(--teal)' } }, code.code || code.id),
+                      React.createElement('span', null, code.label || code.name)
+                    ))
+                  )
+                ))
+              )
+            )
+          )
+    )
+  );
+};
+
+/* ── SchemaWorkbench — top-level tab orchestrator ── */
+const SchemaWorkbench = ({
+  isOrg,
+  orgMeta,
+  networkMembers,
+  fieldDefs,
+  catLabels,
+  catColors,
+  onSaveFieldDef
+}) => {
+  const [activeTab, setActiveTab] = useState('forms');
+  const [form, setForm] = useState(null);
+  const [savedForms, setSavedForms] = useState([]);
+  const [frameworks, setFrameworks] = useState([]);
+  const [bindings, setBindings] = useState([]);
+  const [crosswalks, setCrosswalks] = useState([]);
+  const [toastMsg, setToastMsg] = useState(null);
+
+  const showToast = msg => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
+
+  // All forms: savedForms + DEFAULT_FORMS (network)
+  const allForms = useMemo(() => {
+    const savedIds = new Set((savedForms || []).map(f => f.id));
+    const networkDefaults = (DEFAULT_FORMS || []).filter(f => !savedIds.has(f.id));
+    return [...(savedForms || []).map(sf => sf.form || sf), ...networkDefaults];
+  }, [savedForms]);
+
+  const handleNewForm = () => {
+    const newForm = {
+      name: 'Untitled Form',
+      key: 'untitled_form',
+      version: 1,
+      maturity: 'draft',
+      description: '',
+      sections: [{
+        id: `sec_${Date.now()}`,
+        title: 'General',
+        questions: []
+      }]
+    };
+    setForm(newForm);
+  };
+
+  const handleSave = () => {
+    if (!form) return;
+    const saveEntry = {
+      id: form.id || `form_${Date.now()}`,
+      name: form.name,
+      version: form.version || 1,
+      maturity: form.maturity || 'draft',
+      savedAt: Date.now(),
+      sourceType: 'local',
+      form: form
+    };
+    setSavedForms(prev => {
+      const idx = prev.findIndex(f => f.id === saveEntry.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = saveEntry;
+        return next;
+      }
+      return [...prev, saveEntry];
+    });
+    if (!form.id) setForm(prev => ({ ...prev, id: saveEntry.id }));
+    showToast('Form saved');
+  };
+
+  const handleLoad = (formData) => {
+    setForm(formData.form || formData);
+  };
+
+  const navigateToForm = (formId, fieldKey) => {
+    setActiveTab('forms');
+    // Find and load the form
+    const found = allForms.find(f => f.id === formId);
+    if (found) setForm(found);
+  };
+
+  const tabs = [
+    { id: 'dictionary', label: 'Dictionary', icon: 'book', count: Object.keys(fieldDefs || {}).length + VAULT_FIELDS.length },
+    { id: 'forms', label: 'Forms', icon: 'layers', count: allForms.length },
+    { id: 'columns', label: 'Columns', icon: 'grid', count: null },
+    { id: 'governance', label: 'Governance', icon: 'shieldCheck', count: null }
+  ];
+
+  return React.createElement('div', { className: 'sw-wrap' },
+    // Header
+    React.createElement('div', { className: 'sw-header' },
+      React.createElement('div', { className: 'sw-title' },
+        React.createElement(I, { n: 'layers', s: 18, c: SWC.given }),
+        'Schema Workbench'
+      )
+    ),
+    // Tabs
+    React.createElement('div', { className: 'sw-tabs' },
+      tabs.map(tab => React.createElement('button', {
+        key: tab.id,
+        className: `sw-tab${activeTab === tab.id ? ' active' : ''}`,
+        onClick: () => setActiveTab(tab.id)
+      },
+        React.createElement(I, { n: tab.icon, s: 13 }),
+        tab.label,
+        tab.count != null && React.createElement('span', { className: 'sw-tab-count' }, tab.count)
+      ))
+    ),
+    // Canvas
+    React.createElement('div', { className: 'sw-canvas' },
+      activeTab === 'dictionary' && React.createElement('div', { className: 'sw-canvas-inner' },
+        React.createElement(DictionaryTab, {
+          fieldDefs: fieldDefs,
+          allForms: allForms,
+          catLabels: catLabels || CAT_LABELS,
+          catColors: catColors || CAT_COLORS,
+          catIcons: CAT_ICONS,
+          onSaveFieldDef: onSaveFieldDef
+        })
+      ),
+      activeTab === 'forms' && React.createElement('div', { className: 'sw-canvas-inner', style: { padding: 0 } },
+        React.createElement(FormsTab, {
+          allForms: allForms,
+          savedForms: savedForms,
+          form: form,
+          setForm: setForm,
+          frameworks: frameworks,
+          bindings: bindings,
+          crosswalks: crosswalks,
+          setFrameworks: setFrameworks,
+          setBindings: setBindings,
+          setCrosswalks: setCrosswalks,
+          fieldDefs: fieldDefs,
+          catLabels: catLabels || CAT_LABELS,
+          catColors: catColors || CAT_COLORS,
+          onSaveFieldDef: onSaveFieldDef,
+          onSave: handleSave,
+          onLoad: handleLoad,
+          onNewForm: handleNewForm,
+          showToast: showToast,
+          isOrg: isOrg,
+          orgMeta: orgMeta,
+          networkMembers: networkMembers
+        })
+      ),
+      activeTab === 'columns' && React.createElement('div', { className: 'sw-canvas-inner' },
+        React.createElement(ColumnsTab, {
+          allForms: allForms,
+          fieldDefs: fieldDefs,
+          onNavigateToForm: navigateToForm
+        })
+      ),
+      activeTab === 'governance' && React.createElement('div', { className: 'sw-canvas-inner' },
+        React.createElement(GovernanceTab, {
+          allForms: allForms,
+          onNavigateToForm: navigateToForm
+        })
+      )
+    ),
+    // Toast
+    toastMsg && React.createElement('div', {
+      style: {
+        position: 'fixed', bottom: 20, right: 20, background: SWC.given, color: SWC.bg,
+        padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+        boxShadow: '0 4px 16px rgba(0,0,0,.3)', zIndex: 100, animation: 'fadeUp .2s ease both'
+      }
+    }, toastMsg)
+  );
 };
 
 /* ═══════════════════ ACTION LOG + HELPERS ═══════════════════ */
@@ -35184,7 +36684,7 @@ const ProviderApp = ({
     style: {
       color: 'var(--teal)'
     }
-  }, "K-anonymity (k=5):"), " Combinations with fewer than 5 matching individuals are suppressed. This data is suitable for compliance reporting and aggregate analysis. PII fields (name, DOB, SSN, address, phone, email) are never present \u2014 only demographic ranges and hashed identifiers.")), view === 'schema' && /*#__PURE__*/React.createElement(SchemaView, {
+  }, "K-anonymity (k=5):"), " Combinations with fewer than 5 matching individuals are suppressed. This data is suitable for compliance reporting and aggregate analysis. PII fields (name, DOB, SSN, address, phone, email) are never present \u2014 only demographic ranges and hashed identifiers.")), view === 'schema' && /*#__PURE__*/React.createElement(SchemaWorkbench, {
     isOrg: !!orgRoom,
     orgMeta: orgMeta,
     networkMembers: networkMembers,
