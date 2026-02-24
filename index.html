@@ -2278,6 +2278,20 @@ const MATURITY_LEVELS = {
   }
 };
 
+/* ═══════════════════ TEAM COLOR UTILITIES ═══════════════════ */
+const randomTeamHue = () => Math.floor(Math.random() * 360);
+const teamColorThemed = (hue, isLight) => {
+  if (hue == null) hue = 260;
+  const l = isLight ? 38 : 55;
+  const s = isLight ? 55 : 65;
+  return {
+    primary: `hsl(${hue}, ${s}%, ${l}%)`,
+    dim: `hsla(${hue}, ${s}%, ${l}%, 0.10)`,
+    border: `hsla(${hue}, ${s}%, ${l}%, 0.15)`,
+    mid: `hsla(${hue}, ${s}%, ${l}%, 0.22)`
+  };
+};
+
 /* ═══════════════════ PROPAGATION LEVELS (MVP §CON Semantics) ═══════════════════ */
 // DES(schema.coupling_strengths, {values: [required, standard, recommended, optional]}) — network_governance
 const PROPAGATION_LEVELS = {
@@ -8635,7 +8649,7 @@ const Toast = ({
  * Shows user type, org affiliation, and team membership badges.
  * Used in messaging views to clarify who you're talking to.
  * ═══════════════════════════════════════════════════════════ */
-const ConnectionBadges = ({ userType, orgName, orgType, teamName, teamNames, role, verified, size = 'sm' }) => {
+const ConnectionBadges = ({ userType, orgName, orgType, teamName, teamNames, teamColors, role, verified, size = 'sm' }) => {
   const badges = [];
   const sz = size === 'xs' ? 8 : 9;
   const iconSz = size === 'xs' ? 7 : 9;
@@ -8657,11 +8671,19 @@ const ConnectionBadges = ({ userType, orgName, orgType, teamName, teamNames, rol
       verified ? React.createElement(I, { n: "shieldCheck", s: iconSz }) : React.createElement(I, { n: "users", s: iconSz }),
       orgName, orgType ? ` \u00B7 ${ORG_TYPE_LABELS[orgType] || orgType}` : ''));
   }
-  // Team badge(s)
+  // Team badge(s) — use dynamic team color if available
   const allTeams = teamNames || (teamName ? [teamName] : []);
   allTeams.forEach((tn, i) => {
-    badges.push(React.createElement("span", { key: `team-${i}`, className: `conn-badge conn-badge-team`, style: { fontSize: sz } },
-      React.createElement(I, { n: "users", s: iconSz }), tn));
+    const tc = teamColors?.find(c => c.name === tn);
+    const dynamicStyle = tc?.color_hue != null ? {
+      background: `hsla(${tc.color_hue}, 65%, 55%, 0.10)`,
+      color: `hsl(${tc.color_hue}, 65%, 55%)`
+    } : {};
+    badges.push(React.createElement("span", {
+      key: `team-${i}`,
+      className: `conn-badge ${tc?.color_hue != null ? '' : 'conn-badge-team'}`,
+      style: { fontSize: sz, ...dynamicStyle }
+    }, React.createElement(I, { n: "users", s: iconSz }), tn));
   });
   // Role badge (if within an org)
   if (role && orgName) {
@@ -22892,7 +22914,8 @@ const NoteCreateModal = ({
   onSave,
   showToast,
   T,
-  initialAttachTo
+  initialAttachTo,
+  teamContext
 }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -22939,7 +22962,8 @@ const NoteCreateModal = ({
       author: svc.userId,
       created: Date.now(),
       updated: Date.now(),
-      tombstoned: false
+      tombstoned: false,
+      ...(teamContext ? { team_id: teamContext.roomId, team_name: teamContext.name } : {})
     };
     try {
       const targetRoom = attachTo || rosterRoom;
@@ -25023,6 +25047,8 @@ const TeamDetailView = ({
   fieldDefs,
   fieldCrosswalks,
   showToast,
+  teamMode,
+  onSwitchTeam,
   onBack,
   onInvite,
   onUpdateTeam,
@@ -25423,7 +25449,48 @@ const TeamDetailView = ({
   }, /*#__PURE__*/React.createElement(I, {
     n: tab.icon,
     s: 13
-  }), tab.label))), teamTab === 'overview' && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }), tab.label))), teamTab === 'overview' && /*#__PURE__*/React.createElement("div", null, isLead && /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: {
+      padding: '16px 20px',
+      marginBottom: 12,
+      borderLeft: team.color_hue != null ? `3px solid hsl(${team.color_hue}, 65%, 55%)` : undefined
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "section-label"
+  }, "TEAM COLOR"), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+      background: `hsl(${team.color_hue != null ? team.color_hue : 260}, 65%, 55%)`
+    }
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "range", min: 0, max: 360, value: team.color_hue != null ? team.color_hue : 260,
+    onChange: async (e) => {
+      const hue = parseInt(e.target.value);
+      const updatedMeta = { name: team.name, description: team.description, color_hue: hue, created: team.created, created_by: team.created_by, org_id: team.org_id, org_name: team.org_name };
+      await svc.setState(team.roomId, EVT.TEAM_META, updatedMeta);
+      onUpdateTeam({ ...team, color_hue: hue });
+    },
+    style: { flex: 1, accentColor: `hsl(${team.color_hue != null ? team.color_hue : 260}, 65%, 55%)` }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--tx-3)', minWidth: 30 }
+  }, team.color_hue != null ? team.color_hue : 260, "\u00B0"))), onSwitchTeam && /*#__PURE__*/React.createElement("button", {
+    onClick: () => onSwitchTeam(teamMode?.roomId === team.roomId ? null : team.roomId),
+    className: teamMode?.roomId === team.roomId ? "b-pri b-sm" : "b-gho b-sm",
+    style: {
+      marginBottom: 12,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      width: '100%',
+      justifyContent: 'center'
+    }
+  }, /*#__PURE__*/React.createElement(I, {
+    n: teamMode?.roomId === team.roomId ? "check" : "users",
+    s: 13
+  }), teamMode?.roomId === team.roomId ? "Operating as This Team" : "Operate as This Team"), /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       padding: '16px 20px',
@@ -28287,6 +28354,8 @@ const ProviderApp = ({
   onLogout,
   showToast
 }) => {
+  const { theme: appTheme } = useTheme();
+  const isLightTheme = appTheme === 'light';
   const [rosterRoom, setRosterRoom] = useState(null);
   const [metricsRoom, setMetricsRoom] = useState(null);
   const [schemaRoom, setSchemaRoom] = useState(null);
@@ -28351,6 +28420,7 @@ const ProviderApp = ({
   const [teamInviteModal, setTeamInviteModal] = useState(null); // team object or null
   const [teamInviteUserId, setTeamInviteUserId] = useState('');
   const [activeTeamDetail, setActiveTeamDetail] = useState(null); // expanded team detail view
+  const [teamMode, setTeamMode] = useState(null); // null = individual mode, { roomId, name, color_hue } = operating as team
   // Field definitions & crosswalks
   const [fieldDefs, setFieldDefs] = useState({}); // uri → definition object
   const [fieldCrosswalks, setFieldCrosswalks] = useState([]); // crosswalk records
@@ -28367,6 +28437,8 @@ const ProviderApp = ({
   const [activeResourceProfile, setActiveResourceProfile] = useState(null); // resource row for profile page
   const cellEditTimerRef = useRef({}); // debounce timers for cell edits
   const isMobile = useIsMobile();
+  // Memoized team colors list for badge rendering
+  const teamColorsList = useMemo(() => teams.map(t => ({ name: t.name, color_hue: t.color_hue })), [teams]);
   // Provider profile — self-reported identity info
   const [providerProfile, setProviderProfile] = useState({});
   const [profileModal, setProfileModal] = useState(false);
@@ -28530,6 +28602,26 @@ const ProviderApp = ({
     setChannelMessages([]);
   }, [allOrgs, orgRoom]);
 
+  // ─── Team mode switching ───
+  const switchTeam = React.useCallback((targetRoomId) => {
+    if (!targetRoomId) {
+      setTeamMode(null);
+      try { localStorage.removeItem('khora_active_team'); } catch {}
+      return;
+    }
+    const target = teams.find(t => t.roomId === targetRoomId);
+    if (!target) return;
+    const mode = { roomId: target.roomId, name: target.name, color_hue: target.color_hue };
+    setTeamMode(mode);
+    try { localStorage.setItem('khora_active_team', JSON.stringify({ roomId: target.roomId })); } catch {}
+  }, [teams]);
+
+  // Helper: active context for tagging actions with team/org
+  const activeContext = () => ({
+    ...(teamMode ? { team_id: teamMode.roomId, team_name: teamMode.name } : {}),
+    ...(orgRoom ? { org_id: orgRoom, org_name: orgMeta.name } : {})
+  });
+
   // Notification helpers
   const addNotification = notif => {
     setNotifications(prev => [{
@@ -28647,7 +28739,8 @@ const ProviderApp = ({
     type: 'org',
     room: room || orgRoom,
     role: orgRole || 'admin',
-    epistemic: 'MEANT'
+    epistemic: 'MEANT',
+    ...(teamMode ? { team_id: teamMode.roomId, team_name: teamMode.name } : {})
   });
   const initProvider = async () => {
     setLoading(true);
@@ -28885,6 +28978,14 @@ const ProviderApp = ({
       }
       // Load teams detected during scan
       if (detectedTeams.length > 0) setTeams(detectedTeams);
+      // Restore team mode from localStorage
+      try {
+        const savedTeamId = JSON.parse(localStorage.getItem('khora_active_team') || 'null')?.roomId;
+        if (savedTeamId) {
+          const savedTeam = detectedTeams.find(t => t.roomId === savedTeamId);
+          if (savedTeam) setTeamMode({ roomId: savedTeam.roomId, name: savedTeam.name, color_hue: savedTeam.color_hue });
+        }
+      } catch {}
       // Detect existing team member DM rooms from scan
       const detectedDMs = [];
       for (const [rid, state] of Object.entries(scanned)) {
@@ -29561,7 +29662,8 @@ const ProviderApp = ({
       author: svc.userId,
       ts: Date.now(),
       created_by: svc.userId,
-      origin_server: extractHomeserver(svc.userId)
+      origin_server: extractHomeserver(svc.userId),
+      ...(teamMode ? { team_id: teamMode.roomId, team_name: teamMode.name } : {})
     };
     await svc.sendEvent(activeCase, EVT.OBSERVATION, obs);
     await emitOp(activeCase, 'INS', dot('bridge', 'observations', provObsModal.key), {
@@ -29819,6 +29921,7 @@ const ProviderApp = ({
   const handleCreateTeam = async () => {
     if (!newTeamName.trim()) return;
     try {
+      const teamHue = randomTeamHue();
       // Default team schema: identity + contact fields from vault
       const defaultSchemaFields = DOMAIN_CONFIG.vaultFields.filter(f => f.category === 'identity' || f.category === 'contact').map(f => ({
         uri: f.uri,
@@ -29839,6 +29942,7 @@ const ProviderApp = ({
         content: {
           name: newTeamName,
           description: newTeamDesc || '',
+          color_hue: teamHue,
           created: Date.now(),
           created_by: svc.userId,
           org_id: orgRoom || null,
@@ -29889,6 +29993,7 @@ const ProviderApp = ({
         roomId,
         name: newTeamName,
         description: newTeamDesc || '',
+        color_hue: teamHue,
         created: Date.now(),
         created_by: svc.userId,
         org_id: orgRoom || null,
@@ -31589,7 +31694,7 @@ const ProviderApp = ({
       minWidth: 260,
       height: '100%',
       background: 'var(--bg-1)',
-      borderRight: '1px solid var(--border-0)',
+      borderRight: teamMode ? `2px solid ${teamColorThemed(teamMode.color_hue, isLightTheme).primary}` : '1px solid var(--border-0)',
       display: 'flex',
       flexDirection: 'column'
     }
@@ -32211,7 +32316,66 @@ const ProviderApp = ({
   }, allOrgs.map(o => /*#__PURE__*/React.createElement("option", {
     key: o.roomId,
     value: o.roomId
-  }, o.meta?.name || o.roomId)))), /*#__PURE__*/React.createElement("div", {
+  }, o.meta?.name || o.roomId)))), teamMode && (() => {
+    const tc = teamColorThemed(teamMode.color_hue, isLightTheme);
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: '6px 20px',
+        background: tc.dim,
+        borderBottom: `1px solid ${tc.border}`,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        minHeight: 34,
+        position: 'sticky',
+        top: orgRoom ? 40 : 0,
+        zIndex: 4
+      }
+    }, /*#__PURE__*/React.createElement(I, {
+      n: "users",
+      s: 14,
+      c: tc.primary
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        fontSize: 12.5,
+        color: tc.primary,
+        fontFamily: 'var(--serif)'
+      }
+    }, teamMode.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: tc.primary,
+        opacity: 0.7,
+        fontFamily: 'var(--mono)',
+        letterSpacing: '.06em',
+        fontWeight: 600
+      }
+    }, "TEAM MODE"), /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1 }
+    }), teams.length > 1 && /*#__PURE__*/React.createElement("select", {
+      value: teamMode.roomId,
+      onChange: e => switchTeam(e.target.value),
+      style: {
+        background: 'var(--bg-2)',
+        color: 'var(--tx-0)',
+        border: `1px solid ${tc.border}`,
+        borderRadius: 'var(--r)',
+        padding: '3px 8px',
+        fontSize: 10,
+        fontFamily: 'var(--sans)',
+        cursor: 'pointer',
+        outline: 'none'
+      }
+    }, teams.map(t => /*#__PURE__*/React.createElement("option", {
+      key: t.roomId,
+      value: t.roomId
+    }, t.name))), /*#__PURE__*/React.createElement("button", {
+      onClick: () => switchTeam(null),
+      className: "b-gho b-xs",
+      style: { fontSize: 10, padding: '3px 10px' }
+    }, "Individual Mode"));
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 24
     }
@@ -32364,7 +32528,8 @@ const ProviderApp = ({
     onSave: handleNoteSave,
     showToast: showToast,
     T: T,
-    initialAttachTo: newNoteAttachTo
+    initialAttachTo: newNoteAttachTo,
+    teamContext: teamMode
   }), /*#__PURE__*/React.createElement(Modal, {
     open: !!noteDetailModal,
     onClose: () => setNoteDetailModal(null),
@@ -32457,7 +32622,8 @@ const ProviderApp = ({
     onSave: handleNoteSave,
     showToast: showToast,
     T: T,
-    initialAttachTo: newNoteAttachTo
+    initialAttachTo: newNoteAttachTo,
+    teamContext: teamMode
   })), view === 'resource-profile' && activeResourceProfile && /*#__PURE__*/React.createElement(ResourceProfilePage, {
     resource: activeResourceProfile,
     allocations: allAllocations,
@@ -32651,6 +32817,7 @@ const ProviderApp = ({
   }, /*#__PURE__*/React.createElement(ConnectionBadges, {
     userType: "client",
     teamName: (() => { const t = teams.find(t => (t.members || []).some(m => m.userId === c.clientUserId)); return t?.name || null; })(),
+    teamColors: teamColorsList,
     size: "xs"
   }), /*#__PURE__*/React.createElement("span", {
     className: "tag tag-green",
@@ -32795,6 +32962,7 @@ const ProviderApp = ({
           userType: dm.peerType || 'provider',
           orgName: dm.orgName,
           teamName: dm.teamName,
+          teamColors: teamColorsList,
           size: "xs"
         }))))))))), /*#__PURE__*/React.createElement("div", {
     className: "inbox-chat"
@@ -32851,6 +33019,7 @@ const ProviderApp = ({
     }), "E2EE"), convoType === 'case' && /*#__PURE__*/React.createElement(ConnectionBadges, {
       userType: "client",
       teamName: caseData ? (() => { const t = teams.find(t => (t.members || []).some(m => m.userId === caseData.clientUserId)); return t?.name || null; })() : null,
+      teamColors: teamColorsList,
       size: "xs"
     }), convoType === 'case' && caseData && /*#__PURE__*/React.createElement("span", {
       style: {
@@ -32866,6 +33035,7 @@ const ProviderApp = ({
       userType: dmData.peerType || 'provider',
       orgName: dmData.orgName,
       teamName: dmData.teamName,
+      teamColors: teamColorsList,
       size: "xs"
     }))), convoType === 'case' && /*#__PURE__*/React.createElement("button", {
       onClick: () => openCase(inboxConvo),
@@ -33502,13 +33672,14 @@ const ProviderApp = ({
     style: {
       padding: 0,
       overflow: 'hidden',
-      cursor: 'pointer'
+      cursor: 'pointer',
+      borderLeft: team.color_hue != null ? `3px solid hsl(${team.color_hue}, 65%, 55%)` : undefined
     },
     onClick: () => setActiveTeamDetail(team)
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '14px 18px',
-      borderBottom: '1px solid var(--border-0)'
+      borderBottom: team.color_hue != null ? `1px solid hsla(${team.color_hue}, 65%, 55%, 0.15)` : '1px solid var(--border-0)'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -33537,7 +33708,18 @@ const ProviderApp = ({
     style: {
       fontSize: 8
     }
-  }, team.org_name))), team.description && /*#__PURE__*/React.createElement("p", {
+  }, team.org_name), teamMode?.roomId === team.roomId && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 8,
+      padding: '3px 10px',
+      borderRadius: 14,
+      fontWeight: 600,
+      fontFamily: 'var(--mono)',
+      letterSpacing: '.03em',
+      background: `hsla(${team.color_hue || 260}, 65%, 55%, 0.10)`,
+      color: `hsl(${team.color_hue || 260}, 65%, 55%)`
+    }
+  }, "ACTIVE"))), team.description && /*#__PURE__*/React.createElement("p", {
     style: {
       fontSize: 11.5,
       color: 'var(--tx-2)',
@@ -33746,6 +33928,8 @@ const ProviderApp = ({
     fieldDefs: fieldDefs,
     fieldCrosswalks: fieldCrosswalks,
     showToast: showToast,
+    teamMode: teamMode,
+    onSwitchTeam: switchTeam,
     onBack: () => setActiveTeamDetail(null),
     onInvite: team => {
       setTeamInviteModal(team);
@@ -39583,7 +39767,7 @@ const ProviderApp = ({
     /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
       /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, fontWeight: 600, display: 'block' } }, c.displayName),
       /*#__PURE__*/React.createElement("div", { style: { marginTop: 3 } },
-        /*#__PURE__*/React.createElement(ConnectionBadges, { userType: "provider", teamName: c.teamName, orgName: orgMeta?.name, role: c.role, size: "xs" }))),
+        /*#__PURE__*/React.createElement(ConnectionBadges, { userType: "provider", teamName: c.teamName, teamColors: teamColorsList, orgName: orgMeta?.name, role: c.role, size: "xs" }))),
     c.hasDM && /*#__PURE__*/React.createElement("span", { className: "tag tag-green", style: { fontSize: 8 } }, "DM exists"))))),
   newDMTarget && /*#__PURE__*/React.createElement("button", {
     onClick: () => startTeamDM(newDMTarget.userId, newDMTarget.displayName, newDMTarget.teamName, newDMTarget.teamRoomId),
