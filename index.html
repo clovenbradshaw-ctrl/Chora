@@ -17447,10 +17447,9 @@ const ClientApp = ({
   const [bridgeMessages, setBridgeMessages] = useState([]);
   const [msgText, setMsgText] = useState('');
   // Inbox chat state
-  const [inboxConvo, setInboxConvo] = useState(null); // provider index for active inbox conversation
+  const [inboxConvo, setInboxConvo] = useState(null); // unified conversation object with .rooms, .peerId, .peerName
   const [inboxMessages, setInboxMessages] = useState([]);
   const [inboxMsgText, setInboxMsgText] = useState('');
-  const [inboxTab, setInboxTab] = useState('providers'); // 'providers' | 'team'
   // ─── Team member DM state (client-side) ───
   const [clientTeamDMs, setClientTeamDMs] = useState([]); // [{roomId, peerId, peerName, teamName, peerType}]
   const [newTeamDMModal, setNewTeamDMModal] = useState(false);
@@ -28192,14 +28191,11 @@ const ProviderApp = ({
   const activeOrgRoleLabels = Object.fromEntries(orgRolesConfig.map(r => [r.key, r.label]));
   const activeOrgRoleDescs = Object.fromEntries(orgRolesConfig.map(r => [r.key, r.description]));
   // ─── Inbox chat state ───
-  const [inboxConvo, setInboxConvo] = useState(null); // room ID of active inbox conversation
+  const [inboxConvo, setInboxConvo] = useState(null); // unified conversation object with .rooms, .peerId, .peerName
   const [inboxMessages, setInboxMessages] = useState([]);
   const [inboxMsgText, setInboxMsgText] = useState('');
-  const [inboxTab, setInboxTab] = useState('direct'); // 'direct' | 'channels' | 'team'
   // ─── Team member DM state ───
   const [teamDMs, setTeamDMs] = useState([]); // [{roomId, peerId, peerName, teamName, teamRoomId}]
-  const [teamDMMessages, setTeamDMMessages] = useState([]);
-  const [teamDMMsgText, setTeamDMMsgText] = useState('');
   const [newTeamDMModal, setNewTeamDMModal] = useState(false);
   const [newDMTarget, setNewDMTarget] = useState(null); // {userId, displayName, teamName}
   // ─── Notifications state ───
@@ -32433,7 +32429,7 @@ const ProviderApp = ({
     style: { padding: '40px 16px', textAlign: 'center' }
   }, /*#__PURE__*/React.createElement(I, { n: "msg", s: 28, c: "var(--tx-3)" }),
   /*#__PURE__*/React.createElement("p", { style: { color: 'var(--tx-3)', fontSize: 11.5, marginTop: 10 } }, "No conversations yet"),
-  /*#__PURE__*/React.createElement("p", { style: { color: 'var(--tx-3)', fontSize: 10.5, marginTop: 4 } }, "No conversations yet")) : unifiedConversations.map(convo => /*#__PURE__*/React.createElement("div", {
+  /*#__PURE__*/React.createElement("p", { style: { color: 'var(--tx-3)', fontSize: 10.5, marginTop: 4 } }, "Select or start a new message")) : unifiedConversations.map(convo => /*#__PURE__*/React.createElement("div", {
     key: convo.peerId,
     onClick: () => openInboxConvo(convo),
     style: {
@@ -32530,7 +32526,7 @@ const ProviderApp = ({
       /*#__PURE__*/React.createElement("div", {
         style: { padding: '10px 14px', background: 'var(--gold-dim)', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center', gap: 8 }
       }, /*#__PURE__*/React.createElement(I, { n: "lock", s: 13, c: "var(--gold)" }),
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 11.5, color: 'var(--gold)' } }, "Your role (", ORG_ROLE_LABELS[orgRole] || orgRole, ") does not have permission to respond to org messages. Contact your admin."))));
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 11.5, color: 'var(--gold)' } }, "Your role (", activeOrgRoleLabels[orgRole] || orgRole, ") does not have permission to respond to org messages. Contact your admin."))));
   })() : /*#__PURE__*/React.createElement("div", {
     style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }
   }, /*#__PURE__*/React.createElement("div", {
