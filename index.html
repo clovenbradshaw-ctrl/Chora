@@ -18428,8 +18428,9 @@ const ClientApp = ({
       setClientTeamDMs(prev => [...prev, newDM]);
       setNewTeamDMModal(false);
       setNewDMTarget(null);
-      setInboxTab('team');
-      openInboxConvo(roomId);
+      // Find or construct the unified convo object for the new DM
+      const convo = unifiedConversations.find(c => c.peerId === peerId) || { peerId, peerName: peerName || peerId, rooms: [{ roomId, type: 'team_dm', label: teamName || 'Team', teamName }], lastTs: Date.now() };
+      openInboxConvo(convo);
       showToast(`DM created — invite sent to ${peerName || peerId}`, 'success');
     } catch (e) {
       showToast('Failed to create DM: ' + e.message, 'error');
@@ -19732,7 +19733,7 @@ const ClientApp = ({
         gap: 4
       }
     }, /*#__PURE__*/React.createElement("button", {
-      onClick: () => { setView('inbox'); openInboxConvo(pi); },
+      onClick: () => { setView('inbox'); const convo = unifiedConversations.find(c => c.peerId === prov.providerUserId); if (convo) openInboxConvo(convo); },
       className: "b-pri b-sm",
       style: { display: 'flex', alignItems: 'center', gap: 4 }
     }, /*#__PURE__*/React.createElement(I, { n: "msg", s: 11 }), "Message"), /*#__PURE__*/React.createElement("button", {
@@ -20604,11 +20605,11 @@ const ClientApp = ({
     }
   }, "Encrypted conversations with your connections. Messages are end-to-end encrypted."), /*#__PURE__*/React.createElement(StorageTransparencyBadge, {
     storageType: "matrix",
-    roomId: typeof inboxConvo === 'number' ? (providers[inboxConvo] || {}).bridgeRoomId : inboxConvo || (providers[0] || {}).bridgeRoomId,
+    roomId: inboxConvo?.rooms?.[0]?.roomId || (providers[0] || {}).bridgeRoomId,
     encrypted: true,
     encLabel: "Megolm E2EE",
     label: "Messages",
-    members: typeof inboxConvo === 'number' && inboxConvo !== null ? providers.filter(p => p.bridgeRoomId === providers[inboxConvo]?.bridgeRoomId).map(p => ({ userId: p.providerUserId, role: 'provider' })).concat([{ userId: svc.userId, role: 'client (you)' }]) : undefined,
+    members: inboxConvo?.rooms ? inboxConvo.rooms.map(r => ({ userId: inboxConvo.peerId, role: r.type })).concat([{ userId: svc.userId, role: 'client (you)' }]) : undefined,
     extra: [{ label: 'Privacy', value: 'Each conversation is a separate encrypted Matrix room. Only you and your connection can read messages.' }]
   })), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: 6, flexShrink: 0 }
@@ -31220,8 +31221,9 @@ const ProviderApp = ({
       setTeamDMs(prev => [...prev, newDM]);
       setNewTeamDMModal(false);
       setNewDMTarget(null);
-      setInboxTab('team');
-      openInboxConvo(roomId);
+      // Find or construct the unified convo object for the new DM
+      const convo = unifiedConversations.find(c => c.peerId === peerId) || { peerId, peerName: peerName || peerId, rooms: [{ roomId, type: 'team_dm', label: teamName || 'Team', teamName }], lastTs: Date.now() };
+      openInboxConvo(convo);
       showToast(`DM created — invite sent to ${peerName || peerId}`, 'success');
     } catch (e) {
       showToast('Failed to create DM: ' + e.message, 'error');
@@ -32397,7 +32399,7 @@ const ProviderApp = ({
     }
   }, "Encrypted conversations with ", T.client_term_plural.toLowerCase(), orgRoom ? ' and organizations' : '', " in one place."), /*#__PURE__*/React.createElement(StorageTransparencyBadge, {
     storageType: "matrix",
-    roomId: inboxConvo,
+    roomId: inboxConvo?.rooms?.[0]?.roomId || null,
     encrypted: true,
     encLabel: "Megolm E2EE",
     label: "Messages",
