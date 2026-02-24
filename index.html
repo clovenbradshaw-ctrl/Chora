@@ -1068,8 +1068,32 @@ table.dt tr.dt-grp td{padding:9px 12px;font-size:12px;font-weight:700;color:var(
 .dt-cap-box .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--tx-2)}
 .dt-sov{margin-top:14px;padding:12px 16px;border-radius:var(--r-lg);background:var(--green-dim);border:1px solid rgba(61,214,140,.15);display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--green);line-height:1.5}
 .dt-hint{margin-top:8px;padding:10px 12px;border-radius:var(--r);background:var(--gold-dim);border:1px solid var(--gold-mid);font-size:12px;color:var(--tx-1);line-height:1.5}
+/* ═══ Collapsible Sidebar ═══ */
+.app-sidebar{transition:width .25s ease,min-width .25s ease,opacity .2s ease}
+.app-sidebar.collapsed{width:0!important;min-width:0!important;overflow:hidden;opacity:0;border-right:none!important;padding:0!important}
+.sidebar-toggle-btn{position:absolute;top:12px;left:12px;z-index:10;width:32px;height:32px;border-radius:var(--r);background:var(--bg-2);border:1px solid var(--border-1);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tx-1);transition:all .18s;opacity:0;pointer-events:none}
+.sidebar-toggle-btn:hover{background:var(--bg-3);border-color:var(--gold);color:var(--gold)}
+.sidebar-collapsed-show .sidebar-toggle-btn{opacity:1;pointer-events:auto}
+.sidebar-collapse-btn{width:28px;height:28px;border-radius:var(--r);background:transparent;border:1px solid var(--border-0);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--tx-2);transition:all .15s;flex-shrink:0}
+.sidebar-collapse-btn:hover{background:var(--bg-3);border-color:var(--gold);color:var(--gold)}
+/* ═══ Linked Records ═══ */
+.linked-rec-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:10.5px;font-weight:600;font-family:var(--mono);cursor:pointer;transition:all .15s;border:1px solid var(--border-1);background:var(--bg-2);color:var(--tx-1);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.linked-rec-chip:hover{border-color:var(--purple);color:var(--purple);background:var(--purple-dim)}
+.linked-rec-chip .lr-type{font-size:8px;padding:1px 4px;border-radius:6px;background:var(--purple-dim);color:var(--purple);font-weight:700;text-transform:uppercase;flex-shrink:0}
+.linked-rec-add{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:10px;cursor:pointer;border:1px dashed var(--border-2);background:transparent;color:var(--tx-2);transition:all .15s;font-family:var(--sans);font-weight:600}
+.linked-rec-add:hover{border-color:var(--purple);color:var(--purple);background:var(--purple-dim)}
+.linked-panel{border:1px solid var(--border-0);border-radius:var(--r-lg);background:var(--bg-2);padding:14px;margin-top:12px}
+.linked-panel-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.lr-record-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border-0);border-radius:var(--r);background:var(--bg-1);cursor:pointer;transition:all .15s;margin-bottom:6px}
+.lr-record-card:hover{border-color:var(--purple);transform:translateX(2px)}
+.lr-record-card .lr-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.lr-record-card .lr-info{flex:1;min-width:0}
+.lr-record-card .lr-name{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lr-record-card .lr-meta{font-size:10px;color:var(--tx-2)}
+.lr-record-card .lr-type-badge{font-size:8.5px;padding:2px 6px;border-radius:8px;font-weight:700;font-family:var(--mono);text-transform:uppercase;flex-shrink:0}
 /* ═══ Database View ═══ */
 .db-view{max-width:1300px;margin:0 auto}
+.db-view.db-full-width{max-width:none}
 .db-tabs{display:flex;gap:0;border-bottom:2px solid var(--border-0);margin-bottom:18px}
 .db-tab{padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--tx-2);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:var(--sans);transition:all .15s;display:flex;align-items:center;gap:6px}
 .db-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
@@ -2624,7 +2648,10 @@ const EVT = {
   DM_META: `${NS}.dm.meta`,
   // Database merge (auditable SYN-based record merging)
   MERGE_RECORD: `${NS}.merge.record`,
-  MERGE_AUDIT: `${NS}.merge.audit`
+  MERGE_AUDIT: `${NS}.merge.audit`,
+  // Linked records (sub-records linked across record types, Airtable-style)
+  LINKED_RECORD: `${NS}.linked.record`,
+  LINKED_RECORD_INDEX: `${NS}.linked.record.index`
 };
 
 /* ═══════════════════ MATURITY LEVELS (MVP §Screen 4) ═══════════════════ */
@@ -26488,6 +26515,315 @@ const NotesTable = ({
     }));
 };
 
+/* ─── Linked Record Types — configurable record types for Airtable-style linking ─── */
+const LINKED_RECORD_TYPES = [
+  { id: 'individual', label: 'Individual', icon: 'user', color: 'var(--green)', colorDim: 'var(--green-dim)' },
+  { id: 'note', label: 'Note', icon: 'msg', color: 'var(--blue)', colorDim: 'var(--blue-dim)' },
+  { id: 'resource', label: 'Resource', icon: 'layers', color: 'var(--teal)', colorDim: 'var(--teal-dim)' },
+  { id: 'case', label: 'Case', icon: 'briefcase', color: 'var(--gold)', colorDim: 'var(--gold-dim)' },
+  { id: 'task', label: 'Task', icon: 'check', color: 'var(--orange)', colorDim: 'var(--orange-dim)' },
+  { id: 'document', label: 'Document', icon: 'file', color: 'var(--purple)', colorDim: 'var(--purple-dim)' }
+];
+
+/* ─── CreateLinkedRecordModal — link sub-records with governance ─── */
+const CreateLinkedRecordModal = ({
+  open,
+  onClose,
+  parentRecord,
+  individuals,
+  notes,
+  resourceTypes,
+  cases: allCases,
+  svc,
+  orgRole,
+  orgRoom,
+  teamMode,
+  activeTeamObj,
+  showToast,
+  onLinkCreated,
+  linkedRecords
+}) => {
+  const [selectedType, setSelectedType] = useState('individual');
+  const [search, setSearch] = useState('');
+  const [selectedTarget, setSelectedTarget] = useState(null);
+  const [newRecordMode, setNewRecordMode] = useState(false);
+  const [newRecordName, setNewRecordName] = useState('');
+  const [newRecordNotes, setNewRecordNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [governanceNote, setGovernanceNote] = useState('');
+
+  if (!open || !parentRecord) return null;
+
+  const typeConfig = LINKED_RECORD_TYPES.find(t => t.id === selectedType) || LINKED_RECORD_TYPES[0];
+  const existingLinks = linkedRecords?.[parentRecord.id] || [];
+  const existingLinkedIds = new Set(existingLinks.map(l => l.linked_record_id));
+
+  // Build candidate records based on selected type
+  let candidates = [];
+  if (selectedType === 'individual') {
+    candidates = (individuals || []).filter(i => i.id !== parentRecord.id && !existingLinkedIds.has(i.id)).map(i => ({
+      id: i.id, name: i.name || 'Unknown', meta: i.status || '', icon: 'user', color: 'var(--green)'
+    }));
+  } else if (selectedType === 'note') {
+    candidates = (notes || []).filter(n => !existingLinkedIds.has(n.id)).map(n => ({
+      id: n.id, name: n.title || 'Untitled Note', meta: n.type || 'note', icon: 'msg', color: 'var(--blue)'
+    }));
+  } else if (selectedType === 'resource') {
+    candidates = (resourceTypes || []).filter(r => !existingLinkedIds.has(r.id)).map(r => ({
+      id: r.id, name: r.name || 'Unknown Resource', meta: r.category || 'general', icon: 'layers', color: 'var(--teal)'
+    }));
+  } else if (selectedType === 'case') {
+    candidates = (allCases || []).filter(c => c.bridgeRoomId !== parentRecord.id && !existingLinkedIds.has(c.bridgeRoomId)).map(c => ({
+      id: c.bridgeRoomId, name: c.sharedData?.full_name || c.clientUserId || 'Unknown', meta: 'case', icon: 'briefcase', color: 'var(--gold)'
+    }));
+  } else {
+    // task, document — allow creating new sub-records
+    candidates = [];
+  }
+
+  const filtered = search ? candidates.filter(c => c.name.toLowerCase().includes(search.toLowerCase())) : candidates;
+
+  // Governance requirement check
+  const governanceRequired = teamMode && activeTeamObj;
+  const consentMode = activeTeamObj?.schemaRule?.mode || 'lead_decides';
+  const isTeamLead = activeTeamObj?.lead === svc?.userId;
+
+  const handleLink = async (target) => {
+    if (!target) return;
+    setSaving(true);
+    try {
+      const linkId = 'lr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+      const linkRecord = {
+        id: linkId,
+        linked_record_id: target.id,
+        record_type: selectedType,
+        record_type_label: typeConfig.label,
+        label: target.name,
+        created_by: svc?.userId || 'unknown',
+        created_at: new Date().toISOString(),
+        governance: governanceRequired ? {
+          team_id: activeTeamObj.roomId,
+          team_name: activeTeamObj.name,
+          consent_mode: consentMode,
+          approved_by: isTeamLead ? svc?.userId : null,
+          governance_note: governanceNote || null,
+          status: (consentMode === 'lead_decides' && isTeamLead) || consentMode === 'advisory' ? 'approved' : 'pending_approval'
+        } : null
+      };
+
+      if (onLinkCreated) onLinkCreated(parentRecord.id, linkRecord);
+      if (showToast) {
+        const govStatus = linkRecord.governance?.status;
+        if (govStatus === 'pending_approval') {
+          showToast(`Link created (pending team approval under ${consentMode} governance)`, 'warning');
+        } else {
+          showToast(`Linked ${typeConfig.label} "${target.name}" to ${parentRecord.name}`, 'success');
+        }
+      }
+      onClose();
+    } catch (e) {
+      if (showToast) showToast('Failed to create link: ' + e.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateNew = async () => {
+    if (!newRecordName.trim()) return;
+    setSaving(true);
+    try {
+      const linkId = 'lr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+      const subRecordId = 'sub_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+      const linkRecord = {
+        id: linkId,
+        linked_record_id: subRecordId,
+        record_type: selectedType,
+        record_type_label: typeConfig.label,
+        label: newRecordName.trim(),
+        notes: newRecordNotes.trim() || null,
+        is_sub_record: true,
+        created_by: svc?.userId || 'unknown',
+        created_at: new Date().toISOString(),
+        governance: governanceRequired ? {
+          team_id: activeTeamObj.roomId,
+          team_name: activeTeamObj.name,
+          consent_mode: consentMode,
+          approved_by: isTeamLead ? svc?.userId : null,
+          governance_note: governanceNote || null,
+          status: (consentMode === 'lead_decides' && isTeamLead) || consentMode === 'advisory' ? 'approved' : 'pending_approval'
+        } : null
+      };
+
+      if (onLinkCreated) onLinkCreated(parentRecord.id, linkRecord);
+      if (showToast) showToast(`Created & linked new ${typeConfig.label} "${newRecordName.trim()}"`, 'success');
+      onClose();
+    } catch (e) {
+      if (showToast) showToast('Failed to create sub-record: ' + e.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return /*#__PURE__*/React.createElement(Modal, {
+    open: open,
+    onClose: onClose,
+    title: `Link Record to ${parentRecord.name || 'Record'}`,
+    w: 560
+  },
+  // Record type selector
+  /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 14 }
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "section-label",
+    style: { fontSize: 10, marginBottom: 6 }
+  }, "RECORD TYPE"),
+  /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 4, flexWrap: 'wrap' }
+  }, LINKED_RECORD_TYPES.map(rt => /*#__PURE__*/React.createElement("button", {
+    key: rt.id,
+    className: selectedType === rt.id ? 'b-pri b-xs' : 'b-gho b-xs',
+    style: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 },
+    onClick: () => { setSelectedType(rt.id); setSelectedTarget(null); setSearch(''); setNewRecordMode(false); }
+  }, /*#__PURE__*/React.createElement(I, { n: rt.icon, s: 11 }), rt.label)))),
+
+  // Governance indicator
+  governanceRequired && /*#__PURE__*/React.createElement("div", {
+    style: { padding: '8px 12px', background: 'var(--purple-dim)', border: '1px solid rgba(139,92,246,.15)', borderRadius: 'var(--r)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }
+  }, /*#__PURE__*/React.createElement(I, { n: "shieldCheck", s: 14, c: "var(--purple)" }),
+  /*#__PURE__*/React.createElement("div", { style: { flex: 1 } },
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11.5, fontWeight: 600, color: 'var(--purple)' } },
+      "Team governance active"),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: 'var(--tx-2)' } },
+      "Consent mode: ", consentMode.replace(/_/g, ' '),
+      !isTeamLead && consentMode !== 'advisory' ? ' — link will require team lead approval' : '')),
+  /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    placeholder: "Governance note (optional)",
+    value: governanceNote,
+    onChange: e => setGovernanceNote(e.target.value),
+    style: { width: 160, padding: '4px 8px', fontSize: 10, borderRadius: 'var(--r)' }
+  })),
+
+  // Toggle: Link existing or create new
+  /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: 4, marginBottom: 12 }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: !newRecordMode ? 'b-pri b-xs' : 'b-gho b-xs',
+    onClick: () => setNewRecordMode(false)
+  }, "Link Existing"), /*#__PURE__*/React.createElement("button", {
+    className: newRecordMode ? 'b-pri b-xs' : 'b-gho b-xs',
+    onClick: () => setNewRecordMode(true)
+  }, /*#__PURE__*/React.createElement(I, { n: "plus", s: 10 }), "Create New Sub-Record")),
+
+  !newRecordMode ? /*#__PURE__*/React.createElement(React.Fragment, null,
+    // Search
+    /*#__PURE__*/React.createElement("input", {
+      type: "text",
+      placeholder: `Search ${typeConfig.label.toLowerCase()}s...`,
+      value: search,
+      onChange: e => setSearch(e.target.value),
+      style: { marginBottom: 10, padding: '8px 12px', fontSize: 12.5 }
+    }),
+
+    // Candidate list
+    /*#__PURE__*/React.createElement("div", {
+      style: { maxHeight: 280, overflow: 'auto', marginBottom: 12 }
+    }, filtered.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: { padding: 20, textAlign: 'center', color: 'var(--tx-2)', fontSize: 12 }
+    }, candidates.length === 0 ? `No ${typeConfig.label.toLowerCase()} records available. Try creating a new sub-record.` : 'No matches found')
+    : filtered.map(c => /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      className: "lr-record-card",
+      style: { borderColor: selectedTarget?.id === c.id ? 'var(--purple)' : undefined, background: selectedTarget?.id === c.id ? 'var(--purple-dim)' : undefined },
+      onClick: () => setSelectedTarget(c)
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "lr-avatar",
+      style: { background: c.color || 'var(--purple)' }
+    }, (c.name || '?')[0].toUpperCase()),
+    /*#__PURE__*/React.createElement("div", { className: "lr-info" },
+      /*#__PURE__*/React.createElement("div", { className: "lr-name" }, c.name),
+      /*#__PURE__*/React.createElement("div", { className: "lr-meta" }, c.meta)),
+    /*#__PURE__*/React.createElement("span", {
+      className: "lr-type-badge",
+      style: { background: typeConfig.colorDim, color: typeConfig.color }
+    }, typeConfig.label),
+    selectedTarget?.id === c.id && /*#__PURE__*/React.createElement(I, { n: "check", s: 16, c: "var(--purple)" })))),
+
+    // Link button
+    /*#__PURE__*/React.createElement("button", {
+      className: "b-pri",
+      style: { width: '100%' },
+      disabled: !selectedTarget || saving,
+      onClick: () => handleLink(selectedTarget)
+    }, saving ? 'Linking...' : `Link ${typeConfig.label}`)
+  )
+
+  : /*#__PURE__*/React.createElement(React.Fragment, null,
+    // Create new sub-record form
+    /*#__PURE__*/React.createElement("div", { style: { marginBottom: 10 } },
+      /*#__PURE__*/React.createElement("label", {
+        className: "section-label",
+        style: { fontSize: 10, marginBottom: 4 }
+      }, `NEW ${typeConfig.label.toUpperCase()} NAME`),
+      /*#__PURE__*/React.createElement("input", {
+        type: "text",
+        placeholder: `Enter ${typeConfig.label.toLowerCase()} name...`,
+        value: newRecordName,
+        onChange: e => setNewRecordName(e.target.value),
+        style: { padding: '10px 14px', fontSize: 13 }
+      })),
+
+    /*#__PURE__*/React.createElement("div", { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement("label", {
+        className: "section-label",
+        style: { fontSize: 10, marginBottom: 4 }
+      }, "NOTES (OPTIONAL)"),
+      /*#__PURE__*/React.createElement("textarea", {
+        placeholder: "Add details about this sub-record...",
+        value: newRecordNotes,
+        onChange: e => setNewRecordNotes(e.target.value),
+        style: { padding: '10px 14px', fontSize: 12.5, minHeight: 60 }
+      })),
+
+    // Sovereignty notice
+    /*#__PURE__*/React.createElement("div", {
+      style: { padding: '8px 12px', background: 'var(--gold-dim)', border: '1px solid var(--gold-mid)', borderRadius: 'var(--r)', marginBottom: 12, fontSize: 11, color: 'var(--tx-1)', lineHeight: 1.5 }
+    }, /*#__PURE__*/React.createElement(I, { n: "eye", s: 11, c: "var(--gold)" }),
+    " This creates a sub-record linked to ", /*#__PURE__*/React.createElement("strong", null, parentRecord.name), ". The link is stored as an EO operation and can be audited."),
+
+    /*#__PURE__*/React.createElement("button", {
+      className: "b-pri",
+      style: { width: '100%' },
+      disabled: !newRecordName.trim() || saving,
+      onClick: handleCreateNew
+    }, saving ? 'Creating...' : `Create & Link ${typeConfig.label}`)),
+
+  // Existing links section
+  existingLinks.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { borderTop: '1px solid var(--border-0)', paddingTop: 12, marginTop: 12 }
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "section-label",
+    style: { fontSize: 10, marginBottom: 6 }
+  }, `EXISTING LINKS (${existingLinks.length})`),
+  existingLinks.map(link => {
+    const lrt = LINKED_RECORD_TYPES.find(t => t.id === link.record_type);
+    return /*#__PURE__*/React.createElement("div", {
+      key: link.id,
+      style: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 'var(--r)', marginBottom: 4, background: 'var(--bg-2)', border: '1px solid var(--border-0)' }
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "lr-type-badge",
+      style: { background: lrt?.colorDim || 'var(--purple-dim)', color: lrt?.color || 'var(--purple)' }
+    }, link.record_type_label || link.record_type),
+    /*#__PURE__*/React.createElement("span", { style: { flex: 1, fontSize: 12, fontWeight: 500 } }, link.label),
+    link.governance && /*#__PURE__*/React.createElement("span", {
+      className: "tag",
+      style: { fontSize: 8, padding: '1px 6px', background: link.governance.status === 'approved' ? 'var(--green-dim)' : 'var(--orange-dim)', color: link.governance.status === 'approved' ? 'var(--green)' : 'var(--orange)' }
+    }, link.governance.status === 'approved' ? 'Approved' : 'Pending'),
+    /*#__PURE__*/React.createElement("span", { style: { fontSize: 9, color: 'var(--tx-3)' } },
+      new Date(link.created_at).toLocaleDateString()));
+  })));
+};
+
 /* ─── DatabaseView — unified tabbed view for Individuals, Notes, Resources ─── */
 const DatabaseView = ({
   cases,
@@ -26545,7 +26881,11 @@ const DatabaseView = ({
   fieldGovernanceConfig,
   onPropose,
   teamMode,
-  activeTeamObj
+  activeTeamObj,
+  sidebarCollapsed,
+  linkedRecords,
+  onCreateLinkedRecord,
+  onRemoveLinkedRecord
 }) => {
   const [dbTab, setDbTab] = useState('individuals');
   const [enabledFieldCols, setEnabledFieldCols] = useState([]);
@@ -26626,6 +26966,9 @@ const DatabaseView = ({
   }, {
     key: 'transferable',
     label: 'Transfer'
+  }, {
+    key: 'linked_records',
+    label: 'Linked Records'
   }];
   // Add dynamic field columns
   const fieldKeys = new Set();
@@ -26666,15 +27009,35 @@ const DatabaseView = ({
     l: 'Priority'
   }];
   const enabledExtras = enabledFieldCols.filter(k => !fieldKeys.has(k));
-  const defaultVisCols = ['name', 'status', 'priority', 'assignedTo', 'fields_count', 'transferable', ...Array.from(fieldKeys).slice(0, 3), ...enabledExtras];
+  const defaultVisCols = ['name', 'status', 'priority', 'assignedTo', 'fields_count', 'linked_records', 'transferable', ...Array.from(fieldKeys).slice(0, 3), ...enabledExtras];
   const getIndVal = (row, key) => {
     if (key === 'fields_count') return Object.keys(row.fields || {}).length;
     if (key === 'transferable') return row.transferable ? 'Yes' : 'Locked';
+    if (key === 'linked_records') return (linkedRecords?.[row.id] || []).length;
     if (row.fields && row.fields[key]) return row.fields[key].value || '';
     return row[key] || '';
   };
   const renderIndCell = (row, col) => {
     const k = col.key;
+    if (k === 'linked_records') {
+      const links = linkedRecords?.[row.id] || [];
+      return /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }
+      }, links.slice(0, 3).map(link => /*#__PURE__*/React.createElement("span", {
+        key: link.id,
+        className: "linked-rec-chip",
+        title: `${link.record_type}: ${link.label}`,
+        onClick: e => { e.stopPropagation(); }
+      }, /*#__PURE__*/React.createElement("span", { className: "lr-type" }, link.record_type_label || link.record_type), link.label)),
+      links.length > 3 && /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: 10, color: 'var(--tx-2)', fontFamily: 'var(--mono)' }
+      }, "+", links.length - 3),
+      /*#__PURE__*/React.createElement("button", {
+        className: "linked-rec-add",
+        onClick: e => { e.stopPropagation(); onCreateLinkedRecord && onCreateLinkedRecord(row); },
+        title: "Link a record"
+      }, /*#__PURE__*/React.createElement(I, { n: "plus", s: 9 }), "Link"));
+    }
     if (k === 'name') {
       const initial = (row.name || '?')[0].toUpperCase();
       return /*#__PURE__*/React.createElement("div", {
@@ -26777,6 +27140,7 @@ const DatabaseView = ({
   };
 
   // Stat cards
+  const totalLinks = Object.values(linkedRecords || {}).reduce((s, arr) => s + arr.length, 0);
   const indStats = [{
     l: 'Total',
     v: allIndividuals.length,
@@ -26785,6 +27149,10 @@ const DatabaseView = ({
     l: 'Active',
     v: allIndividuals.filter(i => i.status === 'active').length,
     c: 'green'
+  }, {
+    l: 'Linked Records',
+    v: totalLinks,
+    c: 'purple'
   }, {
     l: T.staff_term_plural,
     v: (staff || []).length || '—',
@@ -26795,7 +27163,7 @@ const DatabaseView = ({
     c: 'teal'
   }];
   return /*#__PURE__*/React.createElement("div", {
-    className: "anim-up db-view"
+    className: `anim-up db-view${sidebarCollapsed ? ' db-full-width' : ''}`
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -32430,6 +32798,20 @@ const ProviderApp = ({
     }
   }, [teams]);
   const [teamMode, setTeamMode] = useState(null); // null = individual mode, { roomId, name, color_hue } = operating as team
+  // ─── Sidebar collapse state ───
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('khora_sidebar_collapsed') === 'true'; } catch { return false; }
+  });
+  const toggleSidebar = React.useCallback(() => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('khora_sidebar_collapsed', String(next)); } catch {}
+      return next;
+    });
+  }, []);
+  // ─── Linked records state ───
+  const [linkedRecords, setLinkedRecords] = useState({}); // { [parentRecordId]: [{id, linked_record_id, record_type, label, created_by, created_at, governance}] }
+  const [createLinkedRecordModal, setCreateLinkedRecordModal] = useState(null); // {parentRecord} or null
   // Field definitions & crosswalks
   const [fieldDefs, setFieldDefs] = useState({}); // uri → definition object
   const [fieldCrosswalks, setFieldCrosswalks] = useState([]); // crosswalk records
@@ -35853,13 +36235,13 @@ const ProviderApp = ({
     "aria-label": "Quick note"
   }, /*#__PURE__*/React.createElement(I, { n: "plus", s: 24 })),
   /*#__PURE__*/React.createElement("div", {
-    className: "app-sidebar",
+    className: `app-sidebar${sidebarCollapsed ? ' collapsed' : ''}`,
     style: {
-      width: 260,
-      minWidth: 260,
+      width: sidebarCollapsed ? 0 : 260,
+      minWidth: sidebarCollapsed ? 0 : 260,
       height: '100%',
       background: 'var(--bg-1)',
-      borderRight: teamMode ? `2px solid ${teamColorThemed(teamMode.color_hue, isLightTheme).primary}` : '1px solid var(--border-0)',
+      borderRight: sidebarCollapsed ? 'none' : (teamMode ? `2px solid ${teamColorThemed(teamMode.color_hue, isLightTheme).primary}` : '1px solid var(--border-0)'),
       display: 'flex',
       flexDirection: 'column'
     }
@@ -35891,7 +36273,11 @@ const ProviderApp = ({
       fontSize: 15,
       flex: 1
     }
-  }, "Khora"), /*#__PURE__*/React.createElement(NotificationBell, {
+  }, "Khora"), /*#__PURE__*/React.createElement("button", {
+    className: "sidebar-collapse-btn",
+    onClick: toggleSidebar,
+    title: "Collapse sidebar"
+  }, /*#__PURE__*/React.createElement(I, { n: "chevronLeft", s: 14 })), /*#__PURE__*/React.createElement(NotificationBell, {
     notifications: notifications,
     onNotifClick: handleNotifClick,
     onDismiss: n => setNotifications(prev => prev.filter(x => x.id !== n.id)),
@@ -36452,14 +36838,19 @@ const ProviderApp = ({
     n: "logout",
     s: 12
   }), "Logout"))), /*#__PURE__*/React.createElement("div", {
-    className: "app-main",
+    className: `app-main${sidebarCollapsed ? ' sidebar-collapsed-show' : ''}`,
     style: {
       flex: 1,
       overflow: 'auto',
       padding: 0,
-      minWidth: 0
+      minWidth: 0,
+      position: 'relative'
     }
-  }, orgRoom && /*#__PURE__*/React.createElement("div", {
+  }, sidebarCollapsed && /*#__PURE__*/React.createElement("button", {
+    className: "sidebar-toggle-btn",
+    onClick: toggleSidebar,
+    title: "Expand sidebar"
+  }, /*#__PURE__*/React.createElement(I, { n: "chevronRight", s: 14 })), orgRoom && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '8px 20px',
       background: 'linear-gradient(var(--bg-1), var(--bg-1)), linear-gradient(var(--blue-dim), var(--blue-dim))',
@@ -36677,7 +37068,27 @@ const ProviderApp = ({
     fieldGovernanceConfig: fieldGovernanceConfig,
     onPropose: async (proposal, room) => { if (svc) await svc.setState(room, EVT.GOV_PROPOSAL, proposal, proposal.id); },
     teamMode: teamMode,
-    activeTeamObj: activeTeamObj
+    activeTeamObj: activeTeamObj,
+    sidebarCollapsed: sidebarCollapsed,
+    linkedRecords: linkedRecords,
+    onCreateLinkedRecord: (parentRecord) => setCreateLinkedRecordModal({ parentRecord }),
+    onRemoveLinkedRecord: async (parentId, linkId) => {
+      setLinkedRecords(prev => {
+        const next = { ...prev };
+        if (next[parentId]) next[parentId] = next[parentId].filter(l => l.id !== linkId);
+        return next;
+      });
+      // Persist removal to Matrix
+      const roomId = parentId;
+      try {
+        await emitOp(roomId, 'NUL', dot('org', 'linked_records', linkId), {
+          link_id: linkId,
+          edit_source: 'database_linked_record'
+        }, { type: 'org', epistemic: 'MEANT', role: orgRole || 'provider' });
+      } catch (e) { console.warn('Failed to emit unlink op:', e); }
+      if (showToast) showToast('Linked record removed', 'info');
+    },
+    resourceTypes: resourceTypes
   }), /*#__PURE__*/React.createElement(NoteCreateModal, {
     open: newNoteModal,
     onClose: () => setNewNoteModal(false),
@@ -36693,6 +37104,44 @@ const ProviderApp = ({
     T: T,
     initialAttachTo: newNoteAttachTo,
     teamContext: teamMode
+  }), /*#__PURE__*/React.createElement(CreateLinkedRecordModal, {
+    open: !!createLinkedRecordModal,
+    onClose: () => setCreateLinkedRecordModal(null),
+    parentRecord: createLinkedRecordModal?.parentRecord || null,
+    individuals: cases.map(c => ({
+      id: c.bridgeRoomId,
+      name: c.sharedData?.full_name || c.clientUserId || 'Unknown',
+      status: c.meta?.status === 'tombstoned' ? 'revoked' : c.sharedData?.full_name ? 'active' : 'imported'
+    })).concat((clientRecords || []).filter(r => !cases.some(c => c.bridgeRoomId === r.roomId)).map(r => ({
+      id: r.roomId,
+      name: r.client_name || 'Unknown',
+      status: r.status || 'created'
+    }))),
+    notes: dbNotes,
+    resourceTypes: resourceTypes,
+    cases: cases,
+    svc: svc,
+    orgRole: orgRole,
+    orgRoom: orgRoom,
+    teamMode: teamMode,
+    activeTeamObj: activeTeamObj,
+    showToast: showToast,
+    linkedRecords: linkedRecords,
+    onLinkCreated: async (parentId, linkRecord) => {
+      // Update local state
+      setLinkedRecords(prev => ({
+        ...prev,
+        [parentId]: [...(prev[parentId] || []), linkRecord]
+      }));
+      // Persist to Matrix via EO operation
+      try {
+        const roomId = parentId;
+        await emitOp(roomId, 'INS', dot('org', 'linked_records', linkRecord.id), {
+          ...linkRecord,
+          edit_source: 'database_linked_record'
+        }, { type: 'org', epistemic: 'MEANT', role: orgRole || 'provider' });
+      } catch (e) { console.warn('Failed to emit linked record op:', e); }
+    }
   }), /*#__PURE__*/React.createElement(NoteDetailModal, {
     note: noteDetailModal,
     open: !!noteDetailModal,
