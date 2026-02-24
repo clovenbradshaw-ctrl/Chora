@@ -328,7 +328,7 @@ button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r)
 .team-ctx-pills{display:flex;flex-wrap:wrap;gap:4px}
 .team-ctx-pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:20px;border:1px solid var(--border-1);background:var(--bg-2);color:var(--tx-1);font-size:11px;font-family:var(--sans);cursor:pointer;transition:all .15s;white-space:nowrap;outline:none;line-height:1}
 .team-ctx-pill:hover{border-color:var(--tx-2);background:var(--bg-3)}
-.team-ctx-pill.active{background:var(--purple,#8b5cf6);border-color:var(--purple,#8b5cf6);color:#fff;font-weight:600}
+.team-ctx-pill.active{font-weight:600}
 .team-ctx-pill.active-personal{background:var(--bg-4);border-color:var(--border-2);color:var(--tx-0);font-weight:600}
 .team-ctx-pill .pill-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 
@@ -3301,10 +3301,10 @@ function buildDefaultResourcePermissions() {
 const ROLES = {
   client: {
     id: 'client',
-    label: 'Individual',
+    label: 'Personal',
     icon: 'shield',
     color: 'teal',
-    desc: 'Data owner with a personal Vault'
+    desc: 'Data owner with a Personal account and vault'
   },
   provider: {
     id: 'provider',
@@ -17194,12 +17194,12 @@ const classifyRoom = async (roomId, scannedState) => {
   if (id) {
     if (id.account_type === 'client') return {
       type: 'vault',
-      label: 'Individual Vault',
+      label: 'Personal Vault',
       color: 'teal'
     };
     if (id.account_type === 'client_record') return {
       type: 'client_record',
-      label: 'Individual Record',
+      label: 'Personal Record',
       color: 'teal'
     };
     if (id.account_type === 'provider') return {
@@ -26911,7 +26911,7 @@ const NotesTable = ({
 
 /* ─── Linked Record Types — configurable record types for Airtable-style linking ─── */
 const LINKED_RECORD_TYPES = [
-  { id: 'individual', label: 'Individual', icon: 'user', color: 'var(--green)', colorDim: 'var(--green-dim)' },
+  { id: 'individual', label: 'Personal', icon: 'user', color: 'var(--green)', colorDim: 'var(--green-dim)' },
   { id: 'note', label: 'Note', icon: 'msg', color: 'var(--blue)', colorDim: 'var(--blue-dim)' },
   { id: 'resource', label: 'Resource', icon: 'layers', color: 'var(--teal)', colorDim: 'var(--teal-dim)' },
   { id: 'case', label: 'Case', icon: 'briefcase', color: 'var(--gold)', colorDim: 'var(--gold-dim)' },
@@ -31673,7 +31673,7 @@ const IndividualProfilePage = ({
     roomId: individual.bridgeRoom,
     encrypted: true,
     encLabel: "Megolm E2EE",
-    label: "Individual Record",
+    label: "Personal Record",
     members: [
       ...(individual._case?.meta?.client ? [{ userId: individual._case.meta.client, role: 'client (sovereign owner)' }] : []),
       ...(individual._case?.meta?.provider ? [{ userId: individual._case.meta.provider, role: 'provider' }] : []),
@@ -33145,6 +33145,17 @@ const ProviderApp = ({
   // Client records — provider-created rooms representing clients
   const [clientRecords, setClientRecords] = useState([]);
   const [createClientModal, setCreateClientModal] = useState(false);
+  const openCreateClientModal = () => {
+    if (!activeTeamContext) {
+      if (showToast) showToast('Switch to a team context to create individual records. Select a team in the sidebar, or create one in the Teams view.', 'info');
+      setView('teams');
+      return;
+    }
+    setCreateClientModal(true);
+    setNewClientName('');
+    setNewClientMatrixId('');
+    setNewClientNotes('');
+  };
   const [clientInviteModal, setClientInviteModal] = useState(null); // client record object or null
   const [newClientName, setNewClientName] = useState('');
   const [newClientMatrixId, setNewClientMatrixId] = useState('');
@@ -36608,14 +36619,15 @@ const ProviderApp = ({
           className: "team-ctx-pill" + (!activeTeamContext ? " active-personal" : ""),
           onClick: () => switchTeamContext(null)
         }, /*#__PURE__*/React.createElement(I, { n: "user", s: 10 }), "Personal"),
-        teams.map(t => /*#__PURE__*/React.createElement("button", {
+        teams.map(t => { const _tpActive = activeTeamContext === t.roomId; const _tpColor = `hsl(${t.color_hue || 260}, 60%, 55%)`; return /*#__PURE__*/React.createElement("button", {
           key: t.roomId,
-          className: "team-ctx-pill" + (activeTeamContext === t.roomId ? " active" : ""),
+          className: "team-ctx-pill" + (_tpActive ? " active" : ""),
+          style: _tpActive ? { background: _tpColor, borderColor: _tpColor, color: '#fff' } : {},
           onClick: () => switchTeamContext(t.roomId)
         }, /*#__PURE__*/React.createElement("span", {
           className: "pill-dot",
-          style: { background: activeTeamContext === t.roomId ? '#fff' : `hsl(${t.color_hue || 260}, 60%, 55%)` }
-        }), t.name || 'Unnamed Team'))
+          style: { background: _tpActive ? '#fff' : _tpColor }
+        }), t.name || 'Unnamed Team'); }))
       )
     ),
     /*#__PURE__*/React.createElement("div", { style: { padding: '8px 0', borderTop: '1px solid var(--border-0)', marginTop: 8, display: 'flex', gap: 8 } },
@@ -36678,7 +36690,13 @@ const ProviderApp = ({
     onNotifClick: handleNotifClick,
     onDismiss: n => setNotifications(prev => prev.filter(x => x.id !== n.id)),
     onDismissAll: handleDismissAllNotifs
-  })), /*#__PURE__*/React.createElement("div", {
+  })), teamMode && /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '5px 8px', borderRadius: 'var(--r)', background: `hsla(${teamMode.color_hue || 260}, 60%, 55%, 0.1)` }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { width: 7, height: 7, borderRadius: '50%', background: `hsl(${teamMode.color_hue || 260}, 60%, 55%)`, flexShrink: 0 }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 10.5, fontWeight: 700, color: `hsl(${teamMode.color_hue || 260}, 60%, 50%)`, fontFamily: 'var(--mono)', letterSpacing: '0.05em', textTransform: 'uppercase', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+  }, teamMode.name)), /*#__PURE__*/React.createElement("div", {
     onClick: () => setShareContactModal(true),
     style: {
       marginTop: 10,
@@ -36867,14 +36885,15 @@ const ProviderApp = ({
         className: "team-ctx-pill" + (!activeTeamContext ? " active-personal" : ""),
         onClick: () => switchTeamContext(null)
       }, /*#__PURE__*/React.createElement(I, { n: "user", s: 10 }), "Personal"),
-      teams.map(t => /*#__PURE__*/React.createElement("button", {
+      teams.map(t => { const _tpActive = activeTeamContext === t.roomId; const _tpColor = `hsl(${t.color_hue || 260}, 60%, 55%)`; return /*#__PURE__*/React.createElement("button", {
         key: t.roomId,
-        className: "team-ctx-pill" + (activeTeamContext === t.roomId ? " active" : ""),
+        className: "team-ctx-pill" + (_tpActive ? " active" : ""),
+        style: _tpActive ? { background: _tpColor, borderColor: _tpColor, color: '#fff' } : {},
         onClick: () => switchTeamContext(t.roomId)
       }, /*#__PURE__*/React.createElement("span", {
         className: "pill-dot",
-        style: { background: activeTeamContext === t.roomId ? '#fff' : `hsl(${t.color_hue || 260}, 60%, 55%)` }
-      }), t.name || 'Unnamed Team'))
+        style: { background: _tpActive ? '#fff' : _tpColor }
+      }), t.name || 'Unnamed Team'); }))
     )
   ),
   /*#__PURE__*/React.createElement("div", {
@@ -36947,7 +36966,7 @@ const ProviderApp = ({
         cursor: 'pointer',
         marginBottom: 1,
         background: (view === item.id || item.id === 'database' && (view === 'individual-profile' || view === 'resource-profile')) && !activeCase ? 'var(--bg-4)' : 'transparent',
-        borderLeft: (view === item.id || item.id === 'database' && (view === 'individual-profile' || view === 'resource-profile')) && !activeCase ? '2px solid var(--gold)' : '2px solid transparent',
+        borderLeft: (view === item.id || item.id === 'database' && (view === 'individual-profile' || view === 'resource-profile')) && !activeCase ? `2px solid ${teamMode ? `hsl(${teamMode.color_hue || 260}, 60%, 55%)` : 'var(--gold)'}` : '2px solid transparent',
         display: 'flex',
         alignItems: 'center',
         gap: 8,
@@ -37309,8 +37328,8 @@ const ProviderApp = ({
     }
   }, view === 'dashboard' && !activeCase && /*#__PURE__*/React.createElement(React.Fragment, null,
     activeTeamObj && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', marginBottom: 12, background: 'var(--purple-dim, rgba(139,92,246,.08))', border: '1px solid rgba(139,92,246,.15)', borderRadius: 'var(--r-lg)' }
-    }, /*#__PURE__*/React.createElement(I, { n: "users", s: 14, c: "var(--purple, #8b5cf6)" }),
+      style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', marginBottom: 12, background: `hsla(${activeTeamObj.color_hue || 260}, 60%, 55%, 0.08)`, border: `1px solid hsla(${activeTeamObj.color_hue || 260}, 60%, 55%, 0.2)`, borderRadius: 'var(--r-lg)' }
+    }, /*#__PURE__*/React.createElement(I, { n: "users", s: 14, c: `hsl(${activeTeamObj.color_hue || 260}, 60%, 55%)` }),
       /*#__PURE__*/React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600 } }, "Viewing as: ", activeTeamObj.name),
       /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: 'var(--tx-3)' } }, "\u00B7 ", (activeTeamObj.members || []).length, " members"),
       /*#__PURE__*/React.createElement("button", { onClick: () => switchTeamContext(null), className: "b-gho b-xs", style: { marginLeft: 'auto', fontSize: 10 } }, "Clear filter")
@@ -37327,17 +37346,12 @@ const ProviderApp = ({
         setActiveCase(null);
       },
       onDiscover: () => setDiscoverModal(true),
-      onCreateClient: () => {
-        setCreateClientModal(true);
-        setNewClientName('');
-        setNewClientMatrixId('');
-        setNewClientNotes('');
-      }
+      onCreateClient: openCreateClientModal
     })
   ), view === 'database' && !activeCase && /*#__PURE__*/React.createElement(React.Fragment, null,
     activeTeamObj && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', marginBottom: 12, background: 'var(--purple-dim, rgba(139,92,246,.08))', border: '1px solid rgba(139,92,246,.15)', borderRadius: 'var(--r-lg)' }
-    }, /*#__PURE__*/React.createElement(I, { n: "users", s: 14, c: "var(--purple, #8b5cf6)" }),
+      style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', marginBottom: 12, background: `hsla(${activeTeamObj.color_hue || 260}, 60%, 55%, 0.08)`, border: `1px solid hsla(${activeTeamObj.color_hue || 260}, 60%, 55%, 0.2)`, borderRadius: 'var(--r-lg)' }
+    }, /*#__PURE__*/React.createElement(I, { n: "users", s: 14, c: `hsl(${activeTeamObj.color_hue || 260}, 60%, 55%)` }),
       /*#__PURE__*/React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600 } }, "Filtered to: ", activeTeamObj.name),
       /*#__PURE__*/React.createElement("button", { onClick: () => switchTeamContext(null), className: "b-gho b-xs", style: { marginLeft: 'auto', fontSize: 10 } }, "Clear filter")
     ),
@@ -37413,21 +37427,11 @@ const ProviderApp = ({
     canControlResource: canControlResource,
     canAllocateResource: canAllocateResource,
     clientRecords: clientRecords,
-    onCreateClient: () => {
-      setCreateClientModal(true);
-      setNewClientName('');
-      setNewClientMatrixId('');
-      setNewClientNotes('');
-    },
+    onCreateClient: openCreateClientModal,
     onCellEdit: handleDbCellEdit,
     onBulkAction: handleBulkAction,
     onReorder: handleReorder,
-    onAddRow: () => {
-      setCreateClientModal(true);
-      setNewClientName('');
-      setNewClientMatrixId('');
-      setNewClientNotes('');
-    },
+    onAddRow: openCreateClientModal,
     fieldDefs: fieldDefs,
     fieldCrosswalks: fieldCrosswalks,
     teams: teams,
@@ -37600,8 +37604,8 @@ const ProviderApp = ({
     className: "anim-up inbox-wrap"
   },
     activeTeamObj && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', marginBottom: 12, background: 'var(--purple-dim, rgba(139,92,246,.08))', border: '1px solid rgba(139,92,246,.15)', borderRadius: 'var(--r-lg)' }
-    }, /*#__PURE__*/React.createElement(I, { n: "users", s: 14, c: "var(--purple, #8b5cf6)" }),
+      style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', marginBottom: 12, background: `hsla(${activeTeamObj.color_hue || 260}, 60%, 55%, 0.08)`, border: `1px solid hsla(${activeTeamObj.color_hue || 260}, 60%, 55%, 0.2)`, borderRadius: 'var(--r-lg)' }
+    }, /*#__PURE__*/React.createElement(I, { n: "users", s: 14, c: `hsl(${activeTeamObj.color_hue || 260}, 60%, 55%)` }),
       /*#__PURE__*/React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600 } }, "Filtered to: ", activeTeamObj.name),
       /*#__PURE__*/React.createElement("button", { onClick: () => switchTeamContext(null), className: "b-gho b-xs", style: { marginLeft: 'auto', fontSize: 10 } }, "Clear filter")
     ),
@@ -38272,12 +38276,7 @@ const ProviderApp = ({
     n: "git-merge",
     s: 14
   }), "Merge Records"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setCreateClientModal(true);
-      setNewClientName('');
-      setNewClientMatrixId('');
-      setNewClientNotes('');
-    },
+    onClick: openCreateClientModal,
     className: "b-pri b-sm",
     style: {
       display: 'flex',
