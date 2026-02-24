@@ -31104,16 +31104,13 @@ const ProviderApp = ({
         updated_by: svc.userId
       }, orgFrame());
       setProviderProfile(profile);
-      // Broadcast profile to all bridge rooms so clients can see provider identity
-      for (const c of cases) {
-        try {
-          await svc.setState(c.bridgeRoomId, EVT.PROVIDER_PROFILE, profile);
-        } catch (e) {
-          console.warn('Profile broadcast failed for bridge', c.bridgeRoomId, e.message);
-        }
-      }
       setProfileModal(false);
-      showToast('Profile updated — broadcast to all bridges', 'success');
+      showToast('Profile saved', 'success');
+      // Background sync to bridges — non-blocking
+      for (const c of cases) {
+        svc.setState(c.bridgeRoomId, EVT.PROVIDER_PROFILE, profile)
+          .catch(e => console.warn('Profile sync to bridge failed', c.bridgeRoomId, e.message));
+      }
     } catch (e) {
       showToast('Failed to save profile: ' + e.message, 'error');
     }
@@ -38286,7 +38283,7 @@ const ProviderApp = ({
       marginBottom: 16,
       lineHeight: 1.6
     }
-  }, "Your profile is stored in your roster room and broadcast to all bridge rooms. ", T.client_term_plural, " see your name, title, credentials, and organization membership."), /*#__PURE__*/React.createElement("div", {
+  }, "Your profile is stored in your roster room and synced to your bridge rooms. ", T.client_term_plural, " see your name, title, credentials, and organization membership."), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
