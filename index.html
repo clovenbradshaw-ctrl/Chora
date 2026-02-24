@@ -1845,6 +1845,11 @@ function extractHomeserver(matrixId) {
   return idx >= 0 ? matrixId.slice(idx + 1) : 'unknown';
 }
 
+// Validate Matrix user ID format: @localpart:server
+function isValidMatrixId(id) {
+  return /^@[^:]+:[^:]+$/.test(id?.trim());
+}
+
 // Emit an EO operation
 // Enriches every event with provenance metadata (created_by, origin_server)
 // and builds provenance chains linking each op to its predecessor on the same entity.
@@ -17549,12 +17554,14 @@ const ClientApp = ({
     setLoading(true);
     setInitError(null);
     try {
-      // Phase 1: Auto-join any invited client_record rooms so they appear in scanRooms
+      // Phase 1: Auto-join any invited client_record rooms so they appear in scanRooms.
+      // Safety: only join rooms that were explicitly created for this user (client_matrix_id match)
+      // AND have a valid owner set. Rooms are shown as "pending" until the client manually claims them.
       try {
         const invited = await svc.scanInvitedRooms([EVT.IDENTITY]);
         for (const [rid, state] of Object.entries(invited)) {
           const id = state[EVT.IDENTITY];
-          if (id?.account_type === 'client_record' && id.client_matrix_id === svc.userId) {
+          if (id?.account_type === 'client_record' && id.client_matrix_id === svc.userId && id.owner) {
             try {
               await svc.joinRoom(rid);
             } catch (e) {
@@ -17902,6 +17909,14 @@ const ClientApp = ({
   // CON(vault.providers.{id}, {bridge_room, initiated_by: client}) — relationship_establishment + INS(bridge.room, {e2ee, meta, refs}) — secure_channel
   const handleAddProvider = async () => {
     if (!newProviderId.trim()) return;
+    if (!isValidMatrixId(newProviderId)) {
+      showToast('Invalid Matrix ID — use format @user:server', 'error');
+      return;
+    }
+    if (providers.find(p => p.providerUserId === newProviderId.trim())) {
+      showToast('Already connected to this provider', 'info');
+      return;
+    }
     try {
       const bridgeId = await svc.createRoom(`[Khora Bridge] ${svc.userId} ↔ ${newProviderId}`, 'Khora bridge — shared data room', [{
         type: EVT.BRIDGE_META,
@@ -18025,6 +18040,11 @@ const ClientApp = ({
   const handleHardRevoke = async pi => {
     const prov = providers[pi];
     try {
+      // Step 1: Seal old bridge — emit NUL, tombstone, and kick provider BEFORE creating new bridge
+      await emitOp(prov.bridgeRoomId, 'NUL', dot('bridge', 'relationship'), {
+        reason: 'hard_revoke'
+      }, bridgeFrame(prov.bridgeRoomId));
+      // Step 2: Create new bridge with fresh keys
       const newBridgeId = await svc.createRoom(`[Khora Bridge] ${svc.userId} ↔ ${prov.providerUserId}`, 'Khora bridge — replaced', [{
         type: EVT.BRIDGE_META,
         state_key: '',
@@ -18048,16 +18068,15 @@ const ClientApp = ({
           fields: {}
         }
       }]);
-      await emitOp(prov.bridgeRoomId, 'NUL', dot('bridge', 'relationship'), {
-        reason: 'hard_revoke'
-      }, bridgeFrame(prov.bridgeRoomId));
-      const stillShared = Object.fromEntries(Object.entries(prov.sharedFields).filter(([, v]) => v));
-      if (Object.keys(stillShared).length > 0) await syncFieldsToBridge(newBridgeId, stillShared, vaultData);
-      await svc.invite(newBridgeId, prov.providerUserId);
+      // Step 3: Tombstone old bridge (points to new) and kick provider from old
       await svc.tombstone(prov.bridgeRoomId, newBridgeId);
       try {
         await svc.kick(prov.bridgeRoomId, prov.providerUserId, 'Bridge rotated — data revoked');
       } catch {}
+      // Step 4: Sync shared fields to new bridge and invite provider
+      const stillShared = Object.fromEntries(Object.entries(prov.sharedFields).filter(([, v]) => v));
+      if (Object.keys(stillShared).length > 0) await syncFieldsToBridge(newBridgeId, stillShared, vaultData);
+      await svc.invite(newBridgeId, prov.providerUserId);
       await emitOp(newBridgeId, 'CON', dot('bridge', 'connection', prov.providerUserId), {
         relationship: RELATIONSHIP_TYPES.client_provider.id,
         bridge_room: newBridgeId,
@@ -28762,6 +28781,16 @@ const ProviderApp = ({
           if (i % 3 === 2) await new Promise(r => setTimeout(r, 200));
         }
       }
+      // Fallback: if metrics/schema not found by owner, check org metadata for linked room IDs
+      if (detectedOrgs.length > 0) {
+        const activeOrg = detectedOrgs[0];
+        if (!metricsR && activeOrg.meta?.metrics_room) {
+          metricsR = activeOrg.meta.metrics_room;
+        }
+        if (!schema && activeOrg.meta?.schema_room) {
+          schema = activeOrg.meta.schema_room;
+        }
+      }
       setRosterRoom(roster);
       setMetricsRoom(metricsR);
       setSchemaRoom(schema);
@@ -29591,8 +29620,9 @@ const ProviderApp = ({
           origin_server: extractHomeserver(svc.userId)
         });
       } catch (e) {
-        // Provider may not have state permission — update org assignment instead
-        console.warn('Bridge meta update:', e.message);
+        // Expected: provider may not have bridge state permission (client has PL 100).
+        // Org-side ROSTER_ASSIGN is the authoritative record for case assignments.
+        console.warn('Bridge meta update (expected if client controls bridge):', e.message);
       }
       // Step 3: Update ROSTER_ASSIGN in org room
       const updatedAssignments = {
@@ -29621,6 +29651,15 @@ const ProviderApp = ({
         reason: 'org_transfer',
         initiated_by: svc.userId
       }, orgFrame());
+      // Step 5: Remove old provider from bridge room to revoke access
+      if (c.meta.provider !== transferTarget) {
+        try {
+          await svc.kick(c.bridgeRoomId, c.meta.provider, 'Case transferred to new provider');
+        } catch (e) {
+          // May fail if we lack kick permission (client has PL 100) — log but don't block
+          console.warn('Old provider kick during transfer:', e.message);
+        }
+      }
       setTransferModal(null);
       setTransferTarget('');
       showToast(`Case transferred to ${targetStaff.userId}`, 'success');
@@ -29707,13 +29746,17 @@ const ProviderApp = ({
   };
   const handleClientInvite = async () => {
     if (!clientInviteModal || !clientInviteMatrixId.trim()) return;
+    if (!isValidMatrixId(clientInviteMatrixId)) {
+      showToast('Invalid Matrix ID — use format @user:server', 'error');
+      return;
+    }
     try {
       const clientId = clientInviteMatrixId.trim();
-      // Set power levels: client gets PL 100 (superadmin), provider stays at 50
+      // Set client PL 100, invite, THEN demote self to PL 50.
+      // Order matters: if invite fails after self-demotion, no one has admin.
       await svc.setPowerLevel(clientInviteModal.roomId, clientId, 100);
-      await svc.setPowerLevel(clientInviteModal.roomId, svc.userId, 50);
-      // Invite the client
       await svc.invite(clientInviteModal.roomId, clientId);
+      await svc.setPowerLevel(clientInviteModal.roomId, svc.userId, 50);
       // Update identity state with the client's Matrix ID
       await svc.setState(clientInviteModal.roomId, EVT.IDENTITY, {
         ...clientInviteModal,
@@ -29842,8 +29885,16 @@ const ProviderApp = ({
   };
   const handleTeamInvite = async () => {
     if (!teamInviteModal || !teamInviteUserId.trim()) return;
+    if (!isValidMatrixId(teamInviteUserId)) {
+      showToast('Invalid Matrix ID — use format @user:server', 'error');
+      return;
+    }
     try {
       const uid = teamInviteUserId.trim();
+      // Warn if invitee is not an org member (cross-org teams are allowed but noteworthy)
+      if (orgRoom && staff.length > 0 && !staff.find(s => s.userId === uid)) {
+        showToast(`Note: ${uid} is not a member of your organization`, 'info');
+      }
       // Invite user to the team room
       if (svc.client) await svc.client.invite(teamInviteModal.roomId, uid);else await svc._api('POST', `/rooms/${encodeURIComponent(teamInviteModal.roomId)}/invite`, {
         user_id: uid
@@ -30003,7 +30054,7 @@ const ProviderApp = ({
   const getSetupInstructions = roomId => {
     const hs = svc._baseUrl ? svc._baseUrl.replace(/^https?:\/\//, '') : 'matrix.org';
     const link = getInviteUrl(roomId);
-    return `You've been invited to securely manage your information on Khora.\n\nTo get started:\n\n1. Create a free Matrix account:\n   Go to https://${hs} and click "Create Account"\n   (Matrix is a secure, decentralized messaging protocol — your data stays on the server you choose)\n\n2. Download a Matrix client (optional):\n   Web: https://app.element.io\n   Mobile: Search "Element" in your app store\n   Or use any Matrix-compatible app\n\n3. Sign in with your new account\n\n4. Click this link to join your room:\n   ${link}\n\n5. You will have full control of this room — you can remove anyone from it at any time.\n\nQuestions? Contact your provider for help getting set up.`;
+    return `You've been invited to securely manage your information on Khora.\n\nTo get started:\n\n1. Create a free Matrix account:\n   Go to https://${hs} and click "Create Account"\n   (Matrix is a secure, decentralized messaging protocol — your data stays on the server you choose)\n\n2. Download a Matrix client (optional):\n   Web: https://app.element.io\n   Mobile: Search "Element" in your app store\n   Or use any Matrix-compatible app\n\n3. Sign in with your new account\n\n4. Accept the room invitation:\n   The invite should appear automatically in your Matrix client.\n   You can also open this link: ${link}\n   (Note: this is a private room — the invite must be accepted from the account specified above)\n\n5. You will have full control of this room — you can remove anyone from it at any time.\n\nQuestions? Contact your provider for help getting set up.`;
   };
 
   // Discover client by Matrix ID
@@ -30131,13 +30182,33 @@ const ProviderApp = ({
       } else {
         await svc._api('POST', `/join/${encodeURIComponent(joinNetworkId)}`, {});
       }
+      // Add this org to the network members list
+      try {
+        const currentMembers = await svc.getState(joinNetworkId, EVT.NET_MEMBERS);
+        const orgs = currentMembers?.organizations || [];
+        if (!orgs.find(o => o.id === orgRoom)) {
+          orgs.push({ id: orgRoom, name: orgMeta.name || '', joined: Date.now(), role: 'member' });
+          await svc.setState(joinNetworkId, EVT.NET_MEMBERS, { ...currentMembers, organizations: orgs });
+        }
+        await emitOp(joinNetworkId, 'CON', dot('network', 'org', orgRoom), {
+          action: 'join',
+          org_name: orgMeta.name || '',
+          joined_by: svc.userId
+        }, networkFrame(joinNetworkId));
+      } catch (e) {
+        console.warn('Network members update:', e.message);
+      }
       setNetworkRoom(joinNetworkId);
       await loadNetworkMembers(joinNetworkId);
       setJoinNetworkModal(false);
       setJoinNetworkId('');
       showToast('Joined network', 'success');
     } catch (e) {
-      showToast('Failed to join: ' + e.message, 'error');
+      if (e.message?.includes('forbidden') || e.message?.includes('not invited')) {
+        showToast('Cannot join — you must be invited by a network admin first', 'error');
+      } else {
+        showToast('Failed to join: ' + e.message, 'error');
+      }
     }
   };
 
@@ -30576,6 +30647,20 @@ const ProviderApp = ({
         id: 'transform_default',
         transforms: DEFAULT_TRANSFORMS
       }, 'default');
+      // Link supporting room IDs back to the org so other members can discover them
+      try {
+        await svc.setState(org, EVT.ORG_METADATA, {
+          name: setupData.name,
+          type: setupData.type,
+          service_area: setupData.service_area,
+          languages: setupData.languages.split(',').map(s => s.trim()),
+          created: Date.now(),
+          metrics_room: orgMetricsR,
+          schema_room: orgSchema
+        });
+      } catch (e) {
+        console.warn('Org metadata linkage:', e.message);
+      }
     } catch (e) {
       showToast('Error creating org: ' + e.message, 'error');
     }
@@ -30591,22 +30676,46 @@ const ProviderApp = ({
       // Load the org metadata
       const meta = await svc.getState(joinOrgId, EVT.ORG_METADATA);
       const roster = await svc.getState(joinOrgId, EVT.ORG_ROSTER);
-      const entry = roster?.staff?.find(s => s.userId === svc.userId);
+      let entry = roster?.staff?.find(s => s.userId === svc.userId);
+      // Add user to roster if not already present (pending admin role assignment)
+      if (!entry) {
+        const staffList = roster?.staff || [];
+        entry = { userId: svc.userId, role: 'pending', joined: Date.now() };
+        staffList.push(entry);
+        try {
+          await svc.setState(joinOrgId, EVT.ORG_ROSTER, { staff: staffList });
+          await emitOp(joinOrgId, 'CON', dot('org', 'staff', svc.userId), {
+            action: 'join_request',
+            role: 'pending'
+          }, orgFrame(joinOrgId));
+        } catch (e) {
+          console.warn('Roster self-add:', e.message);
+        }
+      }
       setOrgRoom(joinOrgId);
-      setOrgRole(entry?.role || 'read_only');
+      setOrgRole(entry?.role || 'pending');
       if (meta) setOrgMeta(meta);
-      if (roster?.staff) setStaff(roster.staff);
+      const updatedRoster = await svc.getState(joinOrgId, EVT.ORG_ROSTER);
+      if (updatedRoster?.staff) setStaff(updatedRoster.staff);
       setJoinOrgModal(false);
       setJoinOrgId('');
       showToast(`Joined organization${meta?.name ? ' "' + meta.name + '"' : ''}`, 'success');
     } catch (e) {
-      showToast('Failed to join org: ' + e.message, 'error');
+      if (e.message?.includes('forbidden') || e.message?.includes('not invited')) {
+        showToast('Cannot join — you must be invited by an org admin first. Share your Matrix ID with them.', 'error');
+      } else {
+        showToast('Failed to join org: ' + e.message, 'error');
+      }
     }
   };
 
   // CON(org.staff.{userId}, {invitation}) — staff_onboarding — invites user and adds to roster
   const handleInviteStaff = async () => {
     if (!inviteUserId.trim() || !orgRoom) return;
+    if (!isValidMatrixId(inviteUserId)) {
+      showToast('Invalid Matrix ID — use format @user:server', 'error');
+      return;
+    }
     try {
       await svc.invite(orgRoom, inviteUserId);
       const newStaff = [...staff, {
@@ -30882,6 +30991,22 @@ const ProviderApp = ({
     return allowed.includes(orgRole);
   }, [orgRole, orgMsgAccess]);
 
+  // Build opacity-aware envelope for inter-org messages.
+  // transparent: reveals org room ID, org name, sender ID, sender name
+  // translucent: reveals org name only (not room ID or sender identity)
+  // opaque: reveals nothing about the sender org
+  const buildOpacityEnvelope = useCallback(() => ({
+    [`${NS}.type`]: 'org_message',
+    [`${NS}.envelope`]: {
+      opacity: orgOpacity,
+      org_room_id: orgOpacity === 'transparent' ? orgRoom : undefined,
+      org_name: orgOpacity !== 'opaque' ? orgMeta.name || undefined : undefined,
+      sender_id: orgOpacity === 'transparent' ? svc.userId : undefined,
+      sender_name: orgOpacity === 'transparent' ? providerProfile.display_name || undefined : undefined,
+      ts: Date.now()
+    }
+  }), [orgOpacity, orgRoom, orgMeta.name, providerProfile.display_name]);
+
   // Save opacity setting (admin only)
   const handleSaveOpacity = async level => {
     if (!orgRoom || orgRole !== 'admin') return;
@@ -30991,11 +31116,28 @@ const ProviderApp = ({
           created_by: svc.userId
         }
       }]);
-      // Invite the peer org room members (the channel inherits access from org rooms)
+      // Invite eligible staff from the peer org (not the room ID — Matrix can't invite rooms)
       try {
-        await svc.invite(channelRoom, peerOrgId);
+        const peerRoster = await svc.getState(peerOrgId, EVT.ORG_ROSTER);
+        const peerStaff = peerRoster?.staff || [];
+        const peerMsgAccess = await svc.getState(peerOrgId, EVT.ORG_MSG_ACCESS);
+        const readRoles = peerMsgAccess?.read || ['admin', 'case_manager'];
+        let invited = 0;
+        for (const s of peerStaff.filter(s => readRoles.includes(s.role))) {
+          try { await svc.invite(channelRoom, s.userId); invited++; } catch {}
+        }
+        if (invited === 0 && peerStaff.length > 0) {
+          // Fallback: invite all staff if no role-filtered matches
+          for (const s of peerStaff) {
+            try { await svc.invite(channelRoom, s.userId); invited++; } catch {}
+          }
+        }
+        if (invited === 0) {
+          showToast('Channel created but could not invite peer org staff — they may need to join manually', 'warn');
+        }
       } catch (e) {
-        console.warn('Peer invite:', e.message);
+        console.warn('Peer org staff invite:', e.message);
+        showToast('Channel created but peer org roster not readable — share the channel ID with them', 'warn');
       }
       await emitOp(channelRoom, 'INS', dot('org', 'channels', 'channel'), {
         from_org: orgRoom,
@@ -31038,18 +31180,7 @@ const ProviderApp = ({
       return;
     }
     try {
-      // Build opacity envelope: what the receiving org sees depends on our opacity setting
-      const envelope = {
-        [`${NS}.type`]: 'org_message',
-        [`${NS}.envelope`]: {
-          opacity: orgOpacity,
-          org_room_id: orgOpacity === 'opaque' ? undefined : orgRoom,
-          org_name: orgOpacity === 'opaque' ? undefined : orgMeta.name || undefined,
-          sender_id: orgOpacity === 'transparent' ? svc.userId : undefined,
-          sender_name: orgOpacity === 'transparent' ? providerProfile.display_name || undefined : undefined,
-          ts: Date.now()
-        }
-      };
+      const envelope = buildOpacityEnvelope();
       await svc.sendMessage(activeChannel, orgMsgText, envelope);
       await emitOp(activeChannel, 'INS', dot('org', 'messages', 'org_message'), {
         opacity: orgOpacity,
@@ -31120,17 +31251,7 @@ const ProviderApp = ({
         showToast('You do not have permission to send org messages', 'warn');
         return;
       }
-      const envelope = {
-        [`${NS}.type`]: 'org_message',
-        [`${NS}.envelope`]: {
-          opacity: orgOpacity,
-          org_room_id: orgOpacity === 'opaque' ? undefined : orgRoom,
-          org_name: orgOpacity === 'opaque' ? undefined : orgMeta.name || undefined,
-          sender_id: orgOpacity === 'transparent' ? svc.userId : undefined,
-          sender_name: orgOpacity === 'transparent' ? providerProfile.display_name || undefined : undefined,
-          ts: Date.now()
-        }
-      };
+      const envelope = buildOpacityEnvelope();
       await svc.sendMessage(inboxConvo, inboxMsgText, envelope);
       await emitOp(inboxConvo, 'INS', dot('org', 'messages', 'org_message'), {
         opacity: orgOpacity,
