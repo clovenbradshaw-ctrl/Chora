@@ -2226,21 +2226,21 @@ const MATURITY_LEVELS = {
     label: 'Draft',
     color: 'blue',
     icon: '🔵',
-    desc: 'Proposed, not yet reviewed'
+    desc: 'This question is proposed \u2014 it hasn\u2019t been formally reviewed yet and may change'
   },
   trial: {
     id: 'trial',
     label: 'Trial',
     color: 'gold',
     icon: '🟡',
-    desc: 'Approved for testing, may change'
+    desc: 'This question is approved for use but still being tested \u2014 it could be updated'
   },
   normative: {
     id: 'normative',
     label: 'Normative',
     color: 'green',
     icon: '🟢',
-    desc: 'Locked, changes require formal process'
+    desc: 'This question is finalized \u2014 it\u2019s the agreed-upon standard across the network'
   },
   de_facto: {
     id: 'de_facto',
@@ -2265,19 +2265,19 @@ const PROPAGATION_LEVELS = {
     id: 'required',
     label: 'Required',
     color: 'red',
-    desc: 'Tight coupling — auto-applied to orgs, immutable'
+    desc: 'All organizations in the network must use this form \u2014 it can\u2019t be changed locally'
   },
   standard: {
     id: 'standard',
     label: 'Standard',
     color: 'gold',
-    desc: 'Expected coupling — auto-applied, notify on divergence'
+    desc: 'Used by default across the network \u2014 organizations are notified if they diverge'
   },
   recommended: {
     id: 'recommended',
     label: 'Recommended',
     color: 'blue',
-    desc: 'Suggested coupling — org reviews, adopts or ignores'
+    desc: 'Suggested by the network \u2014 each organization decides whether to adopt it'
   },
   optional: {
     id: 'optional',
@@ -3526,7 +3526,7 @@ const DOMAIN_CONFIG = {
     id: 'form_status_engagement',
     name: 'Status & Engagement',
     version: 1,
-    description: 'Core status and engagement tracking for active cases',
+    description: 'Track your current status and any meetings or contacts with your providers',
     maturity: 'normative',
     source: {
       level: 'network',
@@ -3714,7 +3714,7 @@ const DOMAIN_CONFIG = {
     id: 'form_intake',
     name: 'Intake',
     version: 1,
-    description: 'Intake and enrollment event tracking',
+    description: 'Record intake steps like applications, documents, and enrollment',
     maturity: 'trial',
     source: {
       level: 'network',
@@ -3785,7 +3785,7 @@ const DOMAIN_CONFIG = {
     id: 'form_context',
     name: 'Additional Context',
     version: 1,
-    description: 'Supplementary context and situation changes',
+    description: 'Note any changes in your situation or new needs that come up',
     maturity: 'draft',
     source: {
       level: 'local'
@@ -8821,7 +8821,7 @@ const SourceBadge = ({
       fontSize: 9
     },
     title: `${source.propagation}: ${prop?.desc || ''}`
-  }, "Network \xB7 ", prop?.label || source.propagation);
+  }, "Shared \xB7 ", prop?.label || source.propagation);
 };
 
 // Consent gradient — not a vote count, a distribution of positions
@@ -18962,7 +18962,7 @@ const ClientApp = ({
       fontSize: 12.5,
       marginTop: 4
     }
-  }, "Structured observations \u2014 the thermometer readings. What happened, not what it means."), /*#__PURE__*/React.createElement(StorageTransparencyBadge, {
+  }, "Record what\u2019s happening in your own words. These are your self-reports \u2014 simple check-ins that help your providers stay in the loop."), /*#__PURE__*/React.createElement(StorageTransparencyBadge, {
     storageType: "matrix",
     roomId: vaultRoom,
     encrypted: true,
@@ -18983,7 +18983,7 @@ const ClientApp = ({
       color: 'var(--tx-2)',
       marginBottom: 12
     }
-  }, "Choose a form field to record what you observed. Each observation is an immutable GIVEN event in your vault."), DEFAULT_FORMS.map(f => /*#__PURE__*/React.createElement("div", {
+  }, "Pick a question below to record something that happened. Your answers are stored privately in your encrypted vault \u2014 only you decide who sees them."), DEFAULT_FORMS.map(f => /*#__PURE__*/React.createElement("div", {
     key: f.id,
     style: {
       marginBottom: 12
@@ -19005,7 +19005,22 @@ const ClientApp = ({
     maturity: f.maturity
   }), f.source && /*#__PURE__*/React.createElement(SourceBadge, {
     source: f.source
-  })), /*#__PURE__*/React.createElement("div", {
+  })), f.description && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 11,
+      color: 'var(--tx-2)',
+      lineHeight: 1.5,
+      marginBottom: 2,
+      marginTop: 2
+    }
+  }, f.description), /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 10,
+      color: 'var(--tx-3)',
+      fontStyle: 'italic',
+      marginBottom: 6
+    }
+  }, f.source?.level === 'network' ? "This form was set up by your care network and shared to all member organizations." : "This form was created locally by your organization."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))',
