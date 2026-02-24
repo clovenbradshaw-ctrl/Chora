@@ -325,10 +325,12 @@ button{font-family:var(--sans);cursor:pointer;border:none;border-radius:var(--r)
 
 /* ── Team Context Selector ── */
 .team-ctx-wrap{padding:8px 14px;border-bottom:1px solid var(--border-0)}
-.team-ctx-select{width:100%;background:var(--bg-2);color:var(--tx-0);border:1px solid var(--border-1);border-radius:var(--r);padding:7px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;outline:none;transition:border-color .2s;appearance:auto}
-.team-ctx-select:hover,.team-ctx-select:focus{border-color:var(--gold)}
-.team-ctx-banner{display:flex;align-items:center;gap:6px;padding:6px 10px;margin:6px 0 0;background:var(--purple-dim,rgba(139,92,246,.1));border:1px solid rgba(139,92,246,.2);border-radius:var(--r);font-size:10.5px;color:var(--tx-1)}
-.team-ctx-banner strong{color:var(--tx-0);font-weight:600}
+.team-ctx-pills{display:flex;flex-wrap:wrap;gap:4px}
+.team-ctx-pill{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:20px;border:1px solid var(--border-1);background:var(--bg-2);color:var(--tx-1);font-size:11px;font-family:var(--sans);cursor:pointer;transition:all .15s;white-space:nowrap;outline:none;line-height:1}
+.team-ctx-pill:hover{border-color:var(--tx-2);background:var(--bg-3)}
+.team-ctx-pill.active{background:var(--purple,#8b5cf6);border-color:var(--purple,#8b5cf6);color:#fff;font-weight:600}
+.team-ctx-pill.active-personal{background:var(--bg-4);border-color:var(--border-2);color:var(--tx-0);font-weight:600}
+.team-ctx-pill .pill-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 
 /* ── Sections ── */
 .fb-section{border:1px solid var(--border-0);border-radius:var(--r-lg);margin-bottom:16px;overflow:hidden;background:var(--bg-1)}
@@ -30021,10 +30023,13 @@ const ProviderApp = ({
     } catch {}
     if (teamRoomId) {
       const t = teams.find(t => t.roomId === teamRoomId);
-      if (t) { setActiveTeamDetail(t); setView('teams'); }
+      if (t) {
+        setTeamMode({ roomId: t.roomId, name: t.name, color_hue: t.color_hue });
+        setActiveTeamDetail(t);
+      }
     } else {
+      setTeamMode(null);
       setActiveTeamDetail(null);
-      setView('dashboard');
     }
   }, [teams]);
   const [teamMode, setTeamMode] = useState(null); // null = individual mode, { roomId, name, color_hue } = operating as team
@@ -30217,6 +30222,7 @@ const ProviderApp = ({
   const switchTeam = React.useCallback((targetRoomId) => {
     if (!targetRoomId) {
       setTeamMode(null);
+      setActiveTeamContext(null);
       try { localStorage.removeItem('khora_active_team'); } catch {}
       return;
     }
@@ -30224,7 +30230,8 @@ const ProviderApp = ({
     if (!target) return;
     const mode = { roomId: target.roomId, name: target.name, color_hue: target.color_hue };
     setTeamMode(mode);
-    try { localStorage.setItem('khora_active_team', JSON.stringify({ roomId: target.roomId })); } catch {}
+    setActiveTeamContext(target.roomId);
+    try { localStorage.setItem('khora_active_team', target.roomId); } catch {}
   }, [teams]);
 
   // Helper: active context for tagging actions with team/org
@@ -33327,12 +33334,21 @@ const ProviderApp = ({
       }, /*#__PURE__*/React.createElement(I, { n: opt.icon, s: 11 }), opt.label))
     ),
     teams.length > 0 && /*#__PURE__*/React.createElement("div", { style: { padding: '8px 0', borderTop: '1px solid var(--border-0)', marginTop: 4 } },
-      /*#__PURE__*/React.createElement("span", { className: "section-label", style: { fontSize: 9, padding: '0 0 4px' } }, "WORKSPACE"),
-      /*#__PURE__*/React.createElement("select", {
-        className: "team-ctx-select",
-        value: activeTeamContext || '',
-        onChange: e => switchTeamContext(e.target.value || null)
-      }, /*#__PURE__*/React.createElement("option", { value: '' }, "Personal"), teams.map(t => /*#__PURE__*/React.createElement("option", { key: t.roomId, value: t.roomId }, t.name || 'Unnamed Team')))
+      /*#__PURE__*/React.createElement("span", { className: "section-label", style: { fontSize: 9, padding: '0 0 6px' } }, "WORKSPACE"),
+      /*#__PURE__*/React.createElement("div", { className: "team-ctx-pills" },
+        /*#__PURE__*/React.createElement("button", {
+          className: "team-ctx-pill" + (!activeTeamContext ? " active-personal" : ""),
+          onClick: () => switchTeamContext(null)
+        }, /*#__PURE__*/React.createElement(I, { n: "user", s: 10 }), "Personal"),
+        teams.map(t => /*#__PURE__*/React.createElement("button", {
+          key: t.roomId,
+          className: "team-ctx-pill" + (activeTeamContext === t.roomId ? " active" : ""),
+          onClick: () => switchTeamContext(t.roomId)
+        }, /*#__PURE__*/React.createElement("span", {
+          className: "pill-dot",
+          style: { background: activeTeamContext === t.roomId ? '#fff' : `hsl(${t.color_hue || 260}, 60%, 55%)` }
+        }), t.name || 'Unnamed Team'))
+      )
     ),
     /*#__PURE__*/React.createElement("div", { style: { padding: '8px 0', borderTop: '1px solid var(--border-0)', marginTop: 8, display: 'flex', gap: 8 } },
       /*#__PURE__*/React.createElement(ThemeToggle, { style: { flex: 1 } }),
@@ -33573,23 +33589,20 @@ const ProviderApp = ({
   /* ─── Team Context Switcher (sidebar) ─── */
   teams.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "team-ctx-wrap"
-  }, /*#__PURE__*/React.createElement("span", { className: "section-label", style: { fontSize: 9, display: 'block', marginBottom: 4 } }, "WORKSPACE"),
-    /*#__PURE__*/React.createElement("select", {
-      className: "team-ctx-select",
-      value: activeTeamContext || '',
-      onChange: e => switchTeamContext(e.target.value || null)
-    }, /*#__PURE__*/React.createElement("option", { value: '' }, "Personal"),
-      teams.map(t => /*#__PURE__*/React.createElement("option", { key: t.roomId, value: t.roomId }, t.name || 'Unnamed Team'))
-    ),
-    activeTeamObj && /*#__PURE__*/React.createElement("div", { className: "team-ctx-banner" },
-      /*#__PURE__*/React.createElement(I, { n: "users", s: 11, c: "var(--purple, #8b5cf6)" }),
-      /*#__PURE__*/React.createElement("strong", null, activeTeamObj.name || 'Team'),
-      /*#__PURE__*/React.createElement("span", { style: { color: 'var(--tx-3)', fontSize: 10 } }, "\u00B7 ", (activeTeamObj.members || []).length, " members"),
+  }, /*#__PURE__*/React.createElement("span", { className: "section-label", style: { fontSize: 9, display: 'block', marginBottom: 6 } }, "WORKSPACE"),
+    /*#__PURE__*/React.createElement("div", { className: "team-ctx-pills" },
       /*#__PURE__*/React.createElement("button", {
-        onClick: () => switchTeamContext(null),
-        className: "b-gho",
-        style: { marginLeft: 'auto', padding: '2px 6px', fontSize: 9, borderRadius: 'var(--r)' }
-      }, "Clear")
+        className: "team-ctx-pill" + (!activeTeamContext ? " active-personal" : ""),
+        onClick: () => switchTeamContext(null)
+      }, /*#__PURE__*/React.createElement(I, { n: "user", s: 10 }), "Personal"),
+      teams.map(t => /*#__PURE__*/React.createElement("button", {
+        key: t.roomId,
+        className: "team-ctx-pill" + (activeTeamContext === t.roomId ? " active" : ""),
+        onClick: () => switchTeamContext(t.roomId)
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "pill-dot",
+        style: { background: activeTeamContext === t.roomId ? '#fff' : `hsl(${t.color_hue || 260}, 60%, 55%)` }
+      }), t.name || 'Unnamed Team'))
     )
   ),
   /*#__PURE__*/React.createElement("div", {
@@ -34013,66 +34026,7 @@ const ProviderApp = ({
   }, allOrgs.map(o => /*#__PURE__*/React.createElement("option", {
     key: o.roomId,
     value: o.roomId
-  }, o.meta?.name || o.roomId)))), teamMode && (() => {
-    const tc = teamColorThemed(teamMode.color_hue, isLightTheme);
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        padding: '6px 20px',
-        background: tc.dim,
-        borderBottom: `1px solid ${tc.border}`,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        minHeight: 34,
-        position: 'sticky',
-        top: orgRoom ? 40 : 0,
-        zIndex: 4
-      }
-    }, /*#__PURE__*/React.createElement(I, {
-      n: "users",
-      s: 14,
-      c: tc.primary
-    }), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontWeight: 700,
-        fontSize: 12.5,
-        color: tc.primary,
-        fontFamily: 'var(--serif)'
-      }
-    }, teamMode.name), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 9,
-        color: tc.primary,
-        opacity: 0.7,
-        fontFamily: 'var(--mono)',
-        letterSpacing: '.06em',
-        fontWeight: 600
-      }
-    }, "TEAM MODE"), /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1 }
-    }), teams.length > 1 && /*#__PURE__*/React.createElement("select", {
-      value: teamMode.roomId,
-      onChange: e => switchTeam(e.target.value),
-      style: {
-        background: 'var(--bg-2)',
-        color: 'var(--tx-0)',
-        border: `1px solid ${tc.border}`,
-        borderRadius: 'var(--r)',
-        padding: '3px 8px',
-        fontSize: 10,
-        fontFamily: 'var(--sans)',
-        cursor: 'pointer',
-        outline: 'none'
-      }
-    }, teams.map(t => /*#__PURE__*/React.createElement("option", {
-      key: t.roomId,
-      value: t.roomId
-    }, t.name))), /*#__PURE__*/React.createElement("button", {
-      onClick: () => switchTeam(null),
-      className: "b-gho b-xs",
-      style: { fontSize: 10, padding: '3px 10px' }
-    }, "Individual Mode"));
-  })(), /*#__PURE__*/React.createElement("div", {
+  }, o.meta?.name || o.roomId)))), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 24
     }
