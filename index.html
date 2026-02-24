@@ -2525,7 +2525,7 @@ const RESOURCE_OPACITY = {
   SOVEREIGN: 0,
   // holder-only, no one else sees it
   ATTESTED: 1,
-  // shared with specific partners via bridge
+  // shared with specific partners via case room
   CONTRIBUTED: 2,
   // visible in network resource commons
   PUBLISHED: 3 // externally visible (API, 211 feed, directory)
@@ -2538,7 +2538,7 @@ const RESOURCE_OPACITY_LABELS = {
 };
 const RESOURCE_OPACITY_DESCRIPTIONS = {
   0: 'Only visible to the holding org',
-  1: 'Shared with specific partners via bridge',
+  1: 'Shared with specific partners via case room',
   2: 'Visible in network resource commons',
   3: 'Externally visible (API, directory)'
 };
@@ -4532,9 +4532,9 @@ const DOMAIN_CONFIG = {
   defaultOrgRoles: [
     { key: 'admin', label: 'Admin', description: 'Full access. Manage team, see all cases, configure schema.', protected: true },
     { key: 'provider', label: 'Provider (Team Member)', description: 'View aggregate dashboards only. No PII access.' },
-    { key: 'case_manager', label: 'Case Manager', description: 'Assigned cases only. Full read/write on assigned bridges.' },
+    { key: 'case_manager', label: 'Case Manager', description: 'Assigned cases only. Full read/write on assigned case rooms.' },
     { key: 'field_worker', label: 'Field Worker', description: 'Assigned cases. Record encounters. Limited to own observations.' },
-    { key: 'intake_coordinator', label: 'Intake Coordinator', description: 'Create new bridges. Run intake assessments. Route to case managers.' },
+    { key: 'intake_coordinator', label: 'Intake Coordinator', description: 'Create new case rooms. Run intake assessments. Route to case managers.' },
     { key: 'read_only', label: 'Read Only', description: 'View aggregate dashboards only. No PII access.' }
   ],
   /* ── Relationship Types ── */
@@ -18145,7 +18145,7 @@ const ClientApp = ({
       // Step 3: Tombstone old bridge (points to new) and kick provider from old
       await svc.tombstone(prov.bridgeRoomId, newBridgeId);
       try {
-        await svc.kick(prov.bridgeRoomId, prov.providerUserId, 'Bridge rotated — data revoked');
+        await svc.kick(prov.bridgeRoomId, prov.providerUserId, 'Room rotated — data revoked');
       } catch {}
       // Step 4: Sync shared fields to new bridge and invite provider
       const stillShared = Object.fromEntries(Object.entries(prov.sharedFields).filter(([, v]) => v));
@@ -21953,7 +21953,7 @@ const IndividualPanel = ({
     }
   }, "No allocations recorded.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
     className: "section-label"
-  }, "Resources Received (dual-write: bridge + vault shadow)"), indAllocs.map(a => {
+  }, "Resources Received (dual-write: case room + vault shadow)"), indAllocs.map(a => {
     const stCls = a.status === 'active' ? 'tag-green' : a.status === 'consumed' ? 'tag-purple' : 'tag-gold';
     return /*#__PURE__*/React.createElement("div", {
       key: a.id,
@@ -22013,7 +22013,7 @@ const IndividualPanel = ({
         fontSize: 11,
         color: 'var(--tx-2)'
       }
-    }, /*#__PURE__*/React.createElement("strong", null, "Vault shadow: "), "\"", a.vaultShadow.resource_name, "\" from ", a.vaultShadow.org, " \u2014 denormalized, survives bridge severance"), a.events && a.events.length > 0 && /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("strong", null, "Vault shadow: "), "\"", a.vaultShadow.resource_name, "\" from ", a.vaultShadow.org, " \u2014 denormalized, survives room severance"), a.events && a.events.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "dt-alloc-events"
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -22053,7 +22053,7 @@ const IndividualPanel = ({
     op: "ALT"
   }), " (\u223F). Revocations emit ", /*#__PURE__*/React.createElement(DtEo, {
     op: "NUL"
-  }), " (\u2205). The bridge room gets the live record; the vault gets a denormalized shadow copy."))))));
+  }), " (\u2205). The case room gets the live record; the vault gets a denormalized shadow copy."))))));
 };
 
 /* ─── Resource Side Panel ─── */
@@ -22290,7 +22290,7 @@ const ResourcePanel = ({
       fontWeight: 600,
       fontSize: 13
     }
-  }, a.indName || '[bridge ref]'), /*#__PURE__*/React.createElement("div", {
+  }, a.indName || '[room ref]'), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: 'var(--tx-2)'
@@ -22439,7 +22439,7 @@ const NoteCreateModal = ({
     }, (individuals || []).find(i => i.id === initialAttachTo)?.name || initialAttachTo),
     /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 10, color: 'var(--tx-2)', marginTop: 4 }
-    }, "Stored in the individual\u2019s bridge room \u2014 they can see and control this note.")
+    }, "Stored in the individual\u2019s case room \u2014 they can see and control this note.")
   ) : /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("span", { className: "section-label" },
       "ATTACH TO ", T?.client_term?.toUpperCase() || 'INDIVIDUAL', " (OPTIONAL)"),
@@ -22451,7 +22451,7 @@ const NoteCreateModal = ({
       }, ind.name || ind.id))),
     /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 10, color: 'var(--tx-2)', marginTop: 4 }
-    }, attachTo ? 'Stored in the individual\'s bridge room \u2014 they can see and control this note.' : 'Stored in your roster room \u2014 internal to your organization.')
+    }, attachTo ? 'Stored in the individual\'s case room \u2014 they can see and control this note.' : 'Stored in your roster room \u2014 internal to your organization.')
   ));
 
   const renderCreatedBy = () => /*#__PURE__*/React.createElement("div", {
@@ -22618,7 +22618,7 @@ const NotesTable = ({
     const ind = (individuals || []).find(i => i.id === n.attached_to);
     return {
       ...n,
-      attached_to_name: ind ? ind.name : n.attached_to ? '[bridge]' : 'Standalone',
+      attached_to_name: ind ? ind.name : n.attached_to ? '[room]' : 'Standalone',
       tags_display: (n.tags || []).map(t => t.displayName).join(', ') || '—',
       author_name: (n.author || '').split(':')[0]?.replace('@', '') || 'Unknown'
     };
@@ -26781,7 +26781,7 @@ const ResourceProfilePage = ({
       fontWeight: 600,
       fontSize: 13
     }
-  }, a.indName || '[bridge ref]'), /*#__PURE__*/React.createElement("div", {
+  }, a.indName || '[room ref]'), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
       color: 'var(--tx-2)'
@@ -29637,7 +29637,7 @@ const ProviderApp = ({
       }
       if (found) {
         await loadCases();
-        showToast('Bridge found — refreshing cases', 'success');
+        showToast('Case room found — refreshing cases', 'success');
       } else {
         showToast(`No bridge found for ${discoverUserId}. The client must create a bridge and invite you.`, 'warn');
       }
@@ -32127,7 +32127,7 @@ const ProviderApp = ({
     encrypted: true,
     encLabel: "Megolm E2EE",
     label: "Messages",
-    extra: [{ label: 'Privacy model', value: 'Each conversation is a separate encrypted Matrix room (bridge). Direct messages are between you and one client. Org channels use opacity envelopes.' }, orgRoom ? { label: 'Org channel opacity', value: orgOpacity + ' \u2014 controls what receiving orgs see about message sender identity' } : null].filter(Boolean)
+    extra: [{ label: 'Privacy model', value: 'Each conversation is a separate encrypted Matrix room. Direct messages are between you and one client. Org channels use opacity envelopes.' }, orgRoom ? { label: 'Org channel opacity', value: orgOpacity + ' \u2014 controls what receiving orgs see about message sender identity' } : null].filter(Boolean)
   })), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: 6, flexShrink: 0 }
   }, /*#__PURE__*/React.createElement("button", {
@@ -33425,7 +33425,7 @@ const ProviderApp = ({
       color: 'var(--tx-2)',
       marginBottom: 10
     }
-  }, "Structured assessments and case management observations. Each entry is an EO event in the bridge room with full provenance."), /*#__PURE__*/React.createElement("div", {
+  }, "Structured assessments and case management observations. Each entry is an EO event in the case room with full provenance."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))',
@@ -33600,7 +33600,7 @@ const ProviderApp = ({
       color: 'var(--tx-2)',
       marginBottom: 10
     }
-  }, "Resources allocated to this ", T.client_term.toLowerCase(), " through this bridge. Each allocation is an EO event with full provenance."), caseAllocations.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, "Resources allocated to this ", T.client_term.toLowerCase(), " through this case room. Each allocation is an EO event with full provenance."), caseAllocations.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: 'center',
       padding: '16px 0',
@@ -33898,7 +33898,7 @@ const ProviderApp = ({
     encLabel: "Megolm E2EE",
     label: "Metrics",
     members: [{ userId: svc.userId, role: 'metrics owner' }],
-    extra: [{ label: 'Anonymization', value: 'K-anonymity (k=5). PII fields are blocked. Demographics are generalized to ranges. Cohort hashing prevents re-identification.' }, { label: 'Data flow', value: 'Clients consent per-category. Observations are anonymized in the bridge room before flowing to this metrics room.' }]
+    extra: [{ label: 'Anonymization', value: 'K-anonymity (k=5). PII fields are blocked. Demographics are generalized to ranges. Cohort hashing prevents re-identification.' }, { label: 'Data flow', value: 'Clients consent per-category. Observations are anonymized in the case room before flowing to this metrics room.' }]
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
@@ -36253,7 +36253,7 @@ const ProviderApp = ({
       marginBottom: 14,
       lineHeight: 1.6
     }
-  }, "Look up a client by their Matrix ID. If they've created a bridge room and invited you, it will appear in your cases."), /*#__PURE__*/React.createElement("div", {
+  }, "Look up a client by their Matrix ID. If they've created a case room and invited you, it will appear in your cases."), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
@@ -36269,7 +36269,7 @@ const ProviderApp = ({
     style: {
       width: '100%'
     }
-  }, "Search for Bridge")), /*#__PURE__*/React.createElement(Modal, {
+  }, "Find Case Room")), /*#__PURE__*/React.createElement(Modal, {
     open: createResourceModal,
     onClose: () => setCreateResourceModal(false),
     title: "Create Resource Type",
@@ -37305,7 +37305,7 @@ const ProviderApp = ({
       marginBottom: 16,
       lineHeight: 1.6
     }
-  }, "Your profile is stored in your roster room and synced to your bridge rooms. ", T.client_term_plural, " see your name, title, credentials, and organization membership."), /*#__PURE__*/React.createElement("div", {
+  }, "Your profile is stored in your roster room and synced to your case rooms. ", T.client_term_plural, " see your name, title, credentials, and organization membership."), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
@@ -37444,7 +37444,7 @@ const ProviderApp = ({
       color: 'var(--tx-2)',
       marginTop: 6
     }
-  }, myVerification?.status === 'verified' ? 'Your identity is email-verified and visible to clients on all bridges.' : 'Your organization membership is verified through the Matrix room roster and will be visible to clients on all bridges.')) : /*#__PURE__*/React.createElement("div", {
+  }, myVerification?.status === 'verified' ? 'Your identity is email-verified and visible to clients on all case rooms.' : 'Your organization membership is verified through the Matrix room roster and will be visible to clients on all case rooms.')) : /*#__PURE__*/React.createElement("div", {
     style: {
       background: 'var(--gold-dim)',
       border: '1px solid var(--gold-mid)',
@@ -37653,7 +37653,7 @@ const ProviderApp = ({
       fontSize: 11,
       color: 'var(--tx-2)'
     }
-  }, "Your verified status is now visible to clients on all bridges and reflected in your provider profile.")), /*#__PURE__*/React.createElement("button", {
+  }, "Your verified status is now visible to clients on all case rooms and reflected in your provider profile.")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setEmailVerifyModal(false),
     className: "b-pri",
     style: {
@@ -38979,7 +38979,7 @@ const ProviderApp = ({
       marginBottom: 16,
       lineHeight: 1.6
     }
-  }, "Reassign this case to a different ", T.provider_term.toLowerCase(), " within your organization. The new ", T.provider_term.toLowerCase(), " will be invited to the encrypted bridge room."), /*#__PURE__*/React.createElement("div", {
+  }, "Reassign this case to a different ", T.provider_term.toLowerCase(), " within your organization. The new ", T.provider_term.toLowerCase(), " will be invited to the encrypted case room."), /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       padding: 14,
@@ -39283,12 +39283,12 @@ const TransparencyPage = ({ onBack }) => {
   const accessMatrix = [
     { entity: 'Your Vault Data', you: true, provider: false, org: false, network: false, server: false,
       detail: 'Encrypted in your private Matrix room. Only your session keys can decrypt. Not even the homeserver operator can read vault contents.' },
-    { entity: 'Bridge Shared Fields', you: true, provider: true, org: false, network: false, server: false,
-      detail: 'Only the specific fields you choose to share via a bridge are visible to the linked provider. You control which fields and can revoke at any time.' },
+    { entity: 'Shared Fields', you: true, provider: true, org: false, network: false, server: false,
+      detail: 'Only the specific fields you choose to share are visible to the linked provider. You control which fields and can revoke at any time.' },
     { entity: 'Observations', you: true, provider: true, org: false, network: false, server: false,
-      detail: 'Written by providers into the bridge room. Both you and the provider can read observations. They cannot be silently edited — EO provenance tracks all changes.' },
+      detail: 'Written by providers into the case room. Both you and the provider can read observations. They cannot be silently edited — EO provenance tracks all changes.' },
     { entity: 'Case Messages', you: true, provider: true, org: false, network: false, server: false,
-      detail: 'Messages in a bridge room are visible to both parties. End-to-end encrypted via Matrix. The homeserver sees encrypted blobs only.' },
+      detail: 'Messages in a case room are visible to both parties. End-to-end encrypted via Matrix. The homeserver sees encrypted blobs only.' },
     { entity: 'Org Channel Messages', you: false, provider: true, org: true, network: false, server: false,
       detail: 'Organization-internal channels are visible to org members only. Not shared with individuals/clients.' },
     { entity: 'Anonymized Metrics', you: false, provider: true, org: true, network: true, server: false,
@@ -39354,7 +39354,7 @@ const TransparencyPage = ({ onBack }) => {
         { icon: 'lock', color: 'green', title: 'End-to-End Encrypted', desc: 'All data in Matrix rooms is encrypted. Only participants with session keys can decrypt.' },
         { icon: 'shield', color: 'teal', title: 'You Own Your Rooms', desc: 'When you claim a room, you become superadmin (power level 100). You can kick anyone — including providers.' },
         { icon: 'eye', color: 'blue', title: 'Full Transparency', desc: 'This page lets you read the actual running source code. The code IS the documentation.' },
-        { icon: 'users', color: 'gold', title: 'Explicit Consent', desc: 'Data only flows where you allow it. Every bridge share is opt-in. Metrics require consent.' },
+        { icon: 'users', color: 'gold', title: 'Explicit Consent', desc: 'Data only flows where you allow it. Every share is opt-in. Metrics require consent.' },
       ].map((card, i) => React.createElement('div', { key: i, className: 'card', style: { display: 'flex', gap: 10, alignItems: 'flex-start' } },
         React.createElement('div', { style: { width: 30, height: 30, borderRadius: 'var(--r)', background: `var(--${card.color}-dim)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: `var(--${card.color})`, flexShrink: 0 } },
           React.createElement(I, { n: card.icon, s: 15 })),
@@ -39438,7 +39438,7 @@ const TransparencyPage = ({ onBack }) => {
         { title: 'No hidden data collection', desc: 'There is no analytics, no telemetry, no tracking pixels, no third-party scripts that phone home. The only network calls are to Matrix homeservers you choose.' },
         { title: 'Encryption at rest', desc: 'Matrix rooms use end-to-end encryption. The homeserver stores encrypted blobs. Decryption keys never leave your device.' },
         { title: 'Sovereignty by default', desc: 'When you claim a room, you get power level 100 (superadmin). You can kick anyone — including the provider who created the room. Ownership cannot be revoked.' },
-        { title: 'Consent-gated sharing', desc: 'Every bridge share is opt-in. Metrics aggregation requires explicit consent. You can revoke field sharing at any time from your vault.' },
+        { title: 'Consent-gated sharing', desc: 'Every share is opt-in. Metrics aggregation requires explicit consent. You can revoke field sharing at any time from your vault.' },
         { title: 'Auditable operations', desc: 'Every state change emits an EO operation with a provenance chain linking it to the previous operation on that entity. The full history is inspectable.' },
         { title: 'K-anonymity for metrics', desc: 'Aggregate metrics use k-anonymity (k=5). Any demographic combination with fewer than 5 matching individuals is suppressed. PII fields are never included.' },
         { title: 'Open protocol, no lock-in', desc: 'Built on Matrix (open federated protocol). You can run your own homeserver, migrate to a different client, or export your data at any time.' },
@@ -39646,7 +39646,7 @@ const TransparencyPage = ({ onBack }) => {
       color: '#3ecf8e', dimColor: 'rgba(62,207,142,.15)', icon: 'lock',
       children: [
         { id: 'vault-fields', label: 'Vault Fields', desc: 'Encrypted personal data fields — name, DOB, identifiers, custom fields. Stored as Matrix state events.', color: '#3ecf8e', dimColor: 'rgba(62,207,142,.15)' },
-        { id: 'vault-consent', label: 'Consent Settings', desc: 'Per-field consent flags controlling which data can be shared with providers via bridges.', color: '#3ecf8e', dimColor: 'rgba(62,207,142,.15)' },
+        { id: 'vault-consent', label: 'Consent Settings', desc: 'Per-field consent flags controlling which data can be shared with providers via case rooms.', color: '#3ecf8e', dimColor: 'rgba(62,207,142,.15)' },
         { id: 'vault-schemas', label: 'Field Schemas', desc: 'Schema definitions that describe the structure and validation rules for vault data fields.', color: '#3ecf8e', dimColor: 'rgba(62,207,142,.15)' },
         { id: 'vault-oplog', label: 'Operation Log', desc: 'Chronological log of every EO operation performed on vault data — fully auditable.', color: '#3ecf8e', dimColor: 'rgba(62,207,142,.15)' }
       ],
@@ -39662,8 +39662,8 @@ const TransparencyPage = ({ onBack }) => {
       children: [
         { id: 'bridge-fields', label: 'Shared Fields', desc: 'Vault fields you have explicitly consented to share with this provider.', color: '#5bc0be', dimColor: 'rgba(91,192,190,.15)' },
         { id: 'bridge-obs', label: 'Observations', desc: 'Clinical or service observations recorded by the provider about this case.', color: '#5bc0be', dimColor: 'rgba(91,192,190,.15)' },
-        { id: 'bridge-msgs', label: 'Messages', desc: 'End-to-end encrypted messages between you and the provider within this bridge.', color: '#5bc0be', dimColor: 'rgba(91,192,190,.15)' },
-        { id: 'bridge-settings', label: 'Bridge Settings', desc: 'Configuration for the bridge — consent state, power levels, room permissions.', color: '#5bc0be', dimColor: 'rgba(91,192,190,.15)' }
+        { id: 'bridge-msgs', label: 'Messages', desc: 'End-to-end encrypted messages between you and the provider within this case room.', color: '#5bc0be', dimColor: 'rgba(91,192,190,.15)' },
+        { id: 'bridge-settings', label: 'Room Settings', desc: 'Configuration for the case room — consent state, power levels, room permissions.', color: '#5bc0be', dimColor: 'rgba(91,192,190,.15)' }
       ],
       childEdges: [
         { from: 0, to: 1, label: 'context for' },
@@ -39675,7 +39675,7 @@ const TransparencyPage = ({ onBack }) => {
       id: 'provider', label: 'Provider', desc: 'Provider dashboard for managing cases, recording observations, and coordinating care.',
       color: '#5b9cf5', dimColor: 'rgba(91,156,245,.15)', icon: 'briefcase',
       children: [
-        { id: 'prov-cases', label: 'Cases', desc: 'Active cases the provider manages — each linked to a bridge room with a client.', color: '#5b9cf5', dimColor: 'rgba(91,156,245,.15)' },
+        { id: 'prov-cases', label: 'Cases', desc: 'Active cases the provider manages — each linked to an encrypted case room with a client.', color: '#5b9cf5', dimColor: 'rgba(91,156,245,.15)' },
         { id: 'prov-individuals', label: 'Individuals', desc: 'Client profiles visible to the provider, built from consented shared data.', color: '#5b9cf5', dimColor: 'rgba(91,156,245,.15)' },
         { id: 'prov-resources', label: 'Resources', desc: 'Services, programs, and referral resources the provider can allocate to cases.', color: '#5b9cf5', dimColor: 'rgba(91,156,245,.15)' },
         { id: 'prov-metrics', label: 'Metrics', desc: 'Outcome and activity metrics tracked per case and per provider.', color: '#5b9cf5', dimColor: 'rgba(91,156,245,.15)' }
@@ -39718,7 +39718,7 @@ const TransparencyPage = ({ onBack }) => {
       id: 'matrix', label: 'Matrix Protocol', desc: 'The underlying open federation protocol. All rooms, events, and encryption happen here.',
       color: '#6b7385', dimColor: 'rgba(107,115,133,.15)', icon: 'layers',
       children: [
-        { id: 'mx-rooms', label: 'Rooms', desc: 'Matrix rooms are the containers for all data — vaults, bridges, channels are all rooms.', color: '#6b7385', dimColor: 'rgba(107,115,133,.15)' },
+        { id: 'mx-rooms', label: 'Rooms', desc: 'Matrix rooms are the containers for all data — vaults, case rooms, channels are all rooms.', color: '#6b7385', dimColor: 'rgba(107,115,133,.15)' },
         { id: 'mx-events', label: 'Events', desc: 'State events and timeline events — every data change is a Matrix event.', color: '#6b7385', dimColor: 'rgba(107,115,133,.15)' },
         { id: 'mx-e2ee', label: 'E2E Encryption', desc: 'Olm/Megolm encryption ensures only room members with session keys can read data.', color: '#6b7385', dimColor: 'rgba(107,115,133,.15)' },
         { id: 'mx-federation', label: 'Federation', desc: 'Homeservers federate — data is replicated but encrypted. No single point of control.', color: '#6b7385', dimColor: 'rgba(107,115,133,.15)' }
@@ -39737,7 +39737,7 @@ const TransparencyPage = ({ onBack }) => {
         { id: 'eo-des', label: '\u225d DES', desc: 'Designate — names or classifies an entity. Sets the frame for what something IS.', color: '#3ecf8e', dimColor: 'rgba(62,207,142,.15)', sublabel: 'Existence' },
         { id: 'eo-ins', label: '\u25b3 INS', desc: 'Instantiate — creates a new entity with a value. The moment data comes into being.', color: '#5bc0be', dimColor: 'rgba(91,192,190,.15)', sublabel: 'Existence' },
         { id: 'eo-seg', label: '\u22a2 SEG', desc: 'Segment — partitions data into structural segments. Creates boundaries between groups.', color: '#5b9cf5', dimColor: 'rgba(91,156,245,.15)', sublabel: 'Structure' },
-        { id: 'eo-con', label: '\u22c8 CON', desc: 'Connect — links entities together. Provenance chains, allocations, bridges.', color: '#e5a550', dimColor: 'rgba(229,165,80,.15)', sublabel: 'Structure' },
+        { id: 'eo-con', label: '\u22c8 CON', desc: 'Connect — links entities together. Provenance chains, allocations, case rooms.', color: '#e5a550', dimColor: 'rgba(229,165,80,.15)', sublabel: 'Structure' },
         { id: 'eo-syn', label: '\u2228 SYN', desc: 'Synthesize — merges multiple sources into a unified view. Parallel hydration.', color: '#b090d4', dimColor: 'rgba(176,144,212,.15)', sublabel: 'Structure' },
         { id: 'eo-alt', label: '\u223f ALT', desc: 'Alter — changes a value within an existing frame. Status transitions, field updates.', color: '#e5a550', dimColor: 'rgba(229,165,80,.15)', sublabel: 'Interpretation' },
         { id: 'eo-sup', label: '\u29a6 SUP', desc: 'Superpose — holds multiple valid values simultaneously. Competing interpretations.', color: '#b090d4', dimColor: 'rgba(176,144,212,.15)', sublabel: 'Interpretation' },
