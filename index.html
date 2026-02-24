@@ -17438,14 +17438,11 @@ const ClientApp = ({
   });
   const [providers, setProviders] = useState([]);
   const [view, setView] = useState('dashboard');
-  const [activeBridge, setActiveBridge] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editModal, setEditModal] = useState(false);
   const [editData, setEditData] = useState({});
   const [addProviderModal, setAddProviderModal] = useState(false);
   const [newProviderId, setNewProviderId] = useState('');
-  const [bridgeMessages, setBridgeMessages] = useState([]);
-  const [msgText, setMsgText] = useState('');
   // Inbox chat state
   const [inboxConvo, setInboxConvo] = useState(null); // unified conversation object with .rooms, .peerId, .peerName
   const [inboxMessages, setInboxMessages] = useState([]);
@@ -18328,26 +18325,6 @@ const ClientApp = ({
       showToast('Failed to save sharing preference: ' + e.message, 'error');
     }
   };
-  const loadBridgeMessages = async bid => {
-    setBridgeMessages(await svc.getMessages(bid));
-  };
-  const handleSendBridgeMsg = async () => {
-    if (!msgText.trim() || !activeBridge) return;
-    await svc.sendMessage(activeBridge, msgText, {
-      [`${NS}.type`]: 'note'
-    });
-    await emitOp(activeBridge, 'INS', dot('bridge', 'messages', 'client_note'), {
-      body: msgText
-    }, bridgeFrame(activeBridge));
-    setMsgText('');
-    setTimeout(() => loadBridgeMessages(activeBridge), 500);
-  };
-  const openBridge = bid => {
-    setActiveBridge(bid);
-    setView('bridge');
-    loadBridgeMessages(bid);
-  };
-
   // ─── Inbox chat functions (unified) ───
   const loadInboxMessagesForConvo = async (convo) => {
     if (!convo?.rooms) return;
@@ -18454,8 +18431,6 @@ const ClientApp = ({
     }
     return contacts;
   }, [myTeams, clientTeamDMs]);
-  const activeProviderIdx = providers.findIndex(p => p.bridgeRoomId === activeBridge);
-  const activeProvider = activeProviderIdx >= 0 ? providers[activeProviderIdx] : null;
   const filledFields = allFields.filter(f => vaultData[f.key]);
   const sharedCount = providers.reduce((s, p) => s + Object.values(p.sharedFields || {}).filter(Boolean).length, 0);
   if (loading) return /*#__PURE__*/React.createElement("div", {
@@ -18539,8 +18514,8 @@ const ClientApp = ({
       { id: 'inbox', icon: 'msg', label: 'Messages', badge: providers.length, badgeClass: 'nav-badge-teal' },
       { id: 'providers', icon: 'users', label: 'People' }
     ],
-    activeView: activeBridge ? 'bridge' : view,
-    onNavigate: id => { setView(id); setActiveBridge(null); },
+    activeView: view,
+    onNavigate: id => { setView(id); },
     moreItems: [
       { id: 'observations', icon: 'clipboard', label: 'Observations' },
       { id: 'resources', icon: 'layers', label: 'My Resources' },
@@ -18549,7 +18524,7 @@ const ClientApp = ({
       { id: 'activity', icon: 'layers', label: 'Activity Stream' },
       { id: 'transparency', icon: 'eye', label: 'Transparency' }
     ],
-    onMoreNavigate: id => { setView(id); setActiveBridge(null); }
+    onMoreNavigate: id => { setView(id); }
   },
     /*#__PURE__*/React.createElement("div", { style: { padding: '8px 0', borderTop: '1px solid var(--border-0)', marginTop: 8, display: 'flex', gap: 8 } },
       /*#__PURE__*/React.createElement(ThemeToggle, { style: { flex: 1 } }),
@@ -18673,7 +18648,6 @@ const ClientApp = ({
     key: item.id,
     onClick: () => {
       setView(item.id);
-      setActiveBridge(null);
       if (item.id !== 'inbox') setInboxConvo(null);
     },
     style: {
@@ -18681,19 +18655,19 @@ const ClientApp = ({
       borderRadius: 'var(--r)',
       cursor: 'pointer',
       marginBottom: 1,
-      background: view === item.id && !activeBridge ? 'var(--bg-4)' : 'transparent',
-      borderLeft: view === item.id && !activeBridge ? '2px solid var(--teal)' : '2px solid transparent',
+      background: view === item.id ? 'var(--bg-4)' : 'transparent',
+      borderLeft: view === item.id ? '2px solid var(--teal)' : '2px solid transparent',
       display: 'flex',
       alignItems: 'center',
       gap: 8,
       transition: 'all .15s',
-      color: view === item.id && !activeBridge ? 'var(--tx-0)' : 'var(--tx-1)'
+      color: view === item.id ? 'var(--tx-0)' : 'var(--tx-1)'
     },
     onMouseEnter: e => {
-      if (!(view === item.id && !activeBridge)) e.currentTarget.style.background = 'var(--bg-3)';
+      if (view !== item.id) e.currentTarget.style.background = 'var(--bg-3)';
     },
     onMouseLeave: e => {
-      if (!(view === item.id && !activeBridge)) e.currentTarget.style.background = 'transparent';
+      if (view !== item.id) e.currentTarget.style.background = 'transparent';
     }
   }, /*#__PURE__*/React.createElement(I, {
     n: item.icon,
@@ -18748,7 +18722,7 @@ const ClientApp = ({
       padding: 24,
       minWidth: 0
     }
-  }, view === 'dashboard' && !activeBridge && /*#__PURE__*/React.createElement(PersonalDashboard, {
+  }, view === 'dashboard' && /*#__PURE__*/React.createElement(PersonalDashboard, {
     session: session,
     providers: providers,
     observations: observations,
@@ -18758,9 +18732,8 @@ const ClientApp = ({
     vaultRoom: vaultRoom,
     onNavigate: v => {
       setView(v);
-      setActiveBridge(null);
     }
-  }), view === 'vault' && !activeBridge && /*#__PURE__*/React.createElement("div", {
+  }), view === 'vault' && /*#__PURE__*/React.createElement("div", {
     className: "anim-up",
     style: {
       maxWidth: 820,
@@ -19027,7 +19000,7 @@ const ClientApp = ({
       label: f.label,
       session: session
     }))))));
-  })), view === 'observations' && !activeBridge && /*#__PURE__*/React.createElement("div", {
+  })), view === 'observations' && /*#__PURE__*/React.createElement("div", {
     className: "anim-up",
     style: {
       maxWidth: 820,
@@ -19315,7 +19288,7 @@ const ClientApp = ({
     value: obs.value,
     reporter: `${ROLES.client.label} self-report`,
     timestamp: obs.ts
-  }))))), view === 'resources' && !activeBridge && /*#__PURE__*/React.createElement("div", {
+  }))))), view === 'resources' && /*#__PURE__*/React.createElement("div", {
     className: "anim-up",
     style: {
       maxWidth: 820,
@@ -19531,7 +19504,7 @@ const ClientApp = ({
         session: session
       })));
     }))));
-  })())), view === 'providers' && !activeBridge && /*#__PURE__*/React.createElement("div", {
+  })())), view === 'providers' && /*#__PURE__*/React.createElement("div", {
     className: "anim-up",
     style: {
       maxWidth: 820,
@@ -19736,9 +19709,6 @@ const ClientApp = ({
       className: "b-pri b-sm",
       style: { display: 'flex', alignItems: 'center', gap: 4 }
     }, /*#__PURE__*/React.createElement(I, { n: "msg", s: 11 }), "Message"), /*#__PURE__*/React.createElement("button", {
-      onClick: () => openBridge(prov.bridgeRoomId),
-      className: "b-gho b-sm"
-    }, "Open Chat"), /*#__PURE__*/React.createElement("button", {
       onClick: () => setHardRevokeTarget(pi),
       className: "b-red b-sm"
     }, /*#__PURE__*/React.createElement(I, {
@@ -20163,7 +20133,7 @@ const ClientApp = ({
         fontSize: 8
       }
     }, c.source === 'bridge' ? ROLES.provider.label : 'Team')))));
-  })())), view === 'records' && !activeBridge && /*#__PURE__*/React.createElement("div", {
+  })())), view === 'records' && /*#__PURE__*/React.createElement("div", {
     className: "anim-up",
     style: {
       maxWidth: 820,
@@ -20467,7 +20437,7 @@ const ClientApp = ({
     style: {
       color: 'var(--teal)'
     }
-  }, "Full control after claiming:"), " When you claim a room, ownership transfers to you (power level 100). You can remove the provider, close the room, or manage who has access. The provider cannot undo your claim."))), view === 'metrics' && !activeBridge && /*#__PURE__*/React.createElement("div", {
+  }, "Full control after claiming:"), " When you claim a room, ownership transfers to you (power level 100). You can remove the provider, close the room, or manage who has access. The provider cannot undo your claim."))), view === 'metrics' && /*#__PURE__*/React.createElement("div", {
     className: "anim-up",
     style: {
       maxWidth: 820,
@@ -20586,7 +20556,7 @@ const ClientApp = ({
       color: 'var(--tx-1)',
       lineHeight: 1.6
     }
-  }, /*#__PURE__*/React.createElement("strong", null, "K-anonymity (k=5):"), " No demographic combination with fewer than 5 matching individuals is reported. Data is generalized or suppressed to prevent re-identification."))), view === 'inbox' && !activeBridge && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("strong", null, "K-anonymity (k=5):"), " No demographic combination with fewer than 5 matching individuals is reported. Data is generalized or suppressed to prevent re-identification."))), view === 'inbox' && /*#__PURE__*/React.createElement("div", {
     className: "anim-up inbox-wrap"
   }, /*#__PURE__*/React.createElement("div", {
     className: "inbox-header"
@@ -20732,251 +20702,9 @@ const ClientApp = ({
   }, /*#__PURE__*/React.createElement(I, {
     n: "plus",
     s: 14
-  }), "Add Provider"))))), view === 'bridge' && activeBridge && activeProvider && /*#__PURE__*/React.createElement("div", {
-    className: "anim-up",
-    style: {
-      maxWidth: 820,
-      margin: '0 auto'
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setView('providers');
-      setActiveBridge(null);
-    },
-    className: "b-gho b-sm",
-    style: {
-      marginBottom: 14,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 4
-    }
-  }, /*#__PURE__*/React.createElement(I, {
-    n: "back",
-    s: 13
-  }), "Back"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 20
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
-    style: {
-      fontFamily: 'var(--serif)',
-      fontSize: 20,
-      fontWeight: 700
-    }
-  }, "Chat: ", activeProvider.providerName || activeProvider.providerUserId), activeProvider.providerProfile?.title && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: 'var(--tx-2)',
-      display: 'block',
-      marginTop: 2
-    }
-  }, activeProvider.providerProfile.title), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-      marginTop: 4,
-      flexWrap: 'wrap'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "tag tag-green"
-  }, /*#__PURE__*/React.createElement(I, {
-    n: "lock",
-    s: 9
-  }), "Megolm + AES-GCM"), activeProvider.providerProfile?.org_membership?.verified && /*#__PURE__*/React.createElement("span", {
-    className: "tag tag-blue"
-  }, /*#__PURE__*/React.createElement(I, {
-    n: "shieldCheck",
-    s: 9
-  }), activeProvider.providerProfile.org_membership.org_name), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontFamily: 'var(--mono)',
-      fontSize: 9.5,
-      color: 'var(--tx-3)'
-    }
-  }, activeBridge))), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setHardRevokeTarget(activeProviderIdx),
-    className: "b-red b-sm"
-  }, /*#__PURE__*/React.createElement(I, {
-    n: "zap",
-    s: 12
-  }), "Hard Revoke")), /*#__PURE__*/React.createElement(StorageTransparencyBadge, {
-    storageType: "matrix",
-    roomId: activeBridge,
-    encrypted: true,
-    encLabel: "Megolm E2EE",
-    label: "Private Room",
-    members: [{ userId: svc.userId, role: 'client' }, { userId: activeProvider.providerUserId, role: 'provider' }],
-    extra: [{ label: 'Room type', value: 'Encrypted room between you and this provider. Data you share here is visible to both parties.' }, { label: 'Your power level', value: activeProvider._bridgeMeta?.client === svc.userId ? '100 (admin)' : '50' }]
-  }), activeProvider.providerProfile?.org_membership?.verified && /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: 'var(--blue-dim)',
-      border: '1px solid rgba(91,156,245,.15)',
-      borderRadius: 'var(--r)',
-      padding: '10px 14px',
-      marginBottom: 16,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 28,
-      height: 28,
-      borderRadius: '50%',
-      background: 'var(--bg-3)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      color: 'var(--blue)',
-      border: '2px solid var(--blue)'
-    }
-  }, /*#__PURE__*/React.createElement(I, {
-    n: "shieldCheck",
-    s: 14
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      fontWeight: 700,
-      color: 'var(--blue)'
-    }
-  }, activeProvider.providerProfile.org_membership.org_name), activeProvider.providerProfile.org_membership.email_verified ? /*#__PURE__*/React.createElement("span", {
-    className: "tag tag-green",
-    style: {
-      fontSize: 7.5,
-      padding: '1px 5px'
-    }
-  }, "EMAIL VERIFIED") : /*#__PURE__*/React.createElement("span", {
-    className: "tag tag-green",
-    style: {
-      fontSize: 7.5,
-      padding: '1px 5px'
-    }
-  }, "VERIFIED")), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      color: 'var(--tx-2)',
-      fontFamily: 'var(--mono)'
-    }
-  }, activeProvider.providerProfile.org_membership.org_type ? (ORG_TYPE_LABELS[activeProvider.providerProfile.org_membership.org_type] || activeProvider.providerProfile.org_membership.org_type) + ' · ' : '', activeProvider.providerProfile.org_membership.role), activeProvider.providerProfile.org_membership.verified_domain && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 9,
-      color: 'var(--green)',
-      fontFamily: 'var(--mono)',
-      display: 'block',
-      marginTop: 2
-    }
-  }, "@", activeProvider.providerProfile.org_membership.verified_domain)), activeProvider.providerProfile.credentials && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 9.5,
-      color: 'var(--tx-2)',
-      fontFamily: 'var(--mono)'
-    }
-  }, activeProvider.providerProfile.credentials)), /*#__PURE__*/React.createElement("div", {
-    className: "card",
-    style: {
-      marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "section-label"
-  }, "CURRENTLY SHARED"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: 6,
-      marginTop: 4
-    }
-  }, allFields.filter(f => activeProvider.sharedFields?.[f.key]).map(f => /*#__PURE__*/React.createElement("span", {
-    key: f.key,
-    className: "tag tag-blue"
-  }, f.label)), Object.values(activeProvider.sharedFields || {}).filter(Boolean).length === 0 && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: 'var(--tx-3)'
-    }
-  }, "No fields shared"))), /*#__PURE__*/React.createElement("div", {
-    className: "card"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "section-label"
-  }, "MESSAGES"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      maxHeight: 280,
-      overflow: 'auto',
-      marginBottom: 12
-    }
-  }, bridgeMessages.length === 0 ? /*#__PURE__*/React.createElement("p", {
-    style: {
-      color: 'var(--tx-3)',
-      fontSize: 12,
-      padding: '14px 0',
-      textAlign: 'center'
-    }
-  }, "No messages yet") : bridgeMessages.map((msg, i) => /*#__PURE__*/React.createElement("div", {
-    key: msg.id || i,
-    style: {
-      padding: '8px 0',
-      borderBottom: '1px solid var(--border-0)'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      marginBottom: 3
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontFamily: 'var(--mono)',
-      fontSize: 10,
-      color: msg.sender === svc.userId ? 'var(--teal)' : 'var(--gold)'
-    }
-  }, msg.sender === svc.userId ? 'You' : msg.sender), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontFamily: 'var(--mono)',
-      fontSize: 9,
-      color: 'var(--tx-3)'
-    }
-  }, msg.ts ? new Date(msg.ts).toLocaleString() : '')), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 12.5,
-      color: 'var(--tx-1)'
-    }
-  }, msg.content?.body)))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 6
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    value: msgText,
-    onChange: e => setMsgText(e.target.value),
-    placeholder: "Message (E2EE)...",
-    onKeyDown: e => {
-      if (e.key === 'Enter' && !e.shiftKey) handleSendBridgeMsg();
-    },
-    style: {
-      flex: 1
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: handleSendBridgeMsg,
-    className: "b-pri"
-  }, /*#__PURE__*/React.createElement(I, {
-    n: "send",
-    s: 13
-  }))))), view === 'activity' && !activeBridge && /*#__PURE__*/React.createElement(ActivityStream, {
+  }), "Add Provider"))))), view === 'activity' && /*#__PURE__*/React.createElement(ActivityStream, {
     session: session
-  }), view === 'transparency' && !activeBridge && /*#__PURE__*/React.createElement(TransparencyPage, {
+  }), view === 'transparency' && /*#__PURE__*/React.createElement(TransparencyPage, {
     onBack: () => setView('dashboard')
   })), /*#__PURE__*/React.createElement(Modal, {
     open: shareContactModal,
@@ -22255,7 +21983,7 @@ const IndividualPanel = ({
       }
     }, a.status))), /*#__PURE__*/React.createElement("div", {
       className: "dt-alloc-detail"
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "By: "), a.allocatedBy), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Date: "), dtFmtDate(a.at)), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Bridge: "), /*#__PURE__*/React.createElement(DtRoom, {
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "By: "), a.allocatedBy), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Date: "), dtFmtDate(a.at)), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Room: "), /*#__PURE__*/React.createElement(DtRoom, {
       room: a.bridgeRoom
     })), a.expiresAt && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Expires: "), a.expiresAt)), a.constraintsChecked && a.constraintsChecked.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
@@ -22491,7 +22219,7 @@ const ResourcePanel = ({
     }
   }, "These events live in ", /*#__PURE__*/React.createElement(DtRoom, {
     room: row.orgRoom
-  }), ". Individual identities are NOT in these events \u2014 only bridge room references. Inventory = total - allocated - reserved."), (row.provisioningEvents || []).map((evt, i) => {
+  }), ". Individual identities are NOT in these events \u2014 only encrypted room references. Inventory = total - allocated - reserved."), (row.provisioningEvents || []).map((evt, i) => {
     const color = DT_PROV_COLORS[evt.event] || 'var(--tx-2)';
     const icon = evt.event === 'restocked' ? '↑' : evt.event === 'allocated' ? '→' : evt.event === 'returned' ? '←' : evt.event === 'expired' ? '⏱' : evt.event.includes('capacity') ? '⚡' : '✓';
     return /*#__PURE__*/React.createElement("div", {
@@ -22585,11 +22313,11 @@ const ResourcePanel = ({
       color: 'var(--tx-2)',
       marginTop: 4
     }
-  }, "Bridge: ", /*#__PURE__*/React.createElement(DtRoom, {
+  }, "Room: ", /*#__PURE__*/React.createElement(DtRoom, {
     room: a.bridgeRoom
   }), " \xB7 By: ", a.allocatedBy))), /*#__PURE__*/React.createElement("div", {
     className: "dt-hint"
-  }, /*#__PURE__*/React.createElement("strong", null, "Privacy note: "), "In production, this panel shows bridge room references, not individual names, unless the viewer has access to each bridge. Names resolve only for bridges you're a member of."))))));
+  }, /*#__PURE__*/React.createElement("strong", null, "Privacy note: "), "In production, this panel shows encrypted room references, not individual names, unless the viewer has access to each room. Names resolve only for rooms you're a member of."))))));
 };
 
 /* ─── NoteCreateModal — create a note (attached or unattached) ─── */
@@ -33316,7 +33044,7 @@ const ProviderApp = ({
       fontSize: 9.5,
       color: 'var(--tx-3)'
     }
-  }, "Client-owned bridge"), activeCaseData.transferable ? /*#__PURE__*/React.createElement("span", {
+  }, "Client-Owned Room"), activeCaseData.transferable ? /*#__PURE__*/React.createElement("span", {
     className: "tag tag-teal"
   }, /*#__PURE__*/React.createElement(I, {
     n: "users",
@@ -33331,9 +33059,9 @@ const ProviderApp = ({
     roomId: activeCase,
     encrypted: true,
     encLabel: "Megolm E2EE + AES-256-GCM at rest",
-    label: "Case / Bridge Room",
+    label: "Case Room",
     members: [{ userId: activeCaseData.clientUserId, role: 'client (room owner)' }, { userId: activeCaseData.meta?.provider || svc.userId, role: 'provider' }, ...(activeCaseData.meta?.assigned_staff || []).filter(s => s !== activeCaseData.meta?.provider).map(s => ({ userId: s, role: 'assigned ' + T.staff_term.toLowerCase() }))],
-    extra: [{ label: 'Ownership', value: 'The client owns this bridge room (power level 100). Shared data is encrypted and only visible to room members.' }, { label: 'Transfer status', value: activeCaseData.transferable ? 'Transferable \u2014 case can be reassigned to another ' + T.staff_term.toLowerCase() : 'Transfer locked \u2014 only the current provider can access' }]
+    extra: [{ label: 'Ownership', value: 'The client owns this case room (power level 100). Shared data is encrypted and only visible to room members.' }, { label: 'Transfer status', value: activeCaseData.transferable ? 'Transferable \u2014 case can be reassigned to another ' + T.staff_term.toLowerCase() : 'Transfer locked \u2014 only the current provider can access' }]
   })), orgRoom && (orgRole === 'admin' || orgRole === 'case_manager') && staff.length > 1 && /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setTransferModal(activeCaseData);
@@ -39575,9 +39303,9 @@ const TransparencyPage = ({ onBack }) => {
 
   const dataFlows = [
     { from: 'You', to: 'Your Vault', description: 'All personal data starts in your encrypted vault room. Only your device keys can decrypt it.', icon: 'lock' },
-    { from: 'You', to: 'Bridge Room', description: 'When you share fields with a provider, selected data is copied into a shared bridge room. You choose exactly which fields.', icon: 'shield' },
-    { from: 'Provider', to: 'Bridge Room', description: 'Providers write observations, notes, and case data into the bridge. Both parties can read.', icon: 'clipboard' },
-    { from: 'Bridge Room', to: 'Org Metrics', description: 'If you consent, anonymized aggregate statistics (k=5 anonymity) flow upward. No PII ever leaves the bridge.', icon: 'bar' },
+    { from: 'You', to: 'Case Room', description: 'When you share fields with a provider, selected data is copied into a shared encrypted room. You choose exactly which fields.', icon: 'shield' },
+    { from: 'Provider', to: 'Case Room', description: 'Providers write observations, notes, and case data into the case room. Both parties can read.', icon: 'clipboard' },
+    { from: 'Case Room', to: 'Org Metrics', description: 'If you consent, anonymized aggregate statistics (k=5 anonymity) flow upward. No PII ever leaves the case room.', icon: 'bar' },
     { from: 'Org', to: 'Network', description: 'Organizations can share anonymized metrics and schema definitions with the broader network. Never individual data.', icon: 'layers' },
   ];
 
@@ -39929,7 +39657,7 @@ const TransparencyPage = ({ onBack }) => {
       ]
     },
     {
-      id: 'bridge', label: 'Bridge Room', desc: 'Shared encrypted room between you and a provider. Data only flows here with explicit consent.',
+      id: 'bridge', label: 'Case Room', desc: 'Shared encrypted room between you and a provider. Data only flows here with explicit consent.',
       color: '#5bc0be', dimColor: 'rgba(91,192,190,.15)', icon: 'link',
       children: [
         { id: 'bridge-fields', label: 'Shared Fields', desc: 'Vault fields you have explicitly consented to share with this provider.', color: '#5bc0be', dimColor: 'rgba(91,192,190,.15)' },
