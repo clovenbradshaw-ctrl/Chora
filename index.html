@@ -28765,10 +28765,18 @@ const AddColumnModal = ({ open, onClose, onSave, onPropose, fieldDefs, teams, te
   const [selectedExistingUri, setSelectedExistingUri] = useState('');
   const [existingSearch, setExistingSearch] = useState('');
 
-  if (!open) return null;
-
   const computedKey = key || fieldLabelToKey(label);
   const uri = `khora:${teamMode ? 'team/' + teamMode.roomId + '/' : 'org/'}${computedKey}`;
+
+  // Check for duplicate URIs / keys — must be before any early return (Rules of Hooks)
+  React.useEffect(() => {
+    if (!open || !computedKey || !fieldDefs) { setDuplicateWarning(null); return; }
+    const existing = Object.values(fieldDefs).find(d => d.key === computedKey || d.uri === uri);
+    setDuplicateWarning(existing ? `A column with key "${computedKey}" already exists (${existing.label})` : null);
+  }, [open, computedKey, uri, fieldDefs]);
+
+  if (!open) return null;
+
   const defLen = definition.length;
   const isValidNew = label.trim().length > 0 && computedKey.length > 0 && defLen >= 20 && dataType;
   const isValidExisting = !!selectedExistingUri;
@@ -28785,13 +28793,6 @@ const AddColumnModal = ({ open, onClose, onSave, onPropose, fieldDefs, teams, te
 
   // Cascading governance: team rules cascade from org/network
   const cascadeSource = activeTeam && orgRoom ? 'org' : activeTeam && networkRoom ? 'network' : null;
-
-  // Check for duplicate URIs / keys
-  React.useEffect(() => {
-    if (!computedKey || !fieldDefs) { setDuplicateWarning(null); return; }
-    const existing = Object.values(fieldDefs).find(d => d.key === computedKey || d.uri === uri);
-    setDuplicateWarning(existing ? `A column with key "${computedKey}" already exists (${existing.label})` : null);
-  }, [computedKey, uri, fieldDefs]);
 
   const handleReset = () => {
     setLabel(''); setKey(''); setKeyEdited(false); setCategory('details');
