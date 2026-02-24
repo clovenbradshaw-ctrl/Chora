@@ -31533,7 +31533,7 @@ const ProviderApp = ({
       padding: '1px 5px',
       cursor: 'pointer'
     },
-    onClick: openEmailVerifyModal
+    onClick: e => { e.stopPropagation(); openEmailVerifyModal(); }
   }, "UNVERIFIED") : /*#__PURE__*/React.createElement("span", {
     className: "tag tag-green",
     style: {
