@@ -2715,6 +2715,17 @@ const hueToColorName = (hue) => {
 
 /* ═══════════════════ TEAM COLOR UTILITIES ═══════════════════ */
 const randomTeamHue = () => Math.floor(Math.random() * 360);
+// Golden-angle spacing ensures team colors are meaningfully distinct per user account
+const distinctTeamHue = (index) => Math.round((index * 137.508) % 360);
+// Per-user localStorage helpers — colors are local, not synced to Matrix
+const _tcKey = (userId, roomId) => `khora_tc_${userId}_${roomId}`;
+const getLocalTeamColor = (userId, roomId, fallback) => {
+  try { const v = localStorage.getItem(_tcKey(userId, roomId)); if (v !== null) return parseInt(v); } catch {}
+  return fallback;
+};
+const setLocalTeamColor = (userId, roomId, hue) => {
+  try { localStorage.setItem(_tcKey(userId, roomId), String(hue)); } catch {}
+};
 const teamColorThemed = (hue, isLight) => {
   if (hue == null) hue = 260;
   const l = isLight ? 38 : 55;
@@ -20993,7 +21004,10 @@ const ClientApp = ({
       await loadVault(vault, bridgeProfiles);
       setPendingClaims(detectedPending);
       setClaimedRooms(detectedClaimed);
-      if (detectedTeams.length > 0) setMyTeams(detectedTeams);
+      if (detectedTeams.length > 0) setMyTeams(detectedTeams.map((t, i) => ({
+        ...t,
+        color_hue: getLocalTeamColor(svc.userId, t.roomId, t.color_hue != null ? t.color_hue : distinctTeamHue(i))
+      })));
       // Detect existing DM rooms (client side)
       const detectedClientDMs = [];
       for (const [rid, state] of Object.entries(scanned)) {
@@ -30664,8 +30678,7 @@ const TeamDetailView = ({
     onChange: (e) => {
       const hue = parseInt(e.target.value);
       onUpdateTeam({ ...team, color_hue: hue });
-      const updatedMeta = { name: team.name, description: team.description, color_hue: hue, created: team.created, created_by: team.created_by, org_id: team.org_id, org_name: team.org_name };
-      svc.setState(team.roomId, EVT.TEAM_META, updatedMeta);
+      setLocalTeamColor(svc.userId, team.roomId, hue);
     },
     style: { flex: 1, accentColor: `hsl(${team.color_hue != null ? team.color_hue : 260}, 65%, 55%)` }
   }), /*#__PURE__*/React.createElement("span", {
@@ -34372,14 +34385,20 @@ const ProviderApp = ({
           console.warn('Assignment load:', e.message);
         }
       }
-      // Load teams detected during scan
-      if (detectedTeams.length > 0) setTeams(detectedTeams);
+      // Load teams detected during scan — apply per-user local color overrides
+      if (detectedTeams.length > 0) setTeams(detectedTeams.map((t, i) => ({
+        ...t,
+        color_hue: getLocalTeamColor(svc.userId, t.roomId, t.color_hue != null ? t.color_hue : distinctTeamHue(i))
+      })));
       // Restore team mode from localStorage
       try {
         const savedTeamId = JSON.parse(localStorage.getItem('khora_active_team') || 'null')?.roomId;
         if (savedTeamId) {
           const savedTeam = detectedTeams.find(t => t.roomId === savedTeamId);
-          if (savedTeam) setTeamMode({ roomId: savedTeam.roomId, name: savedTeam.name, color_hue: savedTeam.color_hue });
+          if (savedTeam) {
+            const localHue = getLocalTeamColor(svc.userId, savedTeam.roomId, savedTeam.color_hue != null ? savedTeam.color_hue : 260);
+            setTeamMode({ roomId: savedTeam.roomId, name: savedTeam.name, color_hue: localHue });
+          }
         }
       } catch {}
       // Detect existing team member DM rooms from scan
@@ -35396,7 +35415,7 @@ const ProviderApp = ({
   const handleCreateTeam = async () => {
     if (!newTeamName.trim()) return;
     try {
-      const teamHue = randomTeamHue();
+      const teamHue = distinctTeamHue(teams.length);
       const govMode = newTeamGovernance || 'lead_decides';
       const parentTeam = newTeamParentId ? teams.find(t => t.roomId === newTeamParentId) : null;
       // Default team schema: identity + contact fields from vault
@@ -35534,6 +35553,7 @@ const ProviderApp = ({
         },
         customTables: []
       };
+      setLocalTeamColor(svc.userId, roomId, teamHue);
       setTeams(prev => [...prev, newTeam]);
       setCreateTeamModal(false);
       setNewTeamName('');
