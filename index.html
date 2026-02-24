@@ -1810,7 +1810,10 @@ const I = ({
     })),
     graphNodes: /*#__PURE__*/React.createElement("svg", p, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "5", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "19", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "19", r: "3" }), /*#__PURE__*/React.createElement("line", { x1: "12", y1: "8", x2: "5", y2: "16" }), /*#__PURE__*/React.createElement("line", { x1: "12", y1: "8", x2: "19", y2: "16" }), /*#__PURE__*/React.createElement("line", { x1: "8", y1: "19", x2: "16", y2: "19" })),
     'git-merge': /*#__PURE__*/React.createElement("svg", p, /*#__PURE__*/React.createElement("circle", { cx: "18", cy: "18", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "6", cy: "6", r: "3" }), /*#__PURE__*/React.createElement("path", { d: "M6 21V9a9 9 0 0 0 9 9" })),
-    edit: /*#__PURE__*/React.createElement("svg", p, /*#__PURE__*/React.createElement("path", { d: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" }), /*#__PURE__*/React.createElement("path", { d: "M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" }))
+    edit: /*#__PURE__*/React.createElement("svg", p, /*#__PURE__*/React.createElement("path", { d: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" }), /*#__PURE__*/React.createElement("path", { d: "M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" })),
+    database: /*#__PURE__*/React.createElement("svg", p, /*#__PURE__*/React.createElement("ellipse", { cx: "12", cy: "5", rx: "9", ry: "3" }), /*#__PURE__*/React.createElement("path", { d: "M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" }), /*#__PURE__*/React.createElement("path", { d: "M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" })),
+    'arr-l': /*#__PURE__*/React.createElement("svg", p, /*#__PURE__*/React.createElement("polyline", { points: "15 18 9 12 15 6" })),
+    'arr-r': /*#__PURE__*/React.createElement("svg", p, /*#__PURE__*/React.createElement("polyline", { points: "9 18 15 12 9 6" }))
   };
   return /*#__PURE__*/React.createElement("span", {
     style: {
@@ -2598,6 +2601,10 @@ const EVT = {
   TEAM_MEMBERS: `${NS}.team.members`,
   TEAM_SCHEMA: `${NS}.team.schema`,
   TEAM_SCHEMA_RULE: `${NS}.team.schema_rule`,
+  // Team hierarchy and custom tables
+  TEAM_HIERARCHY: `${NS}.team.hierarchy`,         // parent/child nesting + rollup policy
+  TEAM_TABLE_DEF: `${NS}.team.table.definition`,  // custom table definition (state_key = table.id)
+  TEAM_TABLE_RECORD: `${NS}.team.table.record`,   // record in custom table (state_key = tableId+':'+recordId)
   // Field definitions & crosswalks
   FIELD_DEF: `${NS}.field.definition`,
   FIELD_CROSSWALK: `${NS}.field.crosswalk`,
@@ -27277,7 +27284,9 @@ const DatabaseView = ({
   sidebarCollapsed,
   linkedRecords,
   onCreateLinkedRecord,
-  onRemoveLinkedRecord
+  onRemoveLinkedRecord,
+  onCreateTable,
+  onOpenTable
 }) => {
   const [dbTab, setDbTab] = useState('individuals');
   const [enabledFieldCols, setEnabledFieldCols] = useState([]);
@@ -27604,6 +27613,11 @@ const DatabaseView = ({
     label: 'Definitions',
     count: Object.keys(fieldDefs || {}).length,
     icon: 'grid'
+  }, {
+    id: 'tables',
+    label: 'Tables',
+    count: (activeTeamObj?.customTables || []).filter(t => t.status === 'active').length,
+    icon: 'database'
   }].map(tab => /*#__PURE__*/React.createElement("button", {
     key: tab.id,
     className: 'db-tab' + (dbTab === tab.id ? ' active' : ''),
@@ -27812,7 +27826,125 @@ const DatabaseView = ({
     showToast: showToast,
     fieldGovernanceConfig: fieldGovernanceConfig,
     onPropose: onPropose
-  }));
+  }),
+  dbTab === 'tables' && React.createElement('div', { className: 'anim-up' },
+    !activeTeamObj
+      ? React.createElement('div', { style: { textAlign: 'center', padding: '40px 20px', color: 'var(--tx-3)' } },
+          React.createElement(I, { n: 'database', s: 32, c: 'var(--border-1)' }),
+          React.createElement('p', { style: { marginTop: 10, fontSize: 13 } }, 'Custom tables are team-specific.'),
+          React.createElement('p', { style: { fontSize: 12, marginTop: 4 } }, 'Select a team context from the sidebar to view and create tables.'))
+      : React.createElement(React.Fragment, null,
+          // Team context header + create button
+          React.createElement('div', { style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 } },
+            React.createElement('div', null,
+              React.createElement('div', { style: { fontWeight: 700, fontSize: 14 } }, activeTeamObj.name, ' Tables'),
+              React.createElement('div', { style: { fontSize: 11, color: 'var(--tx-2)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 } },
+                (() => {
+                  const mode = activeTeamObj.schemaRule?.mode || 'lead_decides';
+                  const cm = TEAM_CONSENT_MODES[mode] || TEAM_CONSENT_MODES.lead_decides;
+                  const govColor = cm.color === 'gold' ? 'var(--gold)' : cm.color === 'green' ? 'var(--green)' : 'var(--blue)';
+                  return React.createElement(React.Fragment, null,
+                    React.createElement(I, { n: 'shieldCheck', s: 10, c: govColor }),
+                    React.createElement('span', { style: { color: govColor } }, cm.label, ' governance'),
+                    React.createElement('span', { style: { color: 'var(--tx-3)' } }, '\u00B7'),
+                    cm.id !== 'lead_decides'
+                      ? React.createElement('span', null, 'Table creation requires approval from team members')
+                      : React.createElement('span', null, 'Team lead can create tables immediately')
+                  );
+                })(),
+                // Parent team rollup notice
+                activeTeamObj.hierarchy?.parent_team_name && React.createElement('span', { style: { marginLeft: 6 } },
+                  React.createElement('span', { style: { color: 'var(--teal)' } },
+                    '\u21A5 nested under ', activeTeamObj.hierarchy.parent_team_name))
+              )
+            ),
+            React.createElement('button', {
+              className: 'b-pri b-sm',
+              style: { display: 'flex', alignItems: 'center', gap: 4 },
+              onClick: () => onCreateTable && onCreateTable(activeTeamObj)
+            }, React.createElement(I, { n: 'plus', s: 11 }), 'New Table')
+          ),
+
+          // Pending proposals notice
+          (() => {
+            const pending = (activeTeamObj.schema?.pending_changes || []).filter(c => c.action === 'create_table');
+            if (pending.length === 0) return null;
+            return React.createElement('div', { style: { background: 'var(--gold-dim)', border: '1px solid rgba(201,163,82,.2)', borderRadius: 'var(--r)', padding: '10px 14px', marginBottom: 12 } },
+              React.createElement('div', { style: { fontWeight: 600, fontSize: 11.5, color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: 6 } },
+                React.createElement(I, { n: 'shieldCheck', s: 12, c: 'var(--gold)' }),
+                pending.length, ' table', pending.length > 1 ? 's' : '', ' pending governance approval'),
+              pending.map(p => React.createElement('div', { key: p.id, style: { fontSize: 11, color: 'var(--tx-1)', marginTop: 4, display: 'flex', align: 'center', gap: 6 } },
+                React.createElement('span', { className: 'tag tag-gold', style: { fontSize: 8 } }, 'PENDING'),
+                React.createElement('strong', null, p.table_definition?.name),
+                ' — proposed by ', p.proposed_by?.split(':')[0]?.replace('@', '') || 'unknown',
+                ' on ', new Date(p.proposed_at).toLocaleDateString()
+              ))
+            );
+          })(),
+
+          // Child teams with rollup tables
+          (() => {
+            const children = activeTeamObj.hierarchy?.child_teams || [];
+            const childTeamObjs = children.map(c => (teams || []).find(t => t.roomId === c.roomId)).filter(Boolean);
+            const rollupTables = childTeamObjs.flatMap(ct =>
+              (ct.customTables || []).filter(t => t.status === 'active' && t.rollup_to_parent).map(t => ({ ...t, _fromTeam: ct }))
+            );
+            if (rollupTables.length === 0) return null;
+            return React.createElement('div', { style: { marginBottom: 16 } },
+              React.createElement('div', { className: 'section-label', style: { marginBottom: 8 } }, 'ROLLED UP FROM SUB-TEAMS'),
+              rollupTables.map(t =>
+                React.createElement('div', { key: t.id, style: { background: 'var(--teal-dim)', border: '1px solid rgba(62,201,176,.15)', borderRadius: 'var(--r)', padding: '10px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' },
+                  onClick: () => onOpenTable && onOpenTable(t, t._fromTeam)
+                },
+                  React.createElement(I, { n: 'database', s: 14, c: 'var(--teal)' }),
+                  React.createElement('div', { style: { flex: 1 } },
+                    React.createElement('div', { style: { fontWeight: 600, fontSize: 12.5 } }, t.name),
+                    React.createElement('div', { style: { fontSize: 10.5, color: 'var(--tx-2)', marginTop: 1 } }, 'From: ', t._fromTeam.name, ' \u00B7 ', (t.columns || []).length, ' columns'),
+                    t.description && React.createElement('div', { style: { fontSize: 10, color: 'var(--tx-3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, t.description)
+                  ),
+                  React.createElement('span', { className: 'tag tag-teal', style: { fontSize: 8 } }, '\u21A5 ROLLUP')
+                )
+              )
+            );
+          })(),
+
+          // Own tables grid
+          (() => {
+            const ownTables = (activeTeamObj.customTables || []).filter(t => t.status === 'active');
+            if (ownTables.length === 0) {
+              return React.createElement('div', { style: { textAlign: 'center', padding: '40px 20px', color: 'var(--tx-3)' } },
+                React.createElement(I, { n: 'database', s: 28, c: 'var(--border-1)' }),
+                React.createElement('p', { style: { marginTop: 8, fontSize: 13 } }, 'No tables yet.'),
+                React.createElement('p', { style: { fontSize: 11, marginTop: 4 } }, 'Tables are team-specific and subject to governance rules before activation.'));
+            }
+            return React.createElement('div', null,
+              React.createElement('div', { className: 'section-label', style: { marginBottom: 8 } }, 'TEAM TABLES'),
+              React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 } },
+                ownTables.map(t =>
+                  React.createElement('div', {
+                    key: t.id,
+                    className: 'card',
+                    style: { padding: '12px 14px', cursor: 'pointer', transition: 'border-color .15s' },
+                    onClick: () => onOpenTable && onOpenTable(t, activeTeamObj)
+                  },
+                    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 } },
+                      React.createElement(I, { n: 'database', s: 14, c: 'var(--purple)' }),
+                      React.createElement('div', { style: { fontWeight: 700, fontSize: 13, flex: 1 } }, t.name),
+                      t.rollup_to_parent && React.createElement('span', { className: 'tag tag-teal', style: { fontSize: 7 } }, '\u21A5 ROLLUP')
+                    ),
+                    React.createElement('p', { style: { fontSize: 10.5, color: 'var(--tx-2)', lineHeight: 1.4, marginBottom: 6 } },
+                      (t.description || '').slice(0, 80), (t.description || '').length > 80 ? '...' : ''),
+                    React.createElement('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+                      React.createElement('span', { className: 'tag tag-blue', style: { fontSize: 8 } }, (t.columns || []).length, ' col', (t.columns || []).length !== 1 ? 's' : ''),
+                      React.createElement('span', { className: 'tag tag-purple', style: { fontSize: 8 } }, 'v', t.version || 1)
+                    )
+                  )
+                )
+              )
+            );
+          })()
+        )
+  ));
 };
 
 /* ─── Wikidata definition fetcher ─── */
@@ -29109,6 +29241,449 @@ const AddColumnModal = ({ open, onClose, onSave, onPropose, fieldDefs, teams, te
               saving ? 'Saving...' : governanceRequired && !(teamSchemaRule.mode === 'lead_decides' && isTeamLead) ? 'Submit Proposal' : 'Create Column')
       )
     )
+  );
+};
+
+/* ─── CreateTableModal — create a new team-scoped custom table with governance ─── */
+const TABLE_COLUMN_TYPES = [
+  { id: 'text', label: 'Text' },
+  { id: 'number', label: 'Number' },
+  { id: 'date', label: 'Date' },
+  { id: 'boolean', label: 'Yes / No' },
+  { id: 'single_select', label: 'Single Select' },
+  { id: 'multi_select', label: 'Multi-Select' },
+  { id: 'url', label: 'URL / Link' }
+];
+
+const CreateTableModal = ({ open, onClose, team, svc, teams, showToast }) => {
+  const [tableName, setTableName] = useState('');
+  const [tableDesc, setTableDesc] = useState('');
+  const [tablePurpose, setTablePurpose] = useState('');
+  const [rollupToParent, setRollupToParent] = useState(false);
+  const [columns, setColumns] = useState([
+    { id: 'c1', key: '', label: '', data_type: 'text', description: '', required: false, sensitive: false, options: [] }
+  ]);
+  const [saving, setSaving] = useState(false);
+
+  if (!open || !team) return null;
+
+  const schemaRule = team.schemaRule || { mode: 'lead_decides' };
+  const consentMode = TEAM_CONSENT_MODES[schemaRule.mode] || TEAM_CONSENT_MODES.lead_decides;
+  const isLead = team.owner === svc?.userId;
+  const needsProposal = schemaRule.mode !== 'lead_decides' || !isLead;
+  const parentTeam = team.hierarchy?.parent_team_id
+    ? teams.find(t => t.roomId === team.hierarchy.parent_team_id)
+    : null;
+
+  const fieldLabelToKey = lbl => lbl.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+  const addColumn = () => {
+    setColumns(prev => [...prev, {
+      id: 'c' + Date.now(), key: '', label: '', data_type: 'text',
+      description: '', required: false, sensitive: false, options: []
+    }]);
+  };
+
+  const updateColumn = (id, field, value) => {
+    setColumns(prev => prev.map(c => {
+      if (c.id !== id) return c;
+      const updated = { ...c, [field]: value };
+      if (field === 'label' && !c._keyEdited) updated.key = fieldLabelToKey(value);
+      return updated;
+    }));
+  };
+
+  const removeColumn = id => {
+    if (columns.length <= 1) return;
+    setColumns(prev => prev.filter(c => c.id !== id));
+  };
+
+  const isValid = () => {
+    if (!tableName.trim() || tableName.trim().length < 2) return false;
+    if (!tableDesc.trim() || tableDesc.trim().length < 15) return false;
+    if (columns.length === 0) return false;
+    // Every column needs a label, key, and a description (governance requirement)
+    return columns.every(c => c.label.trim().length > 0 && c.key.length > 0 && c.description.trim().length >= 10);
+  };
+
+  const handleSave = async () => {
+    if (!isValid()) return;
+    setSaving(true);
+    try {
+      const tableId = 'tbl_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const tableDef = {
+        id: tableId,
+        name: tableName.trim(),
+        description: tableDesc.trim(),
+        purpose: tablePurpose.trim() || null,
+        columns: columns.map(c => ({
+          key: c.key,
+          label: c.label.trim(),
+          data_type: c.data_type,
+          description: c.description.trim(),
+          required: c.required,
+          sensitive: c.sensitive,
+          options: c.options || []
+        })),
+        team_id: team.roomId,
+        created_by: svc.userId,
+        created_at: Date.now(),
+        governance_proposal_id: null,
+        version: 1,
+        change_log: [{ version: 1, summary: 'Table created', by: svc.userId, ts: Date.now() }],
+        rollup_to_parent: rollupToParent && !!parentTeam,
+        status: needsProposal ? 'pending_approval' : 'active'
+      };
+
+      if (needsProposal) {
+        // Create a pending schema change proposal for the table
+        const currentSchema = { ...(team.schema || { version: 1, fields: [], pending_changes: [], change_log: [] }) };
+        const change = {
+          id: 'chg_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          action: 'create_table',
+          table_id: tableId,
+          summary: `Create table "${tableName.trim()}"`,
+          detail: tableDesc.trim().slice(0, 120),
+          proposed_by: svc.userId,
+          proposed_at: Date.now(),
+          table_definition: tableDef,
+          approvals: schemaRule.mode === 'lead_decides' ? {} : { [svc.userId]: Date.now() },
+          blocks: {}
+        };
+        currentSchema.pending_changes = [...(currentSchema.pending_changes || []), change];
+        await svc.setState(team.roomId, EVT.TEAM_SCHEMA, currentSchema);
+        showToast(`Table proposal submitted — awaiting ${consentMode.label.toLowerCase()} approval`, 'info');
+      } else {
+        // Apply immediately — store as TEAM_TABLE_DEF state event (state_key = table id)
+        await svc.setState(team.roomId, EVT.TEAM_TABLE_DEF, tableDef, tableId);
+        showToast(`Table "${tableName.trim()}" created`, 'success');
+      }
+      // Reset and close
+      setTableName(''); setTableDesc(''); setTablePurpose(''); setRollupToParent(false);
+      setColumns([{ id: 'c1', key: '', label: '', data_type: 'text', description: '', required: false, sensitive: false, options: [] }]);
+      onClose(needsProposal ? null : tableDef);
+    } catch (e) {
+      console.error('[CreateTable]', e);
+      showToast('Failed to create table: ' + e.message, 'error');
+    }
+    setSaving(false);
+  };
+
+  const govColor = consentMode.color === 'gold' ? 'var(--gold)' : consentMode.color === 'green' ? 'var(--green)' : 'var(--blue)';
+
+  return React.createElement('div', { className: 'cf-overlay', onClick: e => { if (e.target === e.currentTarget) onClose(null); } },
+    React.createElement('div', { className: 'cf-modal', style: { width: 620, maxHeight: '90vh', display: 'flex', flexDirection: 'column' } },
+      React.createElement('div', { className: 'cf-header' },
+        React.createElement('div', null,
+          React.createElement('h3', null, 'New Table'),
+          React.createElement('span', { style: { fontSize: 10.5, color: 'var(--tx-2)' } }, 'in ', React.createElement('strong', null, team.name))
+        ),
+        React.createElement('button', { className: 'b-gho b-xs', onClick: () => onClose(null), style: { fontSize: 16, lineHeight: 1, padding: '2px 8px' } }, '\u2715')
+      ),
+
+      // Governance banner
+      React.createElement('div', { style: { margin: '0 20px 0', padding: '10px 14px', borderRadius: 'var(--r)', background: 'var(--bg-3)', border: '1px solid var(--border-1)', display: 'flex', gap: 10, alignItems: 'flex-start' } },
+        React.createElement(I, { n: 'shieldCheck', s: 14, c: govColor }),
+        React.createElement('div', { style: { flex: 1 } },
+          React.createElement('div', { style: { fontWeight: 700, fontSize: 12, color: govColor } }, consentMode.label, ' governance'),
+          React.createElement('div', { style: { fontSize: 11, color: 'var(--tx-1)', marginTop: 2 } }, consentMode.desc),
+          needsProposal
+            ? React.createElement('div', { style: { marginTop: 4, fontSize: 10.5, color: 'var(--tx-2)', fontStyle: 'italic' } },
+                'This table will be submitted as a proposal and must be approved before activation.')
+            : React.createElement('div', { style: { marginTop: 4, fontSize: 10.5, color: 'var(--green)', fontStyle: 'italic' } },
+                'As team lead, you can create this table immediately.')
+        )
+      ),
+
+      React.createElement('div', { className: 'cf-body', style: { flex: 1, overflowY: 'auto' } },
+        // Table name
+        React.createElement('div', { className: 'cf-row' },
+          React.createElement('span', { className: 'section-label' }, 'TABLE NAME *'),
+          React.createElement('input', { value: tableName, onChange: e => setTableName(e.target.value), placeholder: 'e.g. Service Encounters, Housing Referrals...' })
+        ),
+        // Description (governance requirement)
+        React.createElement('div', { className: 'cf-row' },
+          React.createElement('span', { className: 'section-label' }, 'DESCRIPTION * \u2014 what data this table holds (min 15 chars)'),
+          React.createElement('textarea', {
+            value: tableDesc, onChange: e => setTableDesc(e.target.value),
+            placeholder: 'Describe what this table captures and why it is needed...',
+            style: { minHeight: 56 }
+          }),
+          tableDesc.length > 0 && tableDesc.length < 15 && React.createElement('span', { style: { fontSize: 10.5, color: 'var(--red)', marginTop: 3 } }, tableDesc.length, '/15 characters')
+        ),
+        // Purpose / rationale
+        React.createElement('div', { className: 'cf-row' },
+          React.createElement('span', { className: 'section-label' }, 'PURPOSE / RATIONALE (optional but recommended)'),
+          React.createElement('textarea', {
+            value: tablePurpose, onChange: e => setTablePurpose(e.target.value),
+            placeholder: 'Why does this team need this table? What decisions will it inform?',
+            style: { minHeight: 44 }
+          })
+        ),
+
+        // Parent rollup
+        parentTeam && React.createElement('div', { className: 'cf-row' },
+          React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' } },
+            React.createElement('input', { type: 'checkbox', checked: rollupToParent, onChange: e => setRollupToParent(e.target.checked) }),
+            React.createElement('div', null,
+              React.createElement('div', { style: { fontWeight: 600, fontSize: 12 } }, 'Roll up data to parent team: ', React.createElement('strong', { style: { color: 'var(--teal)' } }, parentTeam.name)),
+              React.createElement('div', { style: { fontSize: 10.5, color: 'var(--tx-2)', marginTop: 1 } },
+                'When enabled, parent team leads can view aggregate (non-PII) data from this table.')
+            )
+          )
+        ),
+
+        // Columns section
+        React.createElement('div', { style: { marginTop: 8 } },
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 } },
+            React.createElement('span', { className: 'section-label' }, 'COLUMNS * \u2014 each requires a description (governance)'),
+            React.createElement('button', { className: 'b-gho b-xs', onClick: addColumn, style: { display: 'flex', alignItems: 'center', gap: 4 } },
+              React.createElement(I, { n: 'plus', s: 10 }), 'Add Column')
+          ),
+          columns.map((col, idx) =>
+            React.createElement('div', { key: col.id, style: { background: 'var(--bg-3)', border: '1px solid var(--border-1)', borderRadius: 'var(--r)', padding: '12px 14px', marginBottom: 8 } },
+              React.createElement('div', { style: { display: 'flex', gap: 8, marginBottom: 6 } },
+                React.createElement('div', { style: { flex: 2 } },
+                  React.createElement('span', { className: 'section-label', style: { fontSize: 9 } }, 'COLUMN NAME *'),
+                  React.createElement('input', {
+                    value: col.label, onChange: e => updateColumn(col.id, 'label', e.target.value),
+                    placeholder: 'e.g. Encounter Date, Outcome...',
+                    style: { fontSize: 12 }
+                  })
+                ),
+                React.createElement('div', { style: { flex: 1 } },
+                  React.createElement('span', { className: 'section-label', style: { fontSize: 9 } }, 'TYPE'),
+                  React.createElement('select', {
+                    value: col.data_type, onChange: e => updateColumn(col.id, 'data_type', e.target.value),
+                    style: { fontSize: 12 }
+                  }, TABLE_COLUMN_TYPES.map(t => React.createElement('option', { key: t.id, value: t.id }, t.label)))
+                ),
+                React.createElement('div', { style: { flex: 1 } },
+                  React.createElement('span', { className: 'section-label', style: { fontSize: 9 } }, 'KEY (auto)'),
+                  React.createElement('input', {
+                    value: col.key, onChange: e => { updateColumn(col.id, '_keyEdited', true); updateColumn(col.id, 'key', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_')); },
+                    placeholder: 'field_key',
+                    style: { fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--tx-2)' }
+                  })
+                ),
+                React.createElement('button', {
+                  className: 'b-gho b-xs', onClick: () => removeColumn(col.id),
+                  style: { alignSelf: 'flex-end', color: 'var(--red)', opacity: columns.length <= 1 ? 0.3 : 1 },
+                  disabled: columns.length <= 1
+                }, React.createElement(I, { n: 'x', s: 11 }))
+              ),
+              // Column description (governance requirement)
+              React.createElement('div', null,
+                React.createElement('span', { className: 'section-label', style: { fontSize: 9 } }, 'DESCRIPTION * (min 10 chars)'),
+                React.createElement('input', {
+                  value: col.description, onChange: e => updateColumn(col.id, 'description', e.target.value),
+                  placeholder: 'What does this column capture? How should it be filled in?',
+                  style: { fontSize: 11 }
+                }),
+                col.description.length > 0 && col.description.length < 10 && React.createElement('span', { style: { fontSize: 9.5, color: 'var(--red)' } }, col.description.length, '/10')
+              ),
+              // Options for select types
+              (col.data_type === 'single_select' || col.data_type === 'multi_select') &&
+                React.createElement('div', { style: { marginTop: 6 } },
+                  React.createElement('span', { className: 'section-label', style: { fontSize: 9 } }, 'OPTIONS (comma-separated)'),
+                  React.createElement('input', {
+                    value: col.options.join(', '),
+                    onChange: e => updateColumn(col.id, 'options', e.target.value.split(',').map(s => s.trim()).filter(Boolean)),
+                    placeholder: 'Option A, Option B, Option C',
+                    style: { fontSize: 11 }
+                  })
+                ),
+              // Toggles
+              React.createElement('div', { style: { display: 'flex', gap: 16, marginTop: 6 } },
+                React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 11 } },
+                  React.createElement('input', { type: 'checkbox', checked: col.required, onChange: e => updateColumn(col.id, 'required', e.target.checked) }),
+                  'Required'),
+                React.createElement('label', { style: { display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 11 } },
+                  React.createElement('input', { type: 'checkbox', checked: col.sensitive, onChange: e => updateColumn(col.id, 'sensitive', e.target.checked) }),
+                  'Sensitive / PII')
+              )
+            )
+          )
+        )
+      ),
+
+      React.createElement('div', { className: 'cf-footer' },
+        React.createElement('button', { className: 'b-gho', onClick: () => onClose(null) }, 'Cancel'),
+        React.createElement('button', {
+          className: 'b-pri', disabled: !isValid() || saving, onClick: handleSave,
+          style: { display: 'flex', alignItems: 'center', gap: 4 }
+        },
+          React.createElement(I, { n: needsProposal ? 'shieldCheck' : 'plus', s: 13 }),
+          saving ? 'Saving...' : needsProposal ? 'Submit Proposal' : 'Create Table'
+        )
+      )
+    )
+  );
+};
+
+/* ─── CustomTableView — view + add records for a team custom table ─── */
+const CustomTableView = ({ table, team, svc, showToast, onBack }) => {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [addingRow, setAddingRow] = useState(false);
+  const [newRowData, setNewRowData] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  // Load existing records from Matrix state
+  React.useEffect(() => {
+    if (!table || !team || !svc) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const room = svc.client?.getRoom(team.roomId);
+      const allState = room?.currentState?.events;
+      const found = [];
+      if (allState) {
+        const recMap = allState.get(EVT.TEAM_TABLE_RECORD);
+        if (recMap) {
+          for (const [stateKey, evObj] of recMap.entries()) {
+            if (stateKey.startsWith(table.id + ':')) {
+              const content = evObj.getContent?.() || evObj.content || {};
+              if (content.id && content.status !== 'archived') found.push(content);
+            }
+          }
+        }
+      }
+      found.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+      setRecords(found);
+    } catch (e) {
+      console.warn('[CustomTableView] load error:', e.message);
+    }
+    setLoading(false);
+  }, [table?.id, team?.roomId]);
+
+  const handleAddRow = async () => {
+    // Validate required columns
+    const missing = (table.columns || []).filter(c => c.required && !newRowData[c.key]?.toString().trim());
+    if (missing.length > 0) {
+      showToast('Required fields: ' + missing.map(c => c.label).join(', '), 'warning');
+      return;
+    }
+    setSaving(true);
+    try {
+      const recId = 'rec_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      const record = {
+        id: recId,
+        table_id: table.id,
+        data: { ...newRowData },
+        created_by: svc.userId,
+        created_at: Date.now(),
+        modified_by: svc.userId,
+        modified_at: Date.now(),
+        status: 'active'
+      };
+      await svc.setState(team.roomId, EVT.TEAM_TABLE_RECORD, record, table.id + ':' + recId);
+      setRecords(prev => [record, ...prev]);
+      setNewRowData({});
+      setAddingRow(false);
+      showToast('Record added', 'success');
+    } catch (e) {
+      showToast('Failed to add record: ' + e.message, 'error');
+    }
+    setSaving(false);
+  };
+
+  const schemaRule = team.schemaRule || { mode: 'lead_decides' };
+  const consentMode = TEAM_CONSENT_MODES[schemaRule.mode] || TEAM_CONSENT_MODES.lead_decides;
+  const govColor = consentMode.color === 'gold' ? 'var(--gold)' : consentMode.color === 'green' ? 'var(--green)' : 'var(--blue)';
+
+  return React.createElement('div', { className: 'anim-up', style: { padding: '0 0 24px' } },
+    // Header
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 } },
+      React.createElement('button', { className: 'b-gho b-sm', onClick: onBack, style: { display: 'flex', alignItems: 'center', gap: 4 } },
+        React.createElement(I, { n: 'arr-l', s: 12 }), 'Back'),
+      React.createElement('div', { style: { flex: 1 } },
+        React.createElement('h3', { style: { fontFamily: 'var(--serif)', fontSize: 18, fontWeight: 700 } }, table.name),
+        React.createElement('div', { style: { fontSize: 11, color: 'var(--tx-2)', marginTop: 1 } },
+          React.createElement('strong', { style: { color: govColor } }, consentMode.label, ' governance'), ' \u00B7 ', team.name,
+          table.rollup_to_parent && React.createElement('span', { style: { marginLeft: 6, color: 'var(--teal)', fontSize: 10, fontWeight: 600 } }, '\u21A5 rolls up'))
+      ),
+      React.createElement('button', {
+        className: 'b-pri b-sm', onClick: () => setAddingRow(true),
+        style: { display: 'flex', alignItems: 'center', gap: 4 }
+      }, React.createElement(I, { n: 'plus', s: 11 }), 'Add Row')
+    ),
+    // Description
+    React.createElement('p', { style: { fontSize: 12, color: 'var(--tx-1)', marginBottom: 12, lineHeight: 1.5 } }, table.description),
+
+    // Add row inline form
+    addingRow && React.createElement('div', { style: { background: 'var(--bg-3)', border: '1px solid var(--border-1)', borderRadius: 'var(--r)', padding: '14px 16px', marginBottom: 16 } },
+      React.createElement('div', { style: { fontWeight: 700, fontSize: 12, marginBottom: 10 } }, 'New Row'),
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8, marginBottom: 10 } },
+        (table.columns || []).map(col =>
+          React.createElement('div', { key: col.key },
+            React.createElement('span', { className: 'section-label', style: { fontSize: 9 } },
+              col.label.toUpperCase(), col.required ? ' *' : ''),
+            col.data_type === 'boolean'
+              ? React.createElement('select', {
+                  value: newRowData[col.key] || '',
+                  onChange: e => setNewRowData(d => ({ ...d, [col.key]: e.target.value })),
+                  style: { fontSize: 12 }
+                }, React.createElement('option', { value: '' }, '—'), React.createElement('option', { value: 'yes' }, 'Yes'), React.createElement('option', { value: 'no' }, 'No'))
+              : col.data_type === 'single_select'
+              ? React.createElement('select', {
+                  value: newRowData[col.key] || '',
+                  onChange: e => setNewRowData(d => ({ ...d, [col.key]: e.target.value })),
+                  style: { fontSize: 12 }
+                }, React.createElement('option', { value: '' }, '— select —'), ...(col.options || []).map(o => React.createElement('option', { key: o, value: o }, o)))
+              : React.createElement('input', {
+                  type: col.data_type === 'number' ? 'number' : col.data_type === 'date' ? 'date' : 'text',
+                  value: newRowData[col.key] || '',
+                  onChange: e => setNewRowData(d => ({ ...d, [col.key]: e.target.value })),
+                  placeholder: col.description.slice(0, 40),
+                  style: { fontSize: 12 }
+                })
+          )
+        )
+      ),
+      React.createElement('div', { style: { display: 'flex', gap: 8 } },
+        React.createElement('button', { className: 'b-gho b-sm', onClick: () => { setAddingRow(false); setNewRowData({}); } }, 'Cancel'),
+        React.createElement('button', { className: 'b-pri b-sm', disabled: saving, onClick: handleAddRow },
+          saving ? 'Saving...' : 'Add Row')
+      )
+    ),
+
+    // Records table
+    loading
+      ? React.createElement('div', { style: { textAlign: 'center', padding: 32, color: 'var(--tx-3)' } }, 'Loading records...')
+      : records.length === 0 && !addingRow
+        ? React.createElement('div', { style: { textAlign: 'center', padding: 32, color: 'var(--tx-3)', fontSize: 12 } },
+            React.createElement(I, { n: 'layers', s: 24, c: 'var(--border-1)' }),
+            React.createElement('p', { style: { marginTop: 8 } }, 'No records yet. Add the first row.'))
+        : React.createElement('div', { style: { overflowX: 'auto' } },
+            React.createElement('table', { className: 'dt', style: { width: '100%' } },
+              React.createElement('thead', null,
+                React.createElement('tr', null,
+                  React.createElement('th', { style: { width: 32, fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--tx-3)' } }, '#'),
+                  (table.columns || []).map(col =>
+                    React.createElement('th', { key: col.key },
+                      col.label,
+                      col.required && React.createElement('span', { style: { color: 'var(--red)', marginLeft: 2 } }, '*'),
+                      col.sensitive && React.createElement('span', { title: 'Sensitive / PII', style: { marginLeft: 4, color: 'var(--orange)' } }, '\uD83D\uDD12')
+                    )
+                  ),
+                  React.createElement('th', { style: { width: 90, fontSize: 9 } }, 'ADDED')
+                )
+              ),
+              React.createElement('tbody', null,
+                records.map((rec, idx) =>
+                  React.createElement('tr', { key: rec.id },
+                    React.createElement('td', { style: { fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--tx-3)', textAlign: 'center' } }, idx + 1),
+                    (table.columns || []).map(col =>
+                      React.createElement('td', { key: col.key, style: { maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+                        rec.data?.[col.key] ?? React.createElement('span', { style: { color: 'var(--tx-3)', fontStyle: 'italic' } }, '—'))
+                    ),
+                    React.createElement('td', { style: { fontSize: 10, color: 'var(--tx-3)' } },
+                      rec.created_at ? new Date(rec.created_at).toLocaleDateString() : '—')
+                  )
+                )
+              )
+            )
+          )
   );
 };
 
@@ -33145,6 +33720,11 @@ const ProviderApp = ({
   const [createTeamModal, setCreateTeamModal] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamDesc, setNewTeamDesc] = useState('');
+  const [newTeamParentId, setNewTeamParentId] = useState('');     // parent team selection
+  const [newTeamGovernance, setNewTeamGovernance] = useState('lead_decides');  // governance mode
+  // Custom table creation modal
+  const [createTableModal, setCreateTableModal] = useState(null); // null | { teamId, teamName }
+  const [activeCustomTable, setActiveCustomTable] = useState(null); // null | { table, teamId }
   const [teamInviteModal, setTeamInviteModal] = useState(null); // team object or null
   const [teamInviteUserId, setTeamInviteUserId] = useState('');
   const [activeTeamDetail, setActiveTeamDetail] = useState(null); // expanded team detail view
@@ -33545,7 +34125,7 @@ const ProviderApp = ({
     setInitError(null);
     try {
       // Single-pass scan: fetch all Khora state across rooms in one request
-      const scanned = await svc.scanRooms([EVT.ORG_METADATA, EVT.ORG_ROSTER, EVT.PROVIDER_PROFILE, EVT.ORG_OPACITY, EVT.ORG_MSG_ACCESS, EVT.ORG_MSG_CHANNEL, EVT.ORG_TERMINOLOGY, EVT.ORG_ROLES, EVT.TEAM_META, EVT.TEAM_MEMBERS, EVT.TEAM_SCHEMA, EVT.TEAM_SCHEMA_RULE, EVT.FIELD_DEF, EVT.FIELD_CROSSWALK, EVT.DM_META]);
+      const scanned = await svc.scanRooms([EVT.ORG_METADATA, EVT.ORG_ROSTER, EVT.PROVIDER_PROFILE, EVT.ORG_OPACITY, EVT.ORG_MSG_ACCESS, EVT.ORG_MSG_CHANNEL, EVT.ORG_TERMINOLOGY, EVT.ORG_ROLES, EVT.TEAM_META, EVT.TEAM_MEMBERS, EVT.TEAM_SCHEMA, EVT.TEAM_SCHEMA_RULE, EVT.TEAM_HIERARCHY, EVT.TEAM_TABLE_DEF, EVT.FIELD_DEF, EVT.FIELD_CROSSWALK, EVT.DM_META]);
       let roster = null,
         metricsR = null,
         schema = null,
@@ -33601,7 +34181,7 @@ const ProviderApp = ({
             ...chanMeta
           });
         }
-        // Detect team rooms (with schema + consent rule)
+        // Detect team rooms (with schema + consent rule + hierarchy + custom tables)
         if (id?.account_type === 'team') {
           const teamMeta = state[EVT.TEAM_META] || {};
           const teamMembers = state[EVT.TEAM_MEMBERS] || {
@@ -33609,6 +34189,22 @@ const ProviderApp = ({
           };
           const teamSchema = state[EVT.TEAM_SCHEMA] || null;
           const teamSchemaRule = state[EVT.TEAM_SCHEMA_RULE] || null;
+          const teamHierarchy = state[EVT.TEAM_HIERARCHY] || null;
+          // Collect all TEAM_TABLE_DEF state events (keyed by stateKey = table.id)
+          const teamTableDefs = [];
+          const roomObj = svc.client?.getRoom(rid);
+          if (roomObj) {
+            const allState = roomObj.currentState?.events;
+            if (allState) {
+              const tableDefMap = allState.get(EVT.TEAM_TABLE_DEF);
+              if (tableDefMap) {
+                for (const [stateKey, evObj] of tableDefMap.entries()) {
+                  const content = evObj.getContent?.() || evObj.content || {};
+                  if (content.id) teamTableDefs.push(content);
+                }
+              }
+            }
+          }
           detectedTeams.push({
             roomId: rid,
             ...teamMeta,
@@ -33616,7 +34212,9 @@ const ProviderApp = ({
             owner: id.owner,
             created: id.created,
             schema: teamSchema,
-            schemaRule: teamSchemaRule
+            schemaRule: teamSchemaRule,
+            hierarchy: teamHierarchy,
+            customTables: teamTableDefs
           });
         }
         // Collect field definitions and crosswalks from schema rooms
@@ -34799,6 +35397,8 @@ const ProviderApp = ({
     if (!newTeamName.trim()) return;
     try {
       const teamHue = randomTeamHue();
+      const govMode = newTeamGovernance || 'lead_decides';
+      const parentTeam = newTeamParentId ? teams.find(t => t.roomId === newTeamParentId) : null;
       // Default team schema: identity + contact fields from vault
       const defaultSchemaFields = DOMAIN_CONFIG.vaultFields.filter(f => f.category === 'identity' || f.category === 'contact').map(f => ({
         uri: f.uri,
@@ -34823,7 +35423,9 @@ const ProviderApp = ({
           created: Date.now(),
           created_by: svc.userId,
           org_id: orgRoom || null,
-          org_name: orgMeta.name || null
+          org_name: orgMeta.name || null,
+          parent_team_id: parentTeam?.roomId || null,
+          parent_team_name: parentTeam?.name || null
         }
       }, {
         type: EVT.TEAM_MEMBERS,
@@ -34857,14 +35459,46 @@ const ProviderApp = ({
         type: EVT.TEAM_SCHEMA_RULE,
         state_key: '',
         content: {
-          mode: 'lead_decides',
+          mode: govMode,
           modified_by: svc.userId,
           modified_at: Date.now()
         }
+      }, {
+        type: EVT.TEAM_HIERARCHY,
+        state_key: '',
+        content: {
+          parent_team_id: parentTeam?.roomId || null,
+          parent_team_name: parentTeam?.name || null,
+          child_teams: [],
+          rollup_policy: parentTeam ? 'explicit' : 'none',
+          created_by: svc.userId,
+          created_at: Date.now()
+        }
       }]);
+      // If nested under a parent team, register this child on the parent's hierarchy
+      if (parentTeam) {
+        try {
+          const parentHierarchy = await svc.getState(parentTeam.roomId, EVT.TEAM_HIERARCHY) || {};
+          const updatedChildren = [...(parentHierarchy.child_teams || []), { roomId, name: newTeamName }];
+          await svc.setState(parentTeam.roomId, EVT.TEAM_HIERARCHY, {
+            ...parentHierarchy,
+            child_teams: updatedChildren,
+            modified_at: Date.now()
+          });
+          // Update local state for parent
+          setTeams(prev => prev.map(t => t.roomId === parentTeam.roomId ? {
+            ...t,
+            hierarchy: { ...(t.hierarchy || {}), child_teams: updatedChildren }
+          } : t));
+        } catch (e) {
+          console.warn('[Team] Failed to register child on parent hierarchy:', e.message);
+        }
+      }
       await emitOp(roomId, 'DES', dot('org', 'teams', newTeamName), {
         created_by: svc.userId,
-        org: orgMeta.name || null
+        org: orgMeta.name || null,
+        parent_team: parentTeam?.name || null,
+        governance_mode: govMode
       }, orgFrame());
       const newTeam = {
         roomId,
@@ -34875,6 +35509,8 @@ const ProviderApp = ({
         created_by: svc.userId,
         org_id: orgRoom || null,
         org_name: orgMeta.name || null,
+        parent_team_id: parentTeam?.roomId || null,
+        parent_team_name: parentTeam?.name || null,
         members: [{
           userId: svc.userId,
           role: 'lead',
@@ -34889,15 +35525,22 @@ const ProviderApp = ({
           pending_changes: [],
           change_log: []
         },
-        schemaRule: {
-          mode: 'lead_decides'
-        }
+        schemaRule: { mode: govMode },
+        hierarchy: {
+          parent_team_id: parentTeam?.roomId || null,
+          parent_team_name: parentTeam?.name || null,
+          child_teams: [],
+          rollup_policy: parentTeam ? 'explicit' : 'none'
+        },
+        customTables: []
       };
       setTeams(prev => [...prev, newTeam]);
       setCreateTeamModal(false);
       setNewTeamName('');
       setNewTeamDesc('');
-      showToast(`Team "${newTeamName}" created`, 'success');
+      setNewTeamParentId('');
+      setNewTeamGovernance('lead_decides');
+      showToast(`Team "${newTeamName}" created${parentTeam ? ` under ${parentTeam.name}` : ''}`, 'success');
     } catch (e) {
       showToast('Failed to create team: ' + e.message, 'error');
     }
@@ -37466,7 +38109,9 @@ const ProviderApp = ({
       } catch (e) { console.warn('Failed to emit unlink op:', e); }
       if (showToast) showToast('Linked record removed', 'info');
     },
-    resourceTypes: resourceTypes
+    resourceTypes: resourceTypes,
+    onCreateTable: team => setCreateTableModal({ teamId: team.roomId, teamName: team.name }),
+    onOpenTable: (table, team) => setActiveCustomTable({ table, teamId: team.roomId })
   }), /*#__PURE__*/React.createElement(NoteCreateModal, {
     open: newNoteModal,
     onClose: () => setNewNoteModal(false),
@@ -43912,7 +44557,45 @@ const ProviderApp = ({
     style: {
       minHeight: 50
     }
-  })), orgRoom && /*#__PURE__*/React.createElement("div", {
+  })),
+  /* ── Parent team (nesting) ── */
+  teams.length > 0 && React.createElement('div', { style: { marginBottom: 14 } },
+    React.createElement('span', { className: 'section-label' }, 'PARENT TEAM (OPTIONAL — creates a sub-team)'),
+    React.createElement('select', {
+      value: newTeamParentId,
+      onChange: e => setNewTeamParentId(e.target.value),
+      style: { fontSize: 12 }
+    },
+      React.createElement('option', { value: '' }, '— None (top-level team) —'),
+      teams.map(t => React.createElement('option', { key: t.roomId, value: t.roomId }, t.name))
+    ),
+    newTeamParentId && React.createElement('div', { style: { fontSize: 10.5, color: 'var(--teal)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 } },
+      React.createElement(I, { n: 'arr-r', s: 9, c: 'var(--teal)' }),
+      'This team will be nested under ', React.createElement('strong', null, teams.find(t => t.roomId === newTeamParentId)?.name || ''),
+      '. Data can roll up if tables are configured to do so.'
+    )
+  ),
+  /* ── Governance mode ── */
+  React.createElement('div', { style: { marginBottom: 14 } },
+    React.createElement('span', { className: 'section-label' }, 'GOVERNANCE MODE *'),
+    Object.values(TEAM_CONSENT_MODES).map(m => {
+      const govColor = m.color === 'gold' ? 'var(--gold)' : m.color === 'green' ? 'var(--green)' : 'var(--blue)';
+      return React.createElement('label', {
+        key: m.id,
+        style: { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', borderRadius: 'var(--r)', border: '1px solid ' + (newTeamGovernance === m.id ? govColor : 'var(--border-0)'), background: newTeamGovernance === m.id ? 'var(--bg-3)' : 'transparent', cursor: 'pointer', marginBottom: 6 }
+      },
+        React.createElement('input', { type: 'radio', name: 'teamGov', value: m.id, checked: newTeamGovernance === m.id, onChange: () => setNewTeamGovernance(m.id), style: { marginTop: 2 } }),
+        React.createElement('div', null,
+          React.createElement('div', { style: { fontWeight: 600, fontSize: 12, color: newTeamGovernance === m.id ? govColor : 'var(--tx-0)' } },
+            React.createElement(I, { n: m.icon, s: 10, c: govColor }), ' ', m.label),
+          React.createElement('div', { style: { fontSize: 10.5, color: 'var(--tx-2)', marginTop: 2 } }, m.desc),
+          m.id !== 'lead_decides' && React.createElement('div', { style: { fontSize: 10, color: 'var(--tx-3)', marginTop: 2, fontStyle: 'italic' } },
+            'Schema and table changes require team votes to take effect.')
+        )
+      );
+    })
+  ),
+  orgRoom && /*#__PURE__*/React.createElement("div", {
     style: {
       background: 'var(--blue-dim)',
       border: '1px solid rgba(91,156,245,.15)',
@@ -44715,7 +45398,38 @@ const ProviderApp = ({
     showToast: showToast,
     metricsRoom: metricsRoom,
     onComplete: handleImportComplete
-  }), /*#__PURE__*/React.createElement(DatabaseMergeModal, {
+  }),
+  /* ── CreateTableModal ── */
+  React.createElement(CreateTableModal, {
+    open: !!createTableModal,
+    onClose: newTable => {
+      if (newTable) {
+        // Add the newly created table to the active team's customTables in local state
+        setTeams(prev => prev.map(t => t.roomId === createTableModal?.teamId ? {
+          ...t,
+          customTables: [...(t.customTables || []), newTable]
+        } : t));
+      }
+      setCreateTableModal(null);
+    },
+    team: createTableModal ? (teams.find(t => t.roomId === createTableModal.teamId) || null) : null,
+    teams: teams,
+    svc: svc,
+    showToast: showToast
+  }),
+  /* ── CustomTableView overlay ── */
+  activeCustomTable && React.createElement('div', {
+    style: { position: 'fixed', inset: 0, zIndex: 900, background: 'var(--bg-0)', overflowY: 'auto', padding: '24px 32px' }
+  },
+    React.createElement(CustomTableView, {
+      table: activeCustomTable.table,
+      team: teams.find(t => t.roomId === activeCustomTable.teamId) || null,
+      svc: svc,
+      showToast: showToast,
+      onBack: () => setActiveCustomTable(null)
+    })
+  ),
+  /*#__PURE__*/React.createElement(DatabaseMergeModal, {
     open: dbMergeModal,
     onClose: () => { setDbMergeModal(false); setDbMergeRecordA(null); setDbMergeRecordB(null); },
     recordA: dbMergeRecordA,
