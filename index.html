@@ -30213,10 +30213,6 @@ const ProviderApp = ({
     () => activeTeamObj ? cases.filter(c => { const a = caseAssignments[c.bridgeRoomId]; return activeTeamMemberIds.includes(a?.primary || c.meta?.provider); }) : cases,
     [activeTeamObj, cases, caseAssignments, activeTeamMemberIds]
   );
-  const teamFilteredTeamDMs = useMemo(
-    () => activeTeamObj ? teamDMs.filter(dm => activeTeamMemberIds.includes(dm.peerId)) : teamDMs,
-    [activeTeamObj, teamDMs, activeTeamMemberIds]
-  );
   const switchTeamContext = React.useCallback((teamRoomId) => {
     setActiveTeamContext(teamRoomId);
     try {
@@ -30325,6 +30321,10 @@ const ProviderApp = ({
   const [teamDMMsgText, setTeamDMMsgText] = useState('');
   const [newTeamDMModal, setNewTeamDMModal] = useState(false);
   const [newDMTarget, setNewDMTarget] = useState(null); // {userId, displayName, teamName}
+  const teamFilteredTeamDMs = useMemo(
+    () => activeTeamObj ? teamDMs.filter(dm => activeTeamMemberIds.includes(dm.peerId)) : teamDMs,
+    [activeTeamObj, teamDMs, activeTeamMemberIds]
+  );
   // ─── Notifications state ───
   const [notifications, setNotifications] = useState([]);
   // ─── Resource tracking state ───
