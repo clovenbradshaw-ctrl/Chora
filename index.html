@@ -775,6 +775,35 @@ table.dt td.dt-drag-handle:active{cursor:grabbing}
 .pd-res-card{padding:12px 16px;border-radius:var(--r);border:1px solid var(--border-0);background:var(--bg-2);display:flex;align-items:center;justify-content:space-between;transition:border-color .15s}
 .pd-res-card:hover{border-color:var(--green)}
 .pd-empty{text-align:center;padding:30px 20px;border:1px dashed var(--border-1);border-radius:var(--r);color:var(--tx-3)}
+/* ═══ EO Graph View ═══ */
+.eo-graph-wrap{height:100%;display:flex;flex-direction:column;overflow:hidden}
+.eo-graph-header{padding:14px 20px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;gap:12px;flex-shrink:0}
+.eo-graph-breadcrumb{display:flex;align-items:center;gap:4px;font-size:12px;font-family:var(--mono)}
+.eo-graph-breadcrumb .bc-seg{cursor:pointer;color:var(--teal);padding:2px 6px;border-radius:var(--r);transition:background .15s}
+.eo-graph-breadcrumb .bc-seg:hover{background:var(--bg-4)}
+.eo-graph-breadcrumb .bc-sep{color:var(--tx-3)}
+.eo-graph-breadcrumb .bc-cur{color:var(--tx-0);font-weight:700;padding:2px 6px}
+.eo-graph-canvas{flex:1;overflow:auto;position:relative}
+.eo-graph-svg{width:100%;height:100%;min-height:500px}
+.eo-node{cursor:pointer;transition:transform .2s}
+.eo-node:hover .eo-node-bg{filter:brightness(1.2)}
+.eo-node-bg{rx:12;ry:12;transition:filter .2s}
+.eo-edge{stroke:var(--border-1);stroke-width:1.5;fill:none;opacity:.6;transition:opacity .2s}
+.eo-edge:hover{opacity:1;stroke-width:2}
+.eo-edge-arrow{fill:var(--border-1);opacity:.6}
+.eo-graph-detail{position:absolute;top:16px;right:16px;width:320px;max-height:calc(100% - 32px);overflow:auto;background:var(--bg-1);border:1px solid var(--border-1);border-radius:var(--r-lg);box-shadow:0 8px 32px rgba(0,0,0,.3);z-index:10}
+.eo-graph-detail .detail-head{padding:14px 16px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;gap:10px}
+.eo-graph-detail .detail-body{padding:14px 16px;font-size:12px;line-height:1.7;color:var(--tx-1)}
+.eo-graph-detail .detail-ops{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.eo-graph-detail .detail-children{margin-top:10px}
+.eo-graph-detail .detail-child{padding:8px 10px;margin-bottom:4px;border:1px solid var(--border-0);border-radius:var(--r);cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s}
+.eo-graph-detail .detail-child:hover{background:var(--bg-3)}
+.eo-graph-legend{padding:10px 20px;border-top:1px solid var(--border-0);display:flex;align-items:center;gap:16px;flex-shrink:0;font-size:11px;color:var(--tx-2)}
+.eo-graph-legend .leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+@media(max-width:700px){
+  .eo-graph-detail{width:100%;right:0;top:auto;bottom:0;max-height:50%;border-radius:var(--r-lg) var(--r-lg) 0 0}
+}
+
 /* ═══ Transparency Page ═══ */
 @media(max-width:700px){
   .tp-source-split{flex-direction:column!important;height:auto!important;min-height:auto!important}
@@ -1361,7 +1390,8 @@ const I = ({
     })),
     dodeca: /*#__PURE__*/React.createElement("svg", p, /*#__PURE__*/React.createElement("path", {
       d: "M12 1L22.46 8.6L18.47 20.9L5.53 20.9L1.54 8.6Z M14.94 7.95L16.76 13.55L12 17L7.24 13.55L9.06 7.95Z M12 1L14.94 7.95 M22.46 8.6L16.76 13.55 M18.47 20.9L12 17 M5.53 20.9L7.24 13.55 M1.54 8.6L9.06 7.95"
-    }))
+    })),
+    graphNodes: /*#__PURE__*/React.createElement("svg", p, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "5", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "19", r: "3" }), /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "19", r: "3" }), /*#__PURE__*/React.createElement("line", { x1: "12", y1: "8", x2: "5", y2: "16" }), /*#__PURE__*/React.createElement("line", { x1: "12", y1: "8", x2: "19", y2: "16" }), /*#__PURE__*/React.createElement("line", { x1: "8", y1: "19", x2: "16", y2: "19" }))
   };
   return /*#__PURE__*/React.createElement("span", {
     style: {
@@ -18377,7 +18407,8 @@ const ClientApp = ({
       { id: 'records', icon: 'shield', label: 'My Records', badge: pendingClaims.length, badgeClass: 'nav-badge-gold' },
       { id: 'metrics', icon: 'bar', label: 'Metrics' },
       { id: 'activity', icon: 'layers', label: 'Activity Stream' },
-      { id: 'transparency', icon: 'eye', label: 'Transparency' }
+      { id: 'transparency', icon: 'eye', label: 'Transparency' },
+      { id: 'eo-graph', icon: 'graphNodes', label: 'EO Graph' }
     ],
     onMoreNavigate: id => { setView(id); setActiveBridge(null); }
   },
@@ -18490,6 +18521,10 @@ const ClientApp = ({
     id: 'transparency',
     icon: 'eye',
     label: 'Transparency'
+  }, {
+    id: 'eo-graph',
+    icon: 'graphNodes',
+    label: 'EO Graph'
   }].map(item => /*#__PURE__*/React.createElement("div", {
     key: item.id,
     onClick: () => {
@@ -21153,6 +21188,8 @@ const ClientApp = ({
   }))))), view === 'activity' && !activeBridge && /*#__PURE__*/React.createElement(ActivityStream, {
     session: session
   }), view === 'transparency' && !activeBridge && /*#__PURE__*/React.createElement(TransparencyPage, {
+    onBack: () => setView('dashboard')
+  }), view === 'eo-graph' && !activeBridge && /*#__PURE__*/React.createElement(EOGraphView, {
     onBack: () => setView('dashboard')
   })), /*#__PURE__*/React.createElement(Modal, {
     open: editModal,
@@ -31212,6 +31249,7 @@ const ProviderApp = ({
       { id: 'metrics', icon: 'bar', label: 'Metrics' },
       { id: 'activity', icon: 'layers', label: 'Activity Stream' },
       { id: 'transparency', icon: 'eye', label: 'Transparency' },
+      { id: 'eo-graph', icon: 'graphNodes', label: 'EO Graph' },
       ...(orgRoom ? [{ id: 'org-settings', icon: 'briefcase', label: 'Organization' }] : [])
     ],
     onMoreNavigate: id => { setView(id); setActiveCase(null); setActiveIndividual(null); setActiveResourceProfile(null); }
@@ -31487,6 +31525,10 @@ const ProviderApp = ({
       id: 'transparency',
       icon: 'eye',
       label: 'Transparency'
+    }, {
+      id: 'eo-graph',
+      icon: 'graphNodes',
+      label: 'EO Graph'
     }].map(item => /*#__PURE__*/React.createElement("div", {
       key: item.id,
       onClick: () => {
@@ -36615,6 +36657,8 @@ const ProviderApp = ({
     session: session
   }), view === 'transparency' && /*#__PURE__*/React.createElement(TransparencyPage, {
     onBack: () => setView('dashboard')
+  }), view === 'eo-graph' && /*#__PURE__*/React.createElement(EOGraphView, {
+    onBack: () => setView('dashboard')
   }))), /*#__PURE__*/React.createElement(Modal, {
     open: discoverModal,
     onClose: () => setDiscoverModal(false),
@@ -39390,6 +39434,375 @@ const ProviderApp = ({
     n: "users",
     s: 16
   }), " Transfer Case")))));
+};
+
+/* ═══════════════════ EO HIERARCHICAL NODE VIEW ═══════════════════
+ * Operator Manifest:
+ *   DES(eo.graph, {hierarchical_node_view}) — existence
+ *   CON(eo.graph.edges, {operator_relationships, section_linkage}) — structural
+ *   INS(eo.graph.nodes, {triads, operators, sections, functions}) — instantiation
+ *   ALT(eo.graph.level, {drill_down, drill_up}) — navigation transitions
+ *
+ * Triad Summary:
+ *   Existence:       DES (graph view purpose), INS (node/edge creation)
+ *   Structure:       CON (edges between nodes, hierarchy levels)
+ *   Interpretation:  ALT (level transitions on drill-down/up)
+ *
+ * Interactive SVG-based graph that shows all EO functionality as nodes
+ * and edges. Supports hierarchical drill-down through levels:
+ *   L0: System overview (3 triads as top-level nodes)
+ *   L1: Triad detail (3 operators per triad)
+ *   L2: Operator detail (code sections using that operator)
+ *   L3: Section detail (functions/components within section)
+ * ═══════════════════════════════════════════════════════════ */
+const EOGraphView = ({ onBack }) => {
+  const [level, setLevel] = useState(0);
+  const [path, setPath] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [hoveredNode, setHoveredNode] = useState(null);
+  const [eoSections, setEoSections] = useState([]);
+  const svgRef = useRef(null);
+
+  // Parse source code to extract EO sections
+  useEffect(() => {
+    const scripts = document.querySelectorAll('script:not([src]):not([type])');
+    let code = '';
+    scripts.forEach(s => { if (s.textContent.length > 1000) code = s.textContent; });
+    if (!code) {
+      const allScripts = document.querySelectorAll('script');
+      allScripts.forEach(s => { if (!s.src && s.textContent.length > 1000) code = s.textContent; });
+    }
+    const lines = code.split('\n');
+    const sections = [];
+    const sectionRe = /\/\*\s*═{3,}\s*(.*?)\s*═{3,}\s*\*\//;
+    lines.forEach((line, i) => {
+      const m = line.match(sectionRe);
+      if (m) sections.push({ name: m[1].trim(), line: i + 1, operators: [], triad: {}, definitions: [], emitOpCalls: [], allOps: [] });
+    });
+    const opLineRe = /^\s*\*\s+(NUL|DES|INS|SEG|CON|SYN|ALT|SUP|REC)\(([^)]*)\)\s*—\s*(.*)$/;
+    const triadRe = /^\s*\*\s+(Existence|Structure|Interpretation):\s+(.*)$/;
+    const fnRe = /^(?:async\s+)?function\s+(\w+)/;
+    const constFnRe = /^const\s+(\w+)\s*=\s*(?:\([^)]*\)\s*=>|function|\(?\{)/;
+    const emitOpRe = /emitOp\(\s*\S+,\s*'(NUL|DES|INS|SEG|CON|SYN|ALT|SUP|REC)',\s*dot\(([^)]*)\)/;
+    for (let si = 0; si < sections.length; si++) {
+      const sec = sections[si];
+      const endLine = si < sections.length - 1 ? sections[si + 1].line - 1 : lines.length;
+      const headerEnd = Math.min(sec.line + 30, endLine);
+      for (let li = sec.line - 1; li < headerEnd; li++) {
+        const raw = lines[li] || '';
+        const opMatch = raw.match(opLineRe);
+        if (opMatch) sec.operators.push({ op: opMatch[1], target: opMatch[2].trim(), desc: opMatch[3].trim() });
+        const triadMatch = raw.match(triadRe);
+        if (triadMatch) sec.triad[triadMatch[1]] = triadMatch[2].replace(/^\s*/, '').trim();
+      }
+      for (let li = sec.line - 1; li < endLine; li++) {
+        const raw = lines[li] || '';
+        const fnMatch = raw.match(fnRe);
+        if (fnMatch) sec.definitions.push({ name: fnMatch[1], line: li + 1, type: 'function' });
+        else {
+          const cfnMatch = raw.match(constFnRe);
+          if (cfnMatch) sec.definitions.push({ name: cfnMatch[1], line: li + 1, type: raw.includes('=>') ? 'arrow' : 'component' });
+        }
+        const emitMatch = raw.match(emitOpRe);
+        if (emitMatch) sec.emitOpCalls.push({ op: emitMatch[1], target: emitMatch[2].replace(/'/g, '').trim(), line: li + 1 });
+      }
+      const opSet = new Set(sec.operators.map(o => o.op));
+      sec.emitOpCalls.forEach(c => opSet.add(c.op));
+      sec.allOps = [...opSet];
+    }
+    setEoSections(sections);
+  }, []);
+
+  const TRIADS = [
+    { id: 'existence', label: 'Existence', desc: 'What exists? Creation, naming, and destruction of entities.', color: '#3ecf8e', dimColor: 'rgba(62,207,142,.15)', ops: ['NUL', 'DES', 'INS'] },
+    { id: 'structure', label: 'Structure', desc: 'How do things relate? Segmentation, connection, and synthesis.', color: '#5b9cf5', dimColor: 'rgba(91,156,245,.15)', ops: ['SEG', 'CON', 'SYN'] },
+    { id: 'interpretation', label: 'Interpretation', desc: 'How do things change? Alteration, superposition, and reconciliation.', color: '#b090d4', dimColor: 'rgba(176,144,212,.15)', ops: ['ALT', 'SUP', 'REC'] }
+  ];
+  const OP_INFO = {
+    NUL: { label: 'NUL', name: 'Null / Destroy', symbol: '\u2205', desc: 'Absence, void, destruction. Revocation, access removed, capacity destroyed.', triad: 'existence' },
+    DES: { label: 'DES', name: 'Designate', symbol: '\u225d', desc: 'Names or classifies an entity. Labeling, type designation.', triad: 'existence' },
+    INS: { label: 'INS', name: 'Instantiate', symbol: '\u25b3', desc: 'Creates a new entity with a value. First observation, creation.', triad: 'existence' },
+    SEG: { label: 'SEG', name: 'Segment', symbol: '\u22a2', desc: 'Partitions data into structural segments. Boundaries, classification.', triad: 'structure' },
+    CON: { label: 'CON', name: 'Connect', symbol: '\u22c8', desc: 'Links entities together. Provenance chains, allocations, bridges.', triad: 'structure' },
+    SYN: { label: 'SYN', name: 'Synthesize', symbol: '\u2228', desc: 'Merges multiple sources into unified view. Dedup, parallel hydration.', triad: 'structure' },
+    ALT: { label: 'ALT', name: 'Alter', symbol: '\u223f', desc: 'Changes a value within existing frame. Status transitions, field updates.', triad: 'interpretation' },
+    SUP: { label: 'SUP', name: 'Superpose', symbol: '\u29a6', desc: 'Holds multiple valid values simultaneously. Competing interpretations.', triad: 'interpretation' },
+    REC: { label: 'REC', name: 'Reconcile', symbol: '\u21bb', desc: 'Resolves superposition. Schema evolution, governance adaptation.', triad: 'interpretation' }
+  };
+
+  const getTriadForOp = (op) => TRIADS.find(t => t.ops.includes(op));
+  const getTriadById = (id) => TRIADS.find(t => t.id === id);
+  const getSectionsForOp = (op) => eoSections.filter(s => s.allOps.includes(op));
+
+  // Build nodes for current level
+  const getNodesForLevel = () => {
+    if (level === 0) {
+      return TRIADS.map(t => ({
+        id: t.id, label: t.label, desc: t.desc, color: t.color, dimColor: t.dimColor,
+        childCount: t.ops.length, sublabel: t.ops.join(' \xb7 '), type: 'triad'
+      }));
+    }
+    if (level === 1) {
+      const triad = getTriadById(path[0]?.id);
+      if (!triad) return [];
+      return triad.ops.map(op => {
+        const info = OP_INFO[op];
+        const sects = getSectionsForOp(op);
+        return {
+          id: op, label: info.symbol + ' ' + op, desc: info.desc, name: info.name,
+          color: triad.color, dimColor: triad.dimColor,
+          childCount: sects.length, sublabel: info.name, type: 'operator'
+        };
+      });
+    }
+    if (level === 2) {
+      const op = path[1]?.id;
+      const triad = getTriadById(path[0]?.id);
+      if (!op || !triad) return [];
+      return getSectionsForOp(op).map((s, i) => ({
+        id: 'sec-' + i, sectionIndex: i,
+        label: s.name.length > 28 ? s.name.slice(0, 26) + '\u2026' : s.name,
+        fullLabel: s.name,
+        desc: 'Line ' + s.line + ' \xb7 ' + s.definitions.length + ' definitions \xb7 ' + s.allOps.length + ' operators',
+        color: triad.color, dimColor: triad.dimColor,
+        childCount: s.definitions.length, sublabel: s.definitions.length + ' funcs',
+        allOps: s.allOps, operators: s.operators, type: 'section'
+      }));
+    }
+    if (level === 3) {
+      const op = path[1]?.id;
+      const triad = getTriadById(path[0]?.id);
+      const sects = getSectionsForOp(op);
+      const secIdx = path[2]?.sectionIndex;
+      const sec = sects[secIdx];
+      if (!sec || !triad) return [];
+      return sec.definitions.map((d, i) => ({
+        id: 'fn-' + i, label: d.name.length > 24 ? d.name.slice(0, 22) + '\u2026' : d.name,
+        fullLabel: d.name, desc: 'Line ' + d.line + ' \xb7 ' + d.type,
+        color: d.type === 'component' ? triad.color : (d.type === 'arrow' ? '#e5a550' : 'var(--tx-2)'),
+        dimColor: triad.dimColor, childCount: 0, sublabel: d.type, line: d.line, type: 'function'
+      }));
+    }
+    return [];
+  };
+
+  // Build edges
+  const getEdgesForLevel = (nodes) => {
+    if (level === 0) {
+      return [
+        { from: 0, to: 1, label: 'structures' },
+        { from: 1, to: 2, label: 'interprets' },
+        { from: 2, to: 0, label: 'grounds' }
+      ];
+    }
+    if (level === 1) {
+      const edges = [];
+      if (nodes.length >= 2) edges.push({ from: 0, to: 1 });
+      if (nodes.length >= 3) edges.push({ from: 1, to: 2 });
+      if (nodes.length >= 3) edges.push({ from: 0, to: 2, dashed: true });
+      return edges;
+    }
+    if (level === 2) {
+      const edges = [];
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const shared = (nodes[i].allOps || []).filter(o => (nodes[j].allOps || []).includes(o));
+          if (shared.length > 0) edges.push({ from: i, to: j, label: shared.join(','), dashed: shared.length === 1 });
+        }
+      }
+      return edges.slice(0, 20);
+    }
+    if (level === 3) {
+      const edges = [];
+      for (let i = 0; i < nodes.length - 1 && i < 15; i++) edges.push({ from: i, to: i + 1 });
+      return edges;
+    }
+    return [];
+  };
+
+  const drillDown = (node) => {
+    if (node.type === 'function') { setSelected(node); return; }
+    setPath(prev => [...prev, node]);
+    setLevel(prev => prev + 1);
+    setSelected(null);
+  };
+
+  const navigateTo = (depth) => {
+    if (depth < 0) { setLevel(0); setPath([]); setSelected(null); }
+    else { setPath(prev => prev.slice(0, depth + 1)); setLevel(depth + 1); setSelected(null); }
+  };
+
+  // Layout computation
+  const computeLayout = (nodes, edges) => {
+    const count = nodes.length;
+    if (count === 0) return { positions: [], edgePaths: [] };
+    const W = 900, H = Math.max(600, Math.ceil(count / 5) * 120 + 200);
+    const positions = [];
+    if (count <= 3) {
+      if (count === 1) positions.push({ x: W / 2, y: H / 2 });
+      else if (count === 2) { positions.push({ x: W / 3, y: H / 2 }); positions.push({ x: 2 * W / 3, y: H / 2 }); }
+      else { positions.push({ x: W / 2, y: 130 }); positions.push({ x: 180, y: H - 150 }); positions.push({ x: W - 180, y: H - 150 }); }
+    } else if (count <= 9) {
+      const cols = Math.ceil(Math.sqrt(count));
+      const rows = Math.ceil(count / cols);
+      const gapX = W / (cols + 1), gapY = H / (rows + 1);
+      for (let i = 0; i < count; i++) positions.push({ x: gapX * ((i % cols) + 1), y: gapY * (Math.floor(i / cols) + 1) });
+    } else {
+      const cols = Math.min(5, count);
+      const gapX = W / (cols + 1), gapY = Math.min(110, (H - 60) / (Math.ceil(count / cols) + 1));
+      for (let i = 0; i < count; i++) positions.push({ x: gapX * ((i % cols) + 1), y: 80 + gapY * (Math.floor(i / cols) + 1) });
+    }
+    const edgePaths = edges.map(e => {
+      const from = positions[e.from], to = positions[e.to];
+      if (!from || !to) return null;
+      const dx = to.x - from.x, dy = to.y - from.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const nx = dx / dist, ny = dy / dist;
+      const x1 = from.x + nx * 45, y1 = from.y + ny * 35;
+      const x2 = to.x - nx * 45, y2 = to.y - ny * 35;
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      const cx = mx - (y2 - y1) * 0.12, cy = my + (x2 - x1) * 0.12;
+      return { ...e, path: 'M' + x1 + ',' + y1 + ' Q' + cx + ',' + cy + ' ' + x2 + ',' + y2, x1, y1, x2, y2, cx, cy };
+    }).filter(Boolean);
+    return { positions, edgePaths };
+  };
+
+  const nodes = getNodesForLevel();
+  const edges = getEdgesForLevel(nodes);
+  const { positions, edgePaths } = computeLayout(nodes, edges);
+  const levelLabels = ['EO System', 'Triad', 'Operator', 'Section'];
+  const svgH = Math.max(600, Math.ceil(nodes.length / 5) * 120 + 200);
+
+  return React.createElement('div', { className: 'eo-graph-wrap' },
+    // Header + breadcrumb
+    React.createElement('div', { className: 'eo-graph-header' },
+      React.createElement('div', {
+        onClick: onBack, style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, color: 'var(--tx-2)', fontSize: 12 }
+      }, React.createElement(I, { n: 'back', s: 14 }), 'Back'),
+      React.createElement('div', { style: { width: 1, height: 20, background: 'var(--border-0)' } }),
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+        React.createElement(I, { n: 'graphNodes', s: 18, c: 'var(--teal)' }),
+        React.createElement('h2', { style: { fontSize: 16, fontWeight: 700 } }, 'EO Architecture Graph')),
+      React.createElement('div', { style: { flex: 1 } }),
+      React.createElement('div', { className: 'eo-graph-breadcrumb' },
+        React.createElement('span', { className: 'bc-seg', onClick: () => { setLevel(0); setPath([]); setSelected(null); } }, 'EO System'),
+        path.map((p, i) => React.createElement(React.Fragment, { key: i },
+          React.createElement('span', { className: 'bc-sep' }, ' \u203a '),
+          i < path.length - 1
+            ? React.createElement('span', { className: 'bc-seg', onClick: () => navigateTo(i) }, p.label)
+            : React.createElement('span', { className: 'bc-cur' }, p.label)
+        ))
+      ),
+      React.createElement('span', {
+        style: { fontSize: 10, color: 'var(--tx-3)', fontFamily: 'var(--mono)', padding: '3px 8px', background: 'var(--bg-3)', borderRadius: 'var(--r)' }
+      }, 'L' + level + ' \xb7 ' + (levelLabels[level] || 'Detail'))
+    ),
+    // SVG canvas
+    React.createElement('div', { className: 'eo-graph-canvas' },
+      React.createElement('svg', {
+        ref: svgRef, className: 'eo-graph-svg', viewBox: '0 0 900 ' + svgH, preserveAspectRatio: 'xMidYMid meet'
+      },
+        React.createElement('defs', null,
+          React.createElement('marker', { id: 'eo-arrow', markerWidth: '8', markerHeight: '6', refX: '8', refY: '3', orient: 'auto' },
+            React.createElement('polygon', { points: '0 0, 8 3, 0 6', className: 'eo-edge-arrow' })),
+          React.createElement('filter', { id: 'eo-glow' },
+            React.createElement('feGaussianBlur', { stdDeviation: '3', result: 'coloredBlur' }),
+            React.createElement('feMerge', null,
+              React.createElement('feMergeNode', { in: 'coloredBlur' }),
+              React.createElement('feMergeNode', { in: 'SourceGraphic' })))
+        ),
+        // Edges
+        edgePaths.map((e, i) => React.createElement('g', { key: 'e' + i },
+          React.createElement('path', { d: e.path, className: 'eo-edge', markerEnd: 'url(#eo-arrow)', strokeDasharray: e.dashed ? '6,4' : 'none' }),
+          e.label && React.createElement('text', {
+            x: e.cx || (e.x1 + e.x2) / 2, y: (e.cy || (e.y1 + e.y2) / 2) - 8,
+            textAnchor: 'middle', style: { fontSize: 9, fill: 'var(--tx-3)', fontFamily: 'var(--mono)' }
+          }, e.label)
+        )),
+        // Nodes
+        nodes.map((node, i) => {
+          const pos = positions[i];
+          if (!pos) return null;
+          const isHov = hoveredNode === node.id;
+          const isSel = selected?.id === node.id;
+          const nW = level === 0 ? 200 : (level === 3 ? 160 : 180);
+          const nH = level === 0 ? 100 : (level === 3 ? 60 : 80);
+          return React.createElement('g', {
+            key: node.id, className: 'eo-node',
+            transform: 'translate(' + (pos.x - nW / 2) + ',' + (pos.y - nH / 2) + ')',
+            onClick: () => drillDown(node),
+            onMouseEnter: () => setHoveredNode(node.id),
+            onMouseLeave: () => setHoveredNode(null)
+          },
+            React.createElement('rect', {
+              className: 'eo-node-bg', width: nW, height: nH,
+              fill: node.dimColor || 'var(--bg-2)',
+              stroke: isSel ? node.color : (isHov ? node.color : 'var(--border-1)'),
+              strokeWidth: isSel ? 2.5 : (isHov ? 2 : 1),
+              filter: isHov ? 'url(#eo-glow)' : 'none'
+            }),
+            React.createElement('text', {
+              x: nW / 2, y: level === 3 ? nH / 2 - 4 : nH / 2 - 10, textAnchor: 'middle',
+              style: { fontSize: level === 0 ? 16 : 13, fontWeight: 700, fill: node.color || 'var(--tx-0)' }
+            }, node.label),
+            React.createElement('text', {
+              x: nW / 2, y: level === 3 ? nH / 2 + 12 : nH / 2 + 8, textAnchor: 'middle',
+              style: { fontSize: 10, fill: 'var(--tx-2)', fontFamily: 'var(--mono)' }
+            }, node.sublabel),
+            node.childCount > 0 && React.createElement('g', null,
+              React.createElement('rect', { x: nW - 28, y: 6, width: 22, height: 16, rx: 8, fill: node.color, opacity: 0.2 }),
+              React.createElement('text', { x: nW - 17, y: 17, textAnchor: 'middle', style: { fontSize: 9, fontWeight: 700, fill: node.color } }, node.childCount)),
+            node.childCount > 0 && React.createElement('text', {
+              x: nW / 2, y: nH - 8, textAnchor: 'middle', style: { fontSize: 9, fill: 'var(--tx-3)' }
+            }, 'click to expand \u203a')
+          );
+        })
+      ),
+      // Detail panel
+      selected && React.createElement('div', { className: 'eo-graph-detail' },
+        React.createElement('div', { className: 'detail-head' },
+          React.createElement('div', {
+            style: { width: 28, height: 28, borderRadius: 'var(--r)', background: selected.dimColor || 'var(--bg-3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: selected.color || 'var(--tx-0)', fontWeight: 700, fontSize: 11, fontFamily: 'var(--mono)' }
+          }, (selected.label || '').slice(0, 3)),
+          React.createElement('div', { style: { flex: 1 } },
+            React.createElement('div', { style: { fontSize: 14, fontWeight: 700 } }, selected.fullLabel || selected.label),
+            React.createElement('div', { style: { fontSize: 10, color: 'var(--tx-2)', fontFamily: 'var(--mono)' } }, selected.sublabel)),
+          React.createElement('div', { onClick: () => setSelected(null), style: { cursor: 'pointer', padding: 4 } },
+            React.createElement(I, { n: 'x', s: 14 }))
+        ),
+        React.createElement('div', { className: 'detail-body' },
+          React.createElement('p', null, selected.desc),
+          selected.line && React.createElement('div', {
+            style: { marginTop: 8, padding: '6px 10px', background: 'var(--bg-3)', borderRadius: 'var(--r)', fontFamily: 'var(--mono)', fontSize: 11 }
+          }, 'Source: line ' + selected.line),
+          selected.allOps && selected.allOps.length > 0 && React.createElement('div', null,
+            React.createElement('div', { style: { fontSize: 10, fontWeight: 600, color: 'var(--tx-2)', marginTop: 10, marginBottom: 4 } }, 'OPERATORS USED'),
+            React.createElement('div', { className: 'detail-ops' },
+              (selected.allOps || []).map(op => {
+                const tr = getTriadForOp(op);
+                return React.createElement('span', { key: op,
+                  style: { padding: '2px 8px', borderRadius: 'var(--r)', fontSize: 10, fontWeight: 700, fontFamily: 'var(--mono)',
+                    background: tr ? tr.dimColor : 'var(--bg-3)', color: tr ? tr.color : 'var(--tx-1)' }
+                }, op);
+              })))
+        )
+      )
+    ),
+    // Legend
+    React.createElement('div', { className: 'eo-graph-legend' },
+      React.createElement(I, { n: 'graphNodes', s: 13 }),
+      React.createElement('span', { style: { fontWeight: 600 } }, 'Legend:'),
+      TRIADS.map(t => React.createElement('div', { key: t.id, style: { display: 'flex', alignItems: 'center', gap: 5 } },
+        React.createElement('div', { className: 'leg-dot', style: { background: t.color } }),
+        React.createElement('span', null, t.label + ' (' + t.ops.join(', ') + ')'))),
+      React.createElement('div', { style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 } },
+        React.createElement('span', null, 'Level ' + level),
+        React.createElement('span', null, nodes.length + ' nodes'),
+        React.createElement('span', null, edgePaths.length + ' edges'))
+    )
+  );
 };
 
 /* ═══════════════════ TRANSPARENCY & PRIVACY ═══════════════════
