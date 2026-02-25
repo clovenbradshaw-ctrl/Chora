@@ -18335,7 +18335,7 @@ const ActionLog = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
-  const [roomFilter, setRoomFilter] = useState('all');
+  const [targetFilter, setTargetFilter] = useState('all');
   const loadEvents = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -18445,10 +18445,22 @@ const ActionLog = ({
     };
   }, [loadEvents, roomId]);
   const roomTypes = [...new Set(events.map(ev => ev.roomInfo.type))].sort();
-  const roomEntries = [...new Map(events.map(ev => [ev.roomId, ev.roomInfo])).entries()];
+  const targetEntries = [...new Set(
+    events
+      .filter(ev => ev.type === EVT.OP && ev.content?.target)
+      .map(ev => {
+        const parts = (ev.content.target || '').split('.');
+        return parts.length >= 2 ? `${parts[0]}.${parts[1]}` : parts[0];
+      })
+      .filter(Boolean)
+  )].sort();
   let filtered = events;
   if (filter !== 'all') filtered = filtered.filter(ev => ev.roomInfo.type === filter);
-  if (roomFilter !== 'all') filtered = filtered.filter(ev => ev.roomId === roomFilter);
+  if (targetFilter !== 'all') filtered = filtered.filter(ev => {
+    const parts = (ev.content?.target || '').split('.');
+    const key = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : parts[0];
+    return key === targetFilter;
+  });
   if (loading && events.length === 0) return /*#__PURE__*/React.createElement("div", {
     style: { height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }
   }, /*#__PURE__*/React.createElement(Spin, { s: 28 }));
@@ -18487,12 +18499,12 @@ const ActionLog = ({
     style: { width: 'auto', padding: '5px 8px', fontSize: 11 }
   }, /*#__PURE__*/React.createElement("option", { value: "all" }, "All Types"),
   roomTypes.map(t => /*#__PURE__*/React.createElement("option", { key: t, value: t }, t))),
-  !roomId && roomEntries.length > 1 && /*#__PURE__*/React.createElement("select", {
-    value: roomFilter,
-    onChange: e => setRoomFilter(e.target.value),
+  !roomId && targetEntries.length > 0 && /*#__PURE__*/React.createElement("select", {
+    value: targetFilter,
+    onChange: e => setTargetFilter(e.target.value),
     style: { width: 'auto', padding: '5px 8px', fontSize: 11 }
-  }, /*#__PURE__*/React.createElement("option", { value: "all" }, "All Rooms"),
-  roomEntries.map(([rid, info]) => /*#__PURE__*/React.createElement("option", { key: rid, value: rid }, info.label + ' ' + rid.slice(0, 12)))),
+  }, /*#__PURE__*/React.createElement("option", { value: "all" }, "All Targets"),
+  targetEntries.map(t => /*#__PURE__*/React.createElement("option", { key: t, value: t }, t))),
   /*#__PURE__*/React.createElement("button", {
     onClick: loadEvents, className: "b-gho b-xs",
     style: { display: 'flex', alignItems: 'center', gap: 4 }
