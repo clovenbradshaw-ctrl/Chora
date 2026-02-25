@@ -1445,6 +1445,36 @@ const CreateTableModal = ({ open, onClose, team, svc, teams, showToast }) => {
       ),
 
       React.createElement('div', { className: 'cf-body', style: { flex: 1, overflowY: 'auto' } },
+        // Default Individuals template seed button
+        (() => {
+          const alreadyHasDefault = team.customTables?.some(t => t.is_default);
+          if (alreadyHasDefault) return null;
+          return React.createElement('div', {
+            style: { margin: '12px 0 4px', padding: '10px 14px', borderRadius: 'var(--r)', background: 'var(--bg-3)', border: '1px dashed var(--border-1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }
+          },
+            React.createElement('div', null,
+              React.createElement('div', { style: { fontWeight: 600, fontSize: 12 } }, 'Start from the default Individuals template'),
+              React.createElement('div', { style: { fontSize: 11, color: 'var(--tx-2)', marginTop: 2 } },
+                '22 CRM columns covering intake, demographics, housing, case tracking, and exit outcomes.'
+              )
+            ),
+            React.createElement('button', {
+              className: 'b-gho b-xs',
+              style: { whiteSpace: 'nowrap', flexShrink: 0 },
+              onClick: () => {
+                setTableName(DEFAULT_INDIVIDUAL_TABLE_SCHEMA.name);
+                setTableDesc(DEFAULT_INDIVIDUAL_TABLE_SCHEMA.description);
+                setTablePurpose(DEFAULT_INDIVIDUAL_TABLE_SCHEMA.purpose);
+                setColumns(DEFAULT_INDIVIDUAL_TABLE_SCHEMA.columns.map((col, idx) => ({
+                  id: 'c_tmpl_' + idx,
+                  _keyEdited: true,
+                  ...col,
+                  options: col.options || []
+                })));
+              }
+            }, 'Use template')
+          );
+        })(),
         // Table name
         React.createElement('div', { className: 'cf-row' },
           React.createElement('span', { className: 'section-label' }, 'TABLE NAME *'),

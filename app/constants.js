@@ -113,7 +113,9 @@ const EVT = {
   LINKED_RECORD: `${NS}.linked.record`,
   LINKED_RECORD_INDEX: `${NS}.linked.record.index`,
   // Trash bin — soft-deleted individuals pending permanent removal
-  ORG_TRASH: `${NS}.org.trash`
+  ORG_TRASH: `${NS}.org.trash`,
+  // Team record index — maps team rooms to their owned CLIENT_RECORD rooms, tracks vault access state
+  TEAM_RECORD_INDEX: `${NS}.team.record.index`
 };
 
 /* ═══════════════════ MATURITY LEVELS (MVP §Screen 4) ═══════════════════ */

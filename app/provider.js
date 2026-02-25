@@ -106,6 +106,14 @@ const ProviderApp = ({
     () => activeTeamObj ? cases.filter(c => { const a = caseAssignments[c.bridgeRoomId]; return activeTeamMemberIds.includes(a?.primary || c.meta?.provider); }) : cases,
     [activeTeamObj, cases, caseAssignments, activeTeamMemberIds]
   );
+  // Filter client records to those explicitly tagged with the active team.
+  // Falls back to showing all records when no team context is active.
+  // Records created before team_id was introduced (team_id === null) are visible
+  // only in the no-team-context view to avoid silently hiding historical data.
+  const teamFilteredClientRecords = useMemo(
+    () => activeTeamObj ? clientRecords.filter(r => r.team_id === activeTeamContext) : clientRecords,
+    [activeTeamObj, clientRecords, activeTeamContext]
+  );
   const switchTeamContext = React.useCallback((teamRoomId) => {
     setActiveTeamContext(teamRoomId);
     try {
@@ -610,22 +618,51 @@ const ProviderApp = ({
           if (xws?.crosswalks) detectedCrosswalks.push(...xws.crosswalks);
         }
         const meta = state[EVT.BRIDGE_META];
+        const bridgeRefs = state[EVT.BRIDGE_REFS];
         if (meta && meta.status !== 'tombstoned') {
           // Include bridges where this user is the provider OR any org staff member is assigned
           if (meta.provider === svc.userId) {
             bridgeData.push({
               rid,
               meta,
-              refs: state[EVT.BRIDGE_REFS],
+              refs: bridgeRefs,
               mine: true
             });
           } else if (meta.assigned_staff?.includes(svc.userId)) {
             bridgeData.push({
               rid,
               meta,
-              refs: state[EVT.BRIDGE_REFS],
+              refs: bridgeRefs,
               mine: true
             });
+          }
+          // Detect soft-revoke (client removed provider without creating a new bridge)
+          if (bridgeRefs?.revoked && meta.team_id) {
+            try {
+              const idx = await svc.getState(meta.team_id, EVT.TEAM_RECORD_INDEX) || { records: [] };
+              const entry = idx.records.find(r => r.bridge_room_id === rid);
+              if (entry && entry.vault_access !== 'severed') {
+                entry.vault_access = 'severed';
+                entry.vault_severed_at = Date.now();
+                await svc.setState(meta.team_id, EVT.TEAM_RECORD_INDEX, { records: idx.records });
+              }
+            } catch (e) {
+              console.warn('[Bridge] Failed to update team record index for severed bridge:', e.message);
+            }
+          }
+        } else if (meta && meta.status === 'tombstoned' && meta.team_id) {
+          // Client hard-revoked this bridge. Mark vault access as tombstoned in the team record index.
+          // vault_tombstone_reason is intentionally NOT stored — client sovereignty.
+          try {
+            const idx = await svc.getState(meta.team_id, EVT.TEAM_RECORD_INDEX) || { records: [] };
+            const entry = idx.records.find(r => r.bridge_room_id === rid);
+            if (entry && entry.vault_access !== 'tombstoned') {
+              entry.vault_access = 'tombstoned';
+              entry.vault_tombstoned_at = Date.now();
+              await svc.setState(meta.team_id, EVT.TEAM_RECORD_INDEX, { records: idx.records });
+            }
+          } catch (e) {
+            console.warn('[Bridge] Failed to update team record index for tombstoned bridge:', e.message);
           }
         }
       }
@@ -920,6 +957,17 @@ const ProviderApp = ({
             org_id: orgRoom
           });
           meta.org_id = orgRoom;
+        } catch {}
+      }
+      // Backfill team_id on bridge meta when the provider is operating in a team context.
+      // This allows the scan to detect tombstoned bridges and update the team record index.
+      if (activeTeamContext && !meta.team_id && meta.provider === svc.userId) {
+        try {
+          await svc.setState(rid, EVT.BRIDGE_META, {
+            ...meta,
+            team_id: activeTeamContext
+          });
+          meta.team_id = activeTeamContext;
         } catch {}
       }
       found.push({
@@ -1705,30 +1753,29 @@ const ProviderApp = ({
     if (!newClientName.trim()) return;
     try {
       const clientId = newClientMatrixId.trim() || null;
+      const identityBase = {
+        account_type: 'client_record',
+        owner: svc.userId,
+        created: Date.now(),
+        client_name: newClientName,
+        client_matrix_id: clientId,
+        notes: newClientNotes || undefined,
+        status: 'created',
+        // Explicit team association — enables direct filtering without room-membership indirection
+        team_id: activeTeamContext || null,
+        team_name: activeTeamObj?.name || null
+      };
       const roomId = await svc.createClientRoom(`[Client] ${newClientName}`, `${T.client_term} record for ${newClientName}`, [{
         type: EVT.IDENTITY,
         state_key: '',
-        content: {
-          account_type: 'client_record',
-          owner: svc.userId,
-          created: Date.now(),
-          client_name: newClientName,
-          client_matrix_id: clientId,
-          notes: newClientNotes || undefined,
-          status: 'created'
-        }
+        content: identityBase
       }], clientId);
       // If client Matrix ID provided, invite them and set them as admin
       if (clientId) {
         try {
           await svc.invite(roomId, clientId);
           await svc.setState(roomId, EVT.IDENTITY, {
-            account_type: 'client_record',
-            owner: svc.userId,
-            created: Date.now(),
-            client_name: newClientName,
-            client_matrix_id: clientId,
-            notes: newClientNotes || undefined,
+            ...identityBase,
             status: 'invited'
           });
         } catch (e) {
@@ -1738,8 +1785,29 @@ const ProviderApp = ({
       await emitOp(roomId, 'DES', dot('org', 'client_record', newClientName), {
         created_by: svc.userId,
         client_id: clientId || undefined,
-        status: clientId ? 'invited' : 'created'
+        status: clientId ? 'invited' : 'created',
+        team_id: activeTeamContext || undefined
       }, orgFrame());
+      // Register this record in the team's record index so the team room has
+      // a fast lookup without scanning every client_record room.
+      // vault_access starts as 'none' until a bridge is established.
+      if (activeTeamContext) {
+        try {
+          const currentIdx = await svc.getState(activeTeamContext, EVT.TEAM_RECORD_INDEX) || { records: [] };
+          if (!currentIdx.records.some(r => r.room_id === roomId)) {
+            await svc.setState(activeTeamContext, EVT.TEAM_RECORD_INDEX, {
+              records: [...currentIdx.records, {
+                room_id: roomId,
+                bridge_room_id: null,
+                created: Date.now(),
+                vault_access: 'none'
+              }]
+            });
+          }
+        } catch (e) {
+          console.warn('Team record index update failed:', e.message);
+        }
+      }
       const newRecord = {
         roomId,
         client_name: newClientName,
@@ -1747,7 +1815,9 @@ const ProviderApp = ({
         notes: newClientNotes || undefined,
         owner: svc.userId,
         created: Date.now(),
-        status: clientId ? 'invited' : 'created'
+        status: clientId ? 'invited' : 'created',
+        team_id: activeTeamContext || null,
+        team_name: activeTeamObj?.name || null
       };
       setClientRecords(prev => [...prev, newRecord]);
       setCreateClientModal(false);
@@ -1950,6 +2020,22 @@ const ProviderApp = ({
         },
         customTables: []
       };
+      // Seed the default Individuals CRM table into every new team.
+      // This gives teams a ready-to-use profile schema covering intake, demographics,
+      // housing status, case tracking, and exit outcomes — all team-sovereign fields.
+      try {
+        const defaultTable = {
+          ...DEFAULT_INDIVIDUAL_TABLE_SCHEMA,
+          id: 'tbl_individuals_' + Date.now().toString(36),
+          team_id: roomId,
+          created_by: svc.userId,
+          created_at: Date.now()
+        };
+        await svc.setState(roomId, EVT.TEAM_TABLE_DEF, defaultTable, defaultTable.id);
+        newTeam.customTables = [defaultTable];
+      } catch (e) {
+        console.warn('[Team] Failed to seed default Individuals table:', e.message);
+      }
       setLocalTeamColor(svc.userId, roomId, teamHue);
       setTeams(prev => [...prev, newTeam]);
       setCreateTeamModal(false);
@@ -4351,7 +4437,7 @@ const ProviderApp = ({
     ),
     /*#__PURE__*/React.createElement(DashboardOverview, {
       cases: activeTeamObj ? cases.filter(c => { const a = caseAssignments[c.bridgeRoomId]; return activeTeamMemberIds.includes(a?.primary || c.meta?.provider); }) : cases,
-      clientRecords: activeTeamObj ? clientRecords.filter(cr => activeTeamMemberIds.includes(cr.created_by || cr.provider)) : clientRecords,
+      clientRecords: teamFilteredClientRecords,
       staff: staff,
       T: T,
       notes: activeTeamObj ? dbNotes.filter(n => activeTeamMemberIds.includes(n.by || n.author)) : dbNotes,
@@ -4435,7 +4521,7 @@ const ProviderApp = ({
     canViewResource: canViewResource,
     canControlResource: canControlResource,
     canAllocateResource: canAllocateResource,
-    clientRecords: clientRecords,
+    clientRecords: teamFilteredClientRecords,
     onCreateClient: openCreateClientModal,
     onCellEdit: handleDbCellEdit,
     onBulkAction: handleBulkAction,
@@ -4549,7 +4635,7 @@ const ProviderApp = ({
       id: c.bridgeRoomId,
       name: c.sharedData?.full_name || c.clientUserId || 'Unknown',
       status: c.meta?.status === 'tombstoned' ? 'revoked' : c.sharedData?.full_name ? 'active' : 'imported'
-    })).concat((clientRecords || []).filter(r => !cases.some(c => c.bridgeRoomId === r.roomId)).map(r => ({
+    })).concat((teamFilteredClientRecords || []).filter(r => !cases.some(c => c.bridgeRoomId === r.roomId)).map(r => ({
       id: r.roomId,
       name: r.client_name || 'Unknown',
       status: r.status || 'created'
@@ -5105,7 +5191,7 @@ const ProviderApp = ({
   }, /*#__PURE__*/React.createElement(I, {
     n: "upload",
     s: 14
-  }), "Import Data"), clientRecords.length >= 2 && /*#__PURE__*/React.createElement("button", {
+  }), "Import Data"), teamFilteredClientRecords.length >= 2 && /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       setDbMergeRecordA(null);
       setDbMergeRecordB(null);
@@ -5140,32 +5226,32 @@ const ProviderApp = ({
     }
   }, [{
     l: `Total ${T.client_term_plural}`,
-    v: clientRecords.length,
+    v: teamFilteredClientRecords.length,
     c: 'teal',
     i: 'users'
   }, {
     l: 'Imported',
-    v: clientRecords.filter(r => r.imported).length,
+    v: teamFilteredClientRecords.filter(r => r.imported).length,
     c: 'purple',
     i: 'upload'
   }, {
     l: 'Invited',
-    v: clientRecords.filter(r => r.status === 'invited').length,
+    v: teamFilteredClientRecords.filter(r => r.status === 'invited').length,
     c: 'gold',
     i: 'send'
   }, {
     l: 'Joined',
-    v: clientRecords.filter(r => r.status === 'joined').length,
+    v: teamFilteredClientRecords.filter(r => r.status === 'joined').length,
     c: 'green',
     i: 'check'
   }, {
     l: 'Claimed',
-    v: clientRecords.filter(r => r.status === 'claimed').length,
+    v: teamFilteredClientRecords.filter(r => r.status === 'claimed').length,
     c: 'teal',
     i: 'shield'
   }, {
     l: 'Pending',
-    v: clientRecords.filter(r => r.status === 'created' && !r.imported).length,
+    v: teamFilteredClientRecords.filter(r => r.status === 'created' && !r.imported).length,
     c: 'orange',
     i: 'clock'
   }].map((s, i) => /*#__PURE__*/React.createElement("div", {
@@ -5196,7 +5282,7 @@ const ProviderApp = ({
   }, /*#__PURE__*/React.createElement(I, {
     n: s.i,
     s: 15
-  })))))), clientRecords.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  })))))), teamFilteredClientRecords.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "card",
     style: {
       textAlign: 'center',
@@ -5242,7 +5328,7 @@ const ProviderApp = ({
       letterSpacing: '.07em',
       fontWeight: 600
     }
-  }, h))), clientRecords.map((rec, i) => {
+  }, h))), teamFilteredClientRecords.map((rec, i) => {
     const statusColors = {
       created: 'orange',
       invited: 'gold',
@@ -5262,7 +5348,7 @@ const ProviderApp = ({
         gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1.2fr',
         gap: 0,
         padding: '12px 16px',
-        borderBottom: i < clientRecords.length - 1 ? '1px solid var(--border-0)' : 'none',
+        borderBottom: i < teamFilteredClientRecords.length - 1 ? '1px solid var(--border-0)' : 'none',
         alignItems: 'center',
         transition: 'background .15s'
       },
@@ -11476,7 +11562,9 @@ const ProviderApp = ({
     onClose: () => setImportModal(false),
     showToast: showToast,
     metricsRoom: metricsRoom,
-    onComplete: handleImportComplete
+    onComplete: handleImportComplete,
+    teamId: activeTeamContext || null,
+    teamName: activeTeamObj?.name || null
   }),
   /* ── CreateTableModal ── */
   React.createElement(CreateTableModal, {

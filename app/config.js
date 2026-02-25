@@ -1335,6 +1335,56 @@ const DEFAULT_RESOURCE_TYPES = [{
   tags: ['tutoring', 'education']
 }];
 
+/* ═══════════════════ DEFAULT INDIVIDUAL TABLE SCHEMA (§Team CRM) ═══════════════════
+ * Seed schema for the "Individuals" table auto-created in every new team.
+ * Stored as a TEAM_TABLE_DEF state event in the team room.
+ * Two data tracks:
+ *   - Vault fields (client-sovereign, encrypted, 11 built-in): surfaced read-only when bridge is active
+ *   - CRM fields below (team-sovereign): editable by team members regardless of vault/bridge state
+ * Sovereignty invariant: vault_tombstone_reason is NEVER stored on the team side.
+ * ════════════════════════════════════════════════════════════════════════════════════════ */
+const DEFAULT_INDIVIDUAL_TABLE_SCHEMA = {
+  id: null,          // filled in at creation: 'tbl_individuals_' + Date.now().toString(36)
+  name: 'Individuals',
+  description: 'Core profile records for individuals served by this team.',
+  purpose: 'Track intake, demographics, case progress, and exit outcomes for each person.',
+  is_default: true,  // prevents duplicate seeding; guards "Seed from template" button
+  version: 1,
+  change_log: [],
+  rollup_to_parent: false,
+  status: 'active',
+  columns: [
+    // ── Case Management ─────────────────────────────────────────────────────
+    { key: 'intake_date',        label: 'Intake Date',            data_type: 'date',          required: true,  sensitive: false, description: 'Date first enrolled or encountered.' },
+    { key: 'status',             label: 'Case Status',            data_type: 'single_select', required: true,  sensitive: false, description: 'Current status of this individual\'s case.', options: ['active', 'pending', 'inactive', 'closed', 'waitlist'] },
+    { key: 'assigned_to',        label: 'Assigned Case Manager',  data_type: 'text',          required: false, sensitive: false, description: 'Name or user ID of the primary case manager.' },
+    { key: 'referral_source',    label: 'Referral Source',        data_type: 'text',          required: false, sensitive: false, description: 'How or by whom this individual was referred.' },
+    { key: 'priority',           label: 'Priority',               data_type: 'single_select', required: false, sensitive: false, description: 'Urgency level for this individual\'s case.', options: ['urgent', 'high', 'medium', 'low'] },
+    { key: 'program',            label: 'Program / Service',      data_type: 'text',          required: false, sensitive: false, description: 'Program or service this individual is enrolled in.' },
+    // ── Demographics (HMIS-aligned) ─────────────────────────────────────────
+    { key: 'gender_identity',    label: 'Gender Identity',        data_type: 'text',          required: false, sensitive: true,  description: 'How this individual describes their gender.' },
+    { key: 'race_ethnicity',     label: 'Race / Ethnicity',       data_type: 'multi_select',  required: false, sensitive: true,  description: 'Race and/or ethnicity (select all that apply).', options: ['American Indian or Alaska Native', 'Asian', 'Black or African American', 'Hispanic or Latino', 'Native Hawaiian or Pacific Islander', 'White', 'Multiracial', 'Other', 'Unknown', 'Prefer not to say'] },
+    { key: 'veteran_status',     label: 'Veteran Status',         data_type: 'single_select', required: false, sensitive: false, description: 'U.S. military veteran status.', options: ['Yes', 'No', 'Unknown'] },
+    { key: 'household_size',     label: 'Household Size',         data_type: 'number',        required: false, sensitive: false, description: 'Total number of people in the household including children.' },
+    { key: 'disability',         label: 'Disability Status',      data_type: 'multi_select',  required: false, sensitive: true,  description: 'Disability type(s), if any (select all that apply).', options: ['Physical', 'Cognitive', 'Mental Health', 'Substance Use Disorder', 'Chronic Health Condition', 'None', 'Unknown', 'Prefer not to say'] },
+    { key: 'income_source',      label: 'Primary Income Source',  data_type: 'multi_select',  required: false, sensitive: false, description: 'Source(s) of income (select all that apply).', options: ['Employment', 'SSI', 'SSDI', 'TANF', 'General Assistance', 'VA Benefits', 'Child Support', 'No Income', 'Other', 'Unknown'] },
+    // ── Housing Status (HUD/CoC required) ──────────────────────────────────
+    { key: 'housing_status',     label: 'Housing Status',         data_type: 'single_select', required: false, sensitive: false, description: 'Current living / housing situation.', options: ['Unsheltered', 'Emergency Shelter', 'Safe Haven', 'Transitional Housing', 'Doubled Up', 'Hotel or Motel', 'Permanent Housing', 'Unknown'] },
+    { key: 'chronic_homeless',   label: 'Chronic Homelessness',   data_type: 'single_select', required: false, sensitive: false, description: 'Meets HUD definition of chronic homelessness (12+ months or 4+ episodes in 3 years).', options: ['Yes', 'No', 'Unknown'] },
+    { key: 'living_situation',   label: 'Living Situation Detail',data_type: 'text',          required: false, sensitive: false, description: 'Free-text description of where the individual is currently staying.' },
+    // ── Case Tracking ───────────────────────────────────────────────────────
+    { key: 'presenting_situation', label: 'Presenting Situation', data_type: 'text_long',     required: false, sensitive: false, description: 'Why this individual is seeking services; what brought them in.' },
+    { key: 'goals',              label: 'Goals',                  data_type: 'text_long',     required: false, sensitive: false, description: 'What this individual wants to achieve.' },
+    { key: 'barriers',          label: 'Barriers',               data_type: 'text_long',     required: false, sensitive: false, description: 'What is getting in the way of progress.' },
+    { key: 'last_contact_date', label: 'Last Contact Date',      data_type: 'date',          required: false, sensitive: false, description: 'Date of the most recent interaction.' },
+    { key: 'next_appointment',  label: 'Next Appointment',       data_type: 'date',          required: false, sensitive: false, description: 'Date of next scheduled interaction.' },
+    // ── Exit & Outcome ──────────────────────────────────────────────────────
+    { key: 'exit_date',         label: 'Exit Date',              data_type: 'date',          required: false, sensitive: false, description: 'Date this individual exited the program or was closed.' },
+    { key: 'exit_destination',  label: 'Exit Destination',       data_type: 'single_select', required: false, sensitive: false, description: 'Where this individual went upon exit.', options: ['Permanent Housing', 'Transitional Housing', 'Family or Friends', 'Emergency Shelter', 'Another Provider', 'Institutional Setting', 'No Contact / Left', 'Deceased', 'Unknown', 'Other'] },
+    { key: 'outcome',           label: 'Outcome Notes',          data_type: 'text_long',     required: false, sensitive: false, description: 'Summary of outcomes achieved at case closure.' }
+  ]
+};
+
 /* ═══════════════════ FRAMEWORK BINDINGS (§C.2) ═══════════════════ */
 // Multi-framework value mappings: same observation value → different classifications
 // under different institutional frameworks. This is the GIVEN → MEANT crossing made explicit.

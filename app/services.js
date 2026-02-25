@@ -1242,7 +1242,7 @@ function autoMapColumns(sourceHeaders) {
 // Pipeline per row: INS(crypto.key, {}) → ALT(import.fields, {encrypt}) → SEG(import.demographics, {anonymize}) → INS(import.room, {}) → SYN(import.metric, {})
 // Creates one client_record room per row. Each record gets a unique
 // AES-256-GCM key. Only anonymized demographics are emitted as metrics.
-async function importClientRecords(records, mapping, metricsRoom, onProgress) {
+async function importClientRecords(records, mapping, metricsRoom, onProgress, teamId, teamName) {
   const results = {
     created: [],
     errors: [],
@@ -1325,7 +1325,9 @@ async function importClientRecords(records, mapping, metricsRoom, onProgress) {
           import_batch: batchId,
           import_index: i,
           client_name: recordLabel,
-          status: 'created'
+          status: 'created',
+          team_id: teamId || null,
+          team_name: teamName || null
         }
       }, {
         type: EVT.CLIENT_RECORD,
@@ -1428,7 +1430,9 @@ const ImportDataModal = ({
   onClose,
   showToast,
   metricsRoom,
-  onComplete
+  onComplete,
+  teamId,
+  teamName
 }) => {
   const [step, setStep] = useState('upload');
   const [fileData, setFileData] = useState(null);
@@ -1495,7 +1499,7 @@ const ImportDataModal = ({
       total: fileData.records.length
     });
     try {
-      const res = await importClientRecords(fileData.records, mapping, metricsRoom, p => setProgress(p));
+      const res = await importClientRecords(fileData.records, mapping, metricsRoom, p => setProgress(p), teamId, teamName);
       setResults(res);
       setStep('done');
       if (onComplete) onComplete(res);
