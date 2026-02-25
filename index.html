@@ -37298,25 +37298,18 @@ const ProviderApp = ({
     moreItems: [
       { id: 'teams', icon: 'users', label: 'Teams' },
       { id: 'schema', icon: 'grid', label: 'Schema' },
+      { id: 'hierarchy', icon: 'globe', label: 'My Network' },
       { id: 'activity', icon: 'layers', label: 'Activity Stream' },
       { id: 'transparency', icon: 'eye', label: 'Transparency' },
       ...(orgRoom ? [{ id: 'org-settings', icon: 'briefcase', label: 'Organization' }] : [])
     ],
     onMoreNavigate: id => { setView(id); setActiveCase(null); setActiveIndividual(null); setActiveResourceProfile(null); }
   },
-    availableContexts && availableContexts.length > 1 && /*#__PURE__*/React.createElement("div", { style: { padding: '8px 0', borderTop: '1px solid var(--border-0)', marginTop: 8, display: 'flex', gap: 4 } },
-      [{id:'provider',label:ROLES.provider.label,icon:'briefcase'},{id:'client',label:ROLES.client.label,icon:'shield'}].filter(opt => availableContexts.includes(opt.id)).map(opt => /*#__PURE__*/React.createElement("button", {
-        key: opt.id, onClick: () => onSwitchContext(opt.id),
-        className: activeMode === opt.id ? 'b-pri b-xs' : 'b-gho b-xs',
-        style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 'var(--r)', fontSize: 11 }
-      }, /*#__PURE__*/React.createElement(I, { n: opt.icon, s: 11 }), opt.label))
-    ),
-    teams.length > 0 && /*#__PURE__*/React.createElement("div", { style: { padding: '8px 0', borderTop: '1px solid var(--border-0)', marginTop: 4 } },
-      /*#__PURE__*/React.createElement("span", { className: "section-label", style: { fontSize: 9, padding: '0 0 6px' } }, "WORKSPACE"),
+    /*#__PURE__*/React.createElement("div", { style: { padding: '8px 0', borderTop: '1px solid var(--border-0)', marginTop: 4 } },
       /*#__PURE__*/React.createElement("div", { className: "team-ctx-pills" },
         /*#__PURE__*/React.createElement("button", {
-          className: "team-ctx-pill" + (!activeTeamContext ? " active-personal" : ""),
-          onClick: () => switchTeamContext(null)
+          className: "team-ctx-pill",
+          onClick: () => onSwitchContext('client')
         }, /*#__PURE__*/React.createElement(I, { n: "user", s: 10 }), "Personal"),
         teams.map(t => { const _tpActive = activeTeamContext === t.roomId; const _tpColor = `hsl(${t.color_hue || 260}, 60%, 55%)`; return /*#__PURE__*/React.createElement("button", {
           key: t.roomId,
@@ -37566,23 +37559,13 @@ const ProviderApp = ({
       display: 'block'
     }
   }, providerProfile.credentials)))),
-  /* ─── Mode Toggle (sidebar) ─── */
-  availableContexts && availableContexts.length > 1 && /*#__PURE__*/React.createElement("div", {
-    className: "sidebar-mode-toggle"
-  }, [{id:'provider',label:ROLES.provider.label,icon:'briefcase'},{id:'client',label:ROLES.client.label,icon:'shield'}].filter(opt => availableContexts.includes(opt.id)).map(opt => /*#__PURE__*/React.createElement("button", {
-    key: opt.id,
-    onClick: () => onSwitchContext(opt.id),
-    className: activeMode === opt.id ? 'b-pri b-xs' : 'b-gho b-xs',
-    style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 'var(--r)', fontSize: 11 }
-  }, /*#__PURE__*/React.createElement(I, { n: opt.icon, s: 11 }), opt.label))),
-  /* ─── Team Context Switcher (sidebar) ─── */
-  teams.length > 0 && /*#__PURE__*/React.createElement("div", {
+  /* ─── Unified Team / Personal Switcher (sidebar) ─── */
+  /*#__PURE__*/React.createElement("div", {
     className: "team-ctx-wrap"
-  }, /*#__PURE__*/React.createElement("span", { className: "section-label", style: { fontSize: 9, display: 'block', marginBottom: 6 } }, "WORKSPACE"),
-    /*#__PURE__*/React.createElement("div", { className: "team-ctx-pills" },
+  }, /*#__PURE__*/React.createElement("div", { className: "team-ctx-pills" },
       /*#__PURE__*/React.createElement("button", {
-        className: "team-ctx-pill" + (!activeTeamContext ? " active-personal" : ""),
-        onClick: () => switchTeamContext(null)
+        className: "team-ctx-pill",
+        onClick: () => onSwitchContext('client')
       }, /*#__PURE__*/React.createElement(I, { n: "user", s: 10 }), "Personal"),
       teams.map(t => { const _tpActive = activeTeamContext === t.roomId; const _tpColor = `hsl(${t.color_hue || 260}, 60%, 55%)`; return /*#__PURE__*/React.createElement("button", {
         key: t.roomId,
@@ -37626,6 +37609,10 @@ const ProviderApp = ({
       label: 'Schema',
       badge: schemaNotifCount,
       badgeClass: 'nav-badge-teal'
+    }, {
+      id: 'hierarchy',
+      icon: 'globe',
+      label: 'My Network'
     }, {
       id: 'activity',
       icon: 'list',
@@ -40338,7 +40325,116 @@ const ProviderApp = ({
   }, /*#__PURE__*/React.createElement(I, {
     n: "send",
     s: 13
-  }))))), view === 'schema' && /*#__PURE__*/React.createElement(SchemaWorkbench, {
+  }))))), view === 'hierarchy' && /*#__PURE__*/React.createElement("div", {
+    className: "anim-up",
+    style: {
+      maxWidth: 820,
+      margin: '0 auto'
+    }
+  }, /*#__PURE__*/React.createElement("h2", {
+    style: {
+      fontFamily: 'var(--serif)',
+      fontSize: 22,
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, "My Network"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: 'var(--tx-1)',
+      fontSize: 12.5,
+      marginBottom: 20
+    }
+  }, "Teams and organizations you\u2019re part of, shown as a hierarchy."), (() => {
+    /* ─── Build hierarchy tree ─── */
+    const rootTeams = teams.filter(t => !t.hierarchy?.parent_team_id);
+    const renderTeamNode = (team, depth) => {
+      const children = (team.hierarchy?.child_teams || []).map(c => teams.find(t => t.roomId === c.roomId)).filter(Boolean);
+      const govMode = TEAM_CONSENT_MODES[team.schemaRule?.consent_mode || team.governance || 'lead_decides'] || TEAM_CONSENT_MODES.lead_decides;
+      const teamColor = `hsl(${team.color_hue || 260}, 60%, 55%)`;
+      return /*#__PURE__*/React.createElement("div", { key: team.roomId, style: { marginLeft: depth * 20 } },
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+            borderRadius: 'var(--r)', cursor: 'pointer', transition: 'background .15s',
+            borderLeft: `3px solid ${teamColor}`, marginBottom: 4, background: 'var(--bg-2)'
+          },
+          onClick: () => { switchTeamContext(team.roomId); setView('teams'); setActiveTeamDetail(team); },
+          onMouseEnter: e => { e.currentTarget.style.background = 'var(--bg-3)'; },
+          onMouseLeave: e => { e.currentTarget.style.background = 'var(--bg-2)'; }
+        },
+          /*#__PURE__*/React.createElement("span", { style: { width: 8, height: 8, borderRadius: '50%', background: teamColor, flexShrink: 0 } }),
+          /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+            /*#__PURE__*/React.createElement("div", { style: { fontWeight: 600, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, team.name || 'Unnamed Team'),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 10.5, color: 'var(--tx-2)', marginTop: 1, display: 'flex', gap: 8, flexWrap: 'wrap' } },
+              /*#__PURE__*/React.createElement("span", null, (team.members || []).length, " member", (team.members || []).length !== 1 ? "s" : ""),
+              (team.customTables || []).filter(t => t.status === 'active').length > 0 && /*#__PURE__*/React.createElement("span", null, (team.customTables || []).filter(t => t.status === 'active').length, " table", (team.customTables || []).filter(t => t.status === 'active').length !== 1 ? "s" : ""),
+              children.length > 0 && /*#__PURE__*/React.createElement("span", null, children.length, " sub-team", children.length !== 1 ? "s" : "")
+            )
+          ),
+          /*#__PURE__*/React.createElement("span", {
+            className: `tag tag-${govMode.color}`,
+            style: { fontSize: 8, flexShrink: 0 }
+          }, /*#__PURE__*/React.createElement(I, { n: govMode.icon, s: 8 }), govMode.label)
+        ),
+        children.length > 0 && children.map(c => renderTeamNode(c, depth + 1))
+      );
+    };
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /* ─── Network level ─── */
+      networkRoom && /*#__PURE__*/React.createElement("div", { className: "card", style: { marginBottom: 12 } },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 } },
+          /*#__PURE__*/React.createElement(I, { n: "globe", s: 16, c: "var(--blue)" }),
+          /*#__PURE__*/React.createElement("span", { className: "section-label", style: { marginBottom: 0 } }, "NETWORK")
+        ),
+        networkMembers.length > 0 ? networkMembers.map((nm, i) => {
+          const isOwnOrg = orgMeta && (nm.name === orgMeta.name || nm.id === orgRoom);
+          return /*#__PURE__*/React.createElement("div", {
+            key: nm.id || i,
+            style: {
+              display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', marginLeft: 20,
+              borderLeft: '2px solid var(--border-1)', marginBottom: 2,
+              borderRadius: '0 var(--r) var(--r) 0', background: isOwnOrg ? 'var(--blue-dim)' : 'transparent'
+            }
+          },
+            /*#__PURE__*/React.createElement(I, { n: "briefcase", s: 12, c: isOwnOrg ? "var(--blue)" : "var(--tx-2)" }),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: isOwnOrg ? 600 : 400, flex: 1 } }, nm.name || nm.id || 'Unknown Org'),
+            isOwnOrg && /*#__PURE__*/React.createElement("span", { className: "tag tag-blue", style: { fontSize: 8 } }, "YOU"),
+            nm.role && nm.role !== 'member' && /*#__PURE__*/React.createElement("span", { className: "tag tag-gold", style: { fontSize: 8 } }, nm.role.toUpperCase())
+          );
+        }) : /*#__PURE__*/React.createElement("p", { style: { fontSize: 11, color: 'var(--tx-3)', marginLeft: 20, fontStyle: 'italic' } }, "No member organizations yet")
+      ),
+      /* ─── Organization level ─── */
+      orgRoom && /*#__PURE__*/React.createElement("div", { className: "card", style: { marginBottom: 12 } },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 } },
+          /*#__PURE__*/React.createElement(I, { n: "briefcase", s: 16, c: "var(--gold)" }),
+          /*#__PURE__*/React.createElement("span", { className: "section-label", style: { marginBottom: 0 } }, "ORGANIZATION"),
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, marginLeft: 4 } }, orgMeta?.name || 'My Organization')
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: 10, marginLeft: 24 } },
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: 'var(--tx-2)' } }, (orgStaff || []).length, " staff member", (orgStaff || []).length !== 1 ? "s" : ""),
+          teams.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: 'var(--tx-2)' } }, teams.length, " team", teams.length !== 1 ? "s" : ""),
+          networkRoom && /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: 'var(--tx-2)' } }, /*#__PURE__*/React.createElement(I, { n: "globe", s: 10 }), " In network")
+        ),
+        /* ─── Teams nested under org ─── */
+        rootTeams.length > 0 ? /*#__PURE__*/React.createElement("div", { style: { marginLeft: 4 } },
+          /*#__PURE__*/React.createElement("span", { className: "section-label", style: { fontSize: 9, marginBottom: 6, display: 'block', marginLeft: 20 } }, "TEAMS"),
+          rootTeams.map(t => renderTeamNode(t, 1))
+        ) : /*#__PURE__*/React.createElement("p", { style: { fontSize: 11, color: 'var(--tx-3)', marginLeft: 24, fontStyle: 'italic' } }, "No teams yet \u2014 create one from the Teams view")
+      ),
+      /* ─── No org fallback: just teams ─── */
+      !orgRoom && /*#__PURE__*/React.createElement("div", { className: "card", style: { marginBottom: 12 } },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 } },
+          /*#__PURE__*/React.createElement(I, { n: "users", s: 16, c: "var(--gold)" }),
+          /*#__PURE__*/React.createElement("span", { className: "section-label", style: { marginBottom: 0 } }, "YOUR TEAMS")
+        ),
+        rootTeams.length > 0 ? rootTeams.map(t => renderTeamNode(t, 0))
+          : /*#__PURE__*/React.createElement("div", { style: { textAlign: 'center', padding: '20px', borderStyle: 'dashed', border: '1px dashed var(--border-1)', borderRadius: 'var(--r)' } },
+            /*#__PURE__*/React.createElement(I, { n: "users", s: 28 }),
+            /*#__PURE__*/React.createElement("p", { style: { color: 'var(--tx-3)', marginTop: 8 } }, "No teams yet. Create or join a team to see your hierarchy here.")
+          )
+      )
+    );
+  })()), view === 'schema' && /*#__PURE__*/React.createElement(SchemaWorkbench, {
     isOrg: !!orgRoom,
     orgMeta: orgMeta,
     networkMembers: networkMembers,
