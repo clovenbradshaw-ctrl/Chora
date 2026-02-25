@@ -21903,7 +21903,6 @@ const ClientApp = ({
       { id: 'observations', icon: 'clipboard', label: 'Observations' },
       { id: 'resources', icon: 'layers', label: 'My Resources' },
       { id: 'records', icon: 'shield', label: 'My Records', badge: pendingClaims.length, badgeClass: 'nav-badge-gold' },
-      { id: 'metrics', icon: 'bar', label: 'Metrics' },
       { id: 'activity', icon: 'layers', label: 'Activity Stream' },
       { id: 'transparency', icon: 'eye', label: 'Transparency' }
     ],
@@ -22032,10 +22031,6 @@ const ClientApp = ({
     id: 'records',
     icon: 'shield',
     label: 'My Records'
-  }, {
-    id: 'metrics',
-    icon: 'bar',
-    label: 'Metrics'
   }, {
     id: 'activity',
     icon: 'list',
@@ -23902,126 +23897,7 @@ const ClientApp = ({
     style: {
       color: 'var(--teal)'
     }
-  }, "Full control after claiming:"), " When you claim a room, ownership transfers to you (power level 100). You can remove the provider, close the room, or manage who has access. The provider cannot undo your claim."))), view === 'metrics' && !activeBridge && /*#__PURE__*/React.createElement("div", {
-    className: "anim-up",
-    style: {
-      maxWidth: 820,
-      margin: '0 auto'
-    }
-  }, /*#__PURE__*/React.createElement("h2", {
-    style: {
-      fontFamily: 'var(--serif)',
-      fontSize: 22,
-      fontWeight: 700,
-      marginBottom: 6
-    }
-  }, "Metrics Consent"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      color: 'var(--tx-1)',
-      fontSize: 12.5,
-      marginBottom: 20
-    }
-  }, "Control whether anonymized observations flow to provider metrics rooms. Your name, DOB, SSN, and address are never transmitted."), /*#__PURE__*/React.createElement(StorageTransparencyBadge, {
-    storageType: "matrix",
-    roomId: providers[0]?.metricsRoom || vaultRoom,
-    encrypted: true,
-    encLabel: "Megolm E2EE",
-    label: "Metrics",
-    members: [{ userId: svc.userId, role: 'data source (anonymized)' }],
-    extra: [{ label: 'Anonymization', value: 'Metrics are k-anonymized (k=5). PII fields are never transmitted. Only demographic ranges and hashed identifiers flow to the metrics room.' }, { label: 'Consent', value: 'You control which categories are shared. You can revoke consent at any time.' }]
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "card",
-    style: {
-      marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 14
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 14,
-      fontWeight: 600
-    }
-  }, "Anonymized Metrics Reporting"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      fontSize: 11.5,
-      color: 'var(--tx-2)',
-      marginTop: 2
-    }
-  }, "Observations are anonymized before leaving your bridge. PII is always blocked.")), /*#__PURE__*/React.createElement(Toggle, {
-    on: metricsConsent.enabled,
-    onChange: handleMetricsToggle
-  })), metricsConsent.enabled && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-    className: "section-label"
-  }, "CONSENTED CATEGORIES"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 6,
-      flexWrap: 'wrap'
-    }
-  }, metricsConsent.categories?.map(c => /*#__PURE__*/React.createElement("span", {
-    key: c,
-    className: "tag tag-green"
-  }, c))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 12,
-      padding: '10px 14px',
-      background: 'var(--bg-3)',
-      borderRadius: 'var(--r)'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "section-label",
-    style: {
-      marginBottom: 6
-    }
-  }, "WHAT GETS SENT"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
-      gap: 4,
-      fontSize: 11
-    }
-  }, [['Sleep location', 'pass-through'], ['Service contacts', 'pass-through'], ['DOB', 'age range only'], ['Address', 'census tract only'], ['Income', 'bracket only'], ['Name', 'BLOCKED'], ['SSN', 'BLOCKED'], ['Phone', 'BLOCKED'], ['Email', 'BLOCKED']].map(([f, t]) => /*#__PURE__*/React.createElement("div", {
-    key: f,
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      padding: '3px 0'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: 'var(--tx-1)'
-    }
-  }, f), /*#__PURE__*/React.createElement("span", {
-    className: `tag ${t === 'BLOCKED' ? 'tag-red' : 'tag-teal'}`,
-    style: {
-      fontSize: 8.5
-    }
-  }, t))))))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: 'var(--gold-dim)',
-      border: '1px solid var(--gold-mid)',
-      borderRadius: 'var(--r)',
-      padding: '14px 18px',
-      display: 'flex',
-      gap: 10,
-      alignItems: 'flex-start'
-    }
-  }, /*#__PURE__*/React.createElement(I, {
-    n: "eye",
-    s: 16,
-    c: "var(--gold)"
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: 'var(--tx-1)',
-      lineHeight: 1.6
-    }
-  }, /*#__PURE__*/React.createElement("strong", null, "K-anonymity (k=5):"), " No demographic combination with fewer than 5 matching individuals is reported. Data is generalized or suppressed to prevent re-identification."))), view === 'inbox' && !activeBridge && /*#__PURE__*/React.createElement("div", {
+  }, "Full control after claiming:"), " When you claim a room, ownership transfers to you (power level 100). You can remove the provider, close the room, or manage who has access. The provider cannot undo your claim."))), view === 'inbox' && !activeBridge && /*#__PURE__*/React.createElement("div", {
     className: "anim-up inbox-wrap"
   }, /*#__PURE__*/React.createElement("div", {
     className: "inbox-header"
@@ -27658,9 +27534,106 @@ const DatabaseView = ({
     v: cases.reduce((s, c) => s + Object.keys(c.sharedData || {}).length, 0) + enabledFieldCols.length,
     c: 'teal'
   }];
+  // ── Team-specific database: require team selection when teams exist ──
+  const hasTeams = (teams || []).length > 0;
+  const isTeamScoped = !!activeTeamObj;
+  // Detect holonic data (child-team rollups or cross-team linked records)
+  const childTeams = activeTeamObj?.hierarchy?.child_teams || [];
+  const childTeamObjs = childTeams.map(c => (teams || []).find(t => t.roomId === c.roomId)).filter(Boolean);
+  const rollupTables = childTeamObjs.flatMap(ct =>
+    (ct.customTables || []).filter(t => t.status === 'active' && t.rollup_to_parent).map(t => ({ ...t, _fromTeam: ct }))
+  );
+  const hasHolonicData = rollupTables.length > 0 || childTeamObjs.length > 0;
+  // Cross-team linked records
+  const crossTeamLinks = Object.values(linkedRecords || {}).flat().filter(lr => {
+    if (!activeTeamObj) return false;
+    return lr.source_team && lr.source_team !== activeTeamObj.roomId;
+  });
+  const hasCrossTeamLinks = crossTeamLinks.length > 0;
+
+  // If teams exist but none is selected, show team selection prompt
+  if (hasTeams && !isTeamScoped) {
+    return React.createElement("div", {
+      className: `anim-up db-view${sidebarCollapsed ? ' db-full-width' : ''}`,
+      style: { textAlign: 'center', padding: '60px 20px' }
+    },
+      React.createElement(I, { n: "database", s: 48, c: "var(--border-1)" }),
+      React.createElement("h2", {
+        style: { fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 700, marginTop: 16, marginBottom: 8 }
+      }, "Select a Team"),
+      React.createElement("p", {
+        style: { color: 'var(--tx-2)', fontSize: 13, maxWidth: 440, margin: '0 auto 24px', lineHeight: 1.5 }
+      }, "The database is team-specific. Select a team to view and manage its individuals, notes, resources, and tables. Data from linked teams will be clearly marked."),
+      React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360, margin: '0 auto' }
+      },
+        (teams || []).map(t => {
+          const tColor = `hsl(${t.color_hue || 260}, 60%, 55%)`;
+          return React.createElement("button", {
+            key: t.roomId,
+            className: "card",
+            style: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', cursor: 'pointer', border: `1px solid ${tColor}33`, transition: 'all .15s', textAlign: 'left' },
+            onClick: () => {
+              // Trigger team context switch via the parent switchTeamContext
+              if (typeof window.__khoraSwitchTeam === 'function') window.__khoraSwitchTeam(t.roomId);
+            },
+            onMouseEnter: e => { e.currentTarget.style.borderColor = tColor; e.currentTarget.style.background = `${tColor}11`; },
+            onMouseLeave: e => { e.currentTarget.style.borderColor = `${tColor}33`; e.currentTarget.style.background = ''; }
+          },
+            React.createElement("span", { style: { width: 12, height: 12, borderRadius: '50%', background: tColor, flexShrink: 0 } }),
+            React.createElement("div", { style: { flex: 1 } },
+              React.createElement("div", { style: { fontWeight: 700, fontSize: 13.5 } }, t.name || 'Unnamed Team'),
+              React.createElement("div", { style: { fontSize: 11, color: 'var(--tx-2)', marginTop: 2 } },
+                (t.members || []).length, ' members',
+                t.hierarchy?.parent_team_name ? ` · nested under ${t.hierarchy.parent_team_name}` : '',
+                (t.customTables || []).filter(tb => tb.status === 'active').length > 0
+                  ? ` · ${(t.customTables || []).filter(tb => tb.status === 'active').length} tables`
+                  : ''
+              )
+            ),
+            React.createElement(I, { n: "chevronRight", s: 14, c: "var(--tx-3)" })
+          );
+        })
+      )
+    );
+  }
+
   return /*#__PURE__*/React.createElement("div", {
     className: `anim-up db-view${sidebarCollapsed ? ' db-full-width' : ''}`
-  }, /*#__PURE__*/React.createElement("div", {
+  },
+  // ── Team scope header ──
+  isTeamScoped && React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', marginBottom: 14, background: `hsla(${activeTeamObj.color_hue || 260}, 60%, 55%, 0.08)`, border: `1px solid hsla(${activeTeamObj.color_hue || 260}, 60%, 55%, 0.2)`, borderRadius: 'var(--r-lg)' }
+  },
+    React.createElement("span", { style: { width: 10, height: 10, borderRadius: '50%', background: `hsl(${activeTeamObj.color_hue || 260}, 60%, 55%)`, flexShrink: 0 } }),
+    React.createElement(I, { n: "database", s: 14, c: `hsl(${activeTeamObj.color_hue || 260}, 60%, 55%)` }),
+    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700 } }, activeTeamObj.name, " Database"),
+    React.createElement("span", { style: { fontSize: 11, color: 'var(--tx-3)' } }, "\u00B7 ", (activeTeamObj.members || []).length, " members"),
+    // Holonic merge indicator
+    hasHolonicData && React.createElement("span", {
+      className: "tag tag-teal",
+      style: { fontSize: 8, display: 'inline-flex', alignItems: 'center', gap: 3 },
+      title: `Includes rolled-up data from ${childTeamObjs.length} sub-team(s): ${childTeamObjs.map(c => c.name).join(', ')}`
+    }, React.createElement(I, { n: "layers", s: 8, c: "var(--teal)" }), "\u21A5 HOLONIC MERGE \u00B7 ", childTeamObjs.length, " sub-team", childTeamObjs.length !== 1 ? "s" : ""),
+    hasCrossTeamLinks && React.createElement("span", {
+      className: "tag tag-purple",
+      style: { fontSize: 8, display: 'inline-flex', alignItems: 'center', gap: 3 },
+      title: `${crossTeamLinks.length} linked record(s) from other teams`
+    }, React.createElement(I, { n: "link", s: 8, c: "var(--purple)" }), "CROSS-TEAM LINKS \u00B7 ", crossTeamLinks.length)
+  ),
+  // ── Holonic data detail banner ──
+  isTeamScoped && hasHolonicData && React.createElement("div", {
+    style: { background: 'var(--teal-dim)', border: '1px solid rgba(62,201,176,.15)', borderRadius: 'var(--r)', padding: '8px 14px', marginBottom: 12, fontSize: 11, color: 'var(--tx-1)', lineHeight: 1.5 }
+  },
+    React.createElement("strong", { style: { color: 'var(--teal)' } }, "Holonic data merge: "),
+    "This team includes rolled-up data from ", childTeamObjs.length, " sub-team", childTeamObjs.length !== 1 ? "s" : "", " (",
+    childTeamObjs.map((ct, i) => React.createElement(React.Fragment, { key: ct.roomId },
+      i > 0 && ", ",
+      React.createElement("strong", null, ct.name)
+    )),
+    "). Sub-team data is aggregated per table rollup policies. Rows originating from sub-teams are tagged with their source."
+  ),
+  /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -27673,13 +27646,13 @@ const DatabaseView = ({
       fontSize: 22,
       fontWeight: 700
     }
-  }, "Database"), /*#__PURE__*/React.createElement("p", {
+  }, isTeamScoped ? activeTeamObj.name + " Database" : "Database"), /*#__PURE__*/React.createElement("p", {
     style: {
       color: 'var(--tx-1)',
       fontSize: 12.5,
       marginTop: 2
     }
-  }, "Manage individuals, notes, and resources in one place."), /*#__PURE__*/React.createElement(StorageTransparencyBadge, {
+  }, isTeamScoped ? `Team-specific data for ${activeTeamObj.name}. ${hasHolonicData ? 'Includes holonic data from sub-teams.' : ''}` : "Manage individuals, notes, and resources in one place."), /*#__PURE__*/React.createElement(StorageTransparencyBadge, {
     storageType: "matrix",
     roomId: rosterRoom,
     encrypted: true,
@@ -27884,7 +27857,7 @@ const DatabaseView = ({
     onCellEdit: onCellEdit,
     onAddRow: onAddRow || onCreateClient,
     addRowLabel: `Add ${T?.client_term || 'Individual'}`
-  }), dbTab === 'notes' && /*#__PURE__*/React.createElement(NotesTable, {
+  })), dbTab === 'notes' && /*#__PURE__*/React.createElement(NotesTable, {
     notes: notes,
     individuals: allIndividuals,
     onNoteClick: onNoteClick,
@@ -28039,7 +28012,7 @@ const DatabaseView = ({
             );
           })()
         )
-  )));
+  ));
 };
 
 /* ─── Wikidata definition fetcher ─── */
@@ -30092,7 +30065,7 @@ const UriLibraryBrowser = ({ open, onClose, onSelect, mode = 'select' }) => {
     onClose();
   };
 
-  return React.createElement('div', {
+  return ReactDOM.createPortal(React.createElement('div', {
     className: 'uri-browser-overlay',
     onClick: e => { if (e.target === e.currentTarget) onClose(); }
   },
@@ -30226,7 +30199,7 @@ const UriLibraryBrowser = ({ open, onClose, onSelect, mode = 'select' }) => {
         )
       )
     )
-  );
+  ), document.body);
 };
 
 /* ─── FieldPicker — select a field definition to insert into a form ─── */
@@ -31342,7 +31315,7 @@ const TeamDetailView = ({
     className: "fb-adopt-panel",
     onClick: e => e.stopPropagation(),
     style: {
-      maxWidth: 500
+      maxWidth: 700
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -33747,10 +33720,9 @@ const ProviderApp = ({
   const [schemaRoom, setSchemaRoom] = useState(null);
   const [networkRoom, setNetworkRoom] = useState(null);
   const [cases, setCases] = useState([]);
-  const [metrics, setMetrics] = useState([]);
   const [networkMembers, setNetworkMembers] = useState([]);
   const [activeCase, setActiveCase] = useState(null);
-  const [view, setView] = useState('dashboard'); // dashboard|inbox|case|metrics|schema|resources|network|activity|staff|org-settings|org-inbox
+  const [view, setView] = useState('dashboard'); // dashboard|inbox|case|schema|resources|network|activity|staff|org-settings|org-inbox
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState([]);
   const [msgText, setMsgText] = useState('');
@@ -33856,6 +33828,8 @@ const ProviderApp = ({
       setActiveTeamDetail(null);
     }
   }, [teams]);
+  // Expose switchTeamContext globally so DatabaseView team picker can call it
+  React.useEffect(() => { window.__khoraSwitchTeam = switchTeamContext; return () => { delete window.__khoraSwitchTeam; }; }, [switchTeamContext]);
   const [teamMode, setTeamMode] = useState(null); // null = individual mode, { roomId, name, color_hue } = operating as team
   // ─── Sidebar collapse state ───
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -34587,7 +34561,6 @@ const ProviderApp = ({
       }
       // Process bridge data collected during scan (no second pass needed)
       await loadCasesFromScan(bridgeData, metricsR);
-      await loadMetrics(metricsR);
       await loadResources(detectedOrg, network, roster);
       // Auto-register bridges in org assignments if needed
       if (detectedOrg && bridgeData.length > 0) {
@@ -35105,13 +35078,6 @@ const ProviderApp = ({
         console.warn('Assignment sync failed:', e.message);
       }
     }
-  };
-  const loadMetrics = async mRoom => {
-    if (!svc.client || !mRoom) return;
-    const room = svc.client.getRoom(mRoom);
-    if (!room) return;
-    const evts = room.getLiveTimeline().getEvents().filter(e => e.getType() === EVT.METRIC).map(e => e.getContent());
-    setMetrics(evts);
   };
   const loadNetworkMembers = async nRoom => {
     const members = await svc.getState(nRoom, EVT.NET_MEMBERS);
@@ -37246,17 +37212,6 @@ const ProviderApp = ({
   };
   const activeCaseData = cases.find(c => c.bridgeRoomId === activeCase);
 
-  // Aggregate metrics for dashboard
-  const metricsByCategory = useMemo(() => {
-    const agg = {};
-    metrics.forEach(m => {
-      const cat = m.observation?.category || 'unknown';
-      const val = m.observation?.value || 'unknown';
-      if (!agg[cat]) agg[cat] = {};
-      agg[cat][val] = (agg[cat][val] || 0) + 1;
-    });
-    return agg;
-  }, [metrics]);
   if (loading) return /*#__PURE__*/React.createElement("div", {
     style: {
       height: '100%',
@@ -38076,12 +38031,6 @@ const ProviderApp = ({
       onCreateClient: openCreateClientModal
     })
   ), view === 'database' && !activeCase && /*#__PURE__*/React.createElement(React.Fragment, null,
-    activeTeamObj && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', marginBottom: 12, background: `hsla(${activeTeamObj.color_hue || 260}, 60%, 55%, 0.08)`, border: `1px solid hsla(${activeTeamObj.color_hue || 260}, 60%, 55%, 0.2)`, borderRadius: 'var(--r-lg)' }
-    }, /*#__PURE__*/React.createElement(I, { n: "users", s: 14, c: `hsl(${activeTeamObj.color_hue || 260}, 60%, 55%)` }),
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600 } }, "Filtered to: ", activeTeamObj.name),
-      /*#__PURE__*/React.createElement("button", { onClick: () => switchTeamContext(null), className: "b-gho b-xs", style: { marginLeft: 'auto', fontSize: 10 } }, "Clear filter")
-    ),
     /*#__PURE__*/React.createElement(DatabaseView, {
     cases: teamFilteredCases,
     caseAssignments: caseAssignments,
