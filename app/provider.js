@@ -489,6 +489,24 @@ const ProviderApp = ({
       window.removeEventListener('khora:state', handleStateNotif);
     };
   }, []);
+
+  // Auto-refresh active inbox chat when new messages arrive in real time
+  useEffect(() => {
+    let debounce = null;
+    const msgHandler = (e) => {
+      const d = e.detail;
+      if (d?.type !== 'm.room.message' || d?.isOwn) return;
+      if (!inboxConvo || d?.roomId !== inboxConvo) return;
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(() => loadInboxMessages(inboxConvo), 300);
+    };
+    window.addEventListener('khora:timeline', msgHandler);
+    return () => {
+      window.removeEventListener('khora:timeline', msgHandler);
+      if (debounce) clearTimeout(debounce);
+    };
+  }, [inboxConvo]);
+
   const rosterFrame = room => ({
     type: 'roster',
     room: room || rosterRoom,

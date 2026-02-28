@@ -223,7 +223,9 @@ const KhoraAuth = {
     this._client.on('Room.timeline', (event, room, toStartOfTimeline) => {
       if (toStartOfTimeline) return;
       const type = event.getType();
-      if (!type.startsWith(khoraPrefix)) return;
+      // Dispatch for Khora custom events AND standard messages so incoming
+      // messages from Element / other clients trigger a real-time UI refresh.
+      if (!type.startsWith(khoraPrefix) && type !== 'm.room.message') return;
       const detail = {
         eventId: event.getId(),
         roomId: room?.roomId,
@@ -286,7 +288,11 @@ const KhoraAuth = {
         userId: res.user_id,
         deviceId: res.device_id
       });
-      try { await this._client.initCrypto(); } catch (e) { console.warn('Crypto:', e.message); }
+      try {
+        if (typeof Olm !== 'undefined') await Olm.init();
+        await this._client.initCrypto();
+        this._client.setGlobalErrorOnUnknownDevices(false);
+      } catch (e) { console.warn('Crypto init:', e.message); }
       await this._client.startClient({ initialSyncLimit: 30 });
       await new Promise((resolve, reject) => {
         if (this._client.isInitialSyncComplete()) return resolve();
@@ -381,7 +387,11 @@ const KhoraAuth = {
       await LocalVaultCrypto.deriveKey(userId, accessToken, deviceId);
       if (typeof matrixcs !== 'undefined') {
         this._client = matrixcs.createClient({ baseUrl: homeserver, accessToken, userId, deviceId });
-        try { await this._client.initCrypto(); } catch (e) { console.warn('Crypto:', e.message); }
+        try {
+          if (typeof Olm !== 'undefined') await Olm.init();
+          await this._client.initCrypto();
+          this._client.setGlobalErrorOnUnknownDevices(false);
+        } catch (e) { console.warn('Crypto init:', e.message); }
         await this._client.startClient({ initialSyncLimit: 30 });
         await new Promise((resolve, reject) => {
           if (this._client.isInitialSyncComplete()) return resolve();
