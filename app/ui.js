@@ -139,6 +139,7 @@ const Modal = ({
     "aria-label": "Close",
     style: {
       background: 'transparent',
+      border: 'none',
       color: 'var(--tx-2)',
       padding: 8,
       minWidth: 32,

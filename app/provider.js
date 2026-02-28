@@ -3576,8 +3576,8 @@ const ProviderApp = ({
       showToast('Failed to create DM: ' + e.message, 'error');
     }
   };
-  // Build list of all messageable team members (excluding self)
-  const teamMemberContacts = useMemo(() => {
+  // Build list of all messageable contacts (team members + case/bridge contacts)
+  const allContacts = useMemo(() => {
     const contacts = [];
     const seen = new Set();
     for (const team of teams) {
@@ -3594,8 +3594,20 @@ const ProviderApp = ({
         });
       }
     }
+    for (const c of cases) {
+      if (!c.clientUserId || c.clientUserId === svc.userId || seen.has(c.clientUserId)) continue;
+      seen.add(c.clientUserId);
+      contacts.push({
+        userId: c.clientUserId,
+        displayName: c.sharedData.full_name || c.clientUserId,
+        teamName: null,
+        teamRoomId: null,
+        role: null,
+        hasDM: teamDMs.some(d => d.peerId === c.clientUserId)
+      });
+    }
     return contacts;
-  }, [teams, teamDMs]);
+  }, [teams, teamDMs, cases]);
 
   const getInboxConvoName = useCallback(roomId => {
     const c = cases.find(c => c.bridgeRoomId === roomId);
@@ -4781,7 +4793,7 @@ const ProviderApp = ({
   }, /*#__PURE__*/React.createElement(I, {
     n: "plus",
     s: 14
-  }), "New Channel"), teamMemberContacts.length > 0 && /*#__PURE__*/React.createElement("button", {
+  }), "New Channel"), allContacts.length > 0 && /*#__PURE__*/React.createElement("button", {
     onClick: () => setNewTeamDMModal(true),
     className: "b-gho b-sm",
     style: { display: 'flex', alignItems: 'center', gap: 6 }
@@ -5058,7 +5070,7 @@ const ProviderApp = ({
       }) : '')));
     })), /*#__PURE__*/React.createElement("div", {
       className: "inbox-compose"
-    }, convoType === 'case' || hasOrgMsgPermission('respond') ? /*#__PURE__*/React.createElement("div", {
+    }, convoType === 'case' || convoType === 'team_dm' || hasOrgMsgPermission('respond') ? /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         gap: 8
@@ -11720,16 +11732,16 @@ const ProviderApp = ({
   }), " Create Channel")), /*#__PURE__*/React.createElement(Modal, {
     open: newTeamDMModal,
     onClose: () => { setNewTeamDMModal(false); setNewDMTarget(null); },
-    title: "New Team Member DM",
+    title: "New Direct Message",
     w: 480
   }, /*#__PURE__*/React.createElement("p", {
     style: { fontSize: 12, color: 'var(--tx-1)', marginBottom: 14, lineHeight: 1.6 }
-  }, "Start an encrypted direct conversation with a team member. Select someone from your teams below."),
-  teamMemberContacts.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, "Start an encrypted direct conversation. Select a contact below."),
+  allContacts.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', padding: '20px 0', color: 'var(--tx-3)', fontSize: 12 }
-  }, "No team members found. Join a team first.") : /*#__PURE__*/React.createElement("div", {
+  }, "No contacts found.") : /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflow: 'auto', marginBottom: 16 }
-  }, teamMemberContacts.map(c => /*#__PURE__*/React.createElement("div", {
+  }, allContacts.map(c => /*#__PURE__*/React.createElement("div", {
     key: c.userId,
     onClick: () => setNewDMTarget(c),
     style: {

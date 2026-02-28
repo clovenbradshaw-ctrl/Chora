@@ -2032,7 +2032,7 @@ const ClientApp = ({
       showToast('Failed to create DM: ' + e.message, 'error');
     }
   };
-  const clientTeamMemberContacts = useMemo(() => {
+  const allClientContacts = useMemo(() => {
     const contacts = [];
     const seen = new Set();
     for (const team of myTeams) {
@@ -2049,8 +2049,20 @@ const ClientApp = ({
         });
       }
     }
+    for (const p of providers) {
+      if (!p.providerUserId || p.providerUserId === svc.userId || seen.has(p.providerUserId)) continue;
+      seen.add(p.providerUserId);
+      contacts.push({
+        userId: p.providerUserId,
+        displayName: p.providerName || p.providerUserId,
+        teamName: null,
+        teamRoomId: null,
+        role: null,
+        hasDM: clientTeamDMs.some(d => d.peerId === p.providerUserId)
+      });
+    }
     return contacts;
-  }, [myTeams, clientTeamDMs]);
+  }, [myTeams, clientTeamDMs, providers]);
   const activeProviderIdx = providers.findIndex(p => p.bridgeRoomId === activeBridge);
   const activeProvider = activeProviderIdx >= 0 ? providers[activeProviderIdx] : null;
   const filledFields = allFields.filter(f => vaultData[f.key]);
@@ -4173,7 +4185,7 @@ const ClientApp = ({
   }, /*#__PURE__*/React.createElement(I, {
     n: "plus",
     s: 14
-  }), "New Conversation"), clientTeamMemberContacts.length > 0 && /*#__PURE__*/React.createElement("button", {
+  }), "New Conversation"), allClientContacts.length > 0 && /*#__PURE__*/React.createElement("button", {
     onClick: () => setNewTeamDMModal(true),
     className: "b-gho b-sm",
     style: { display: 'flex', alignItems: 'center', gap: 6 }
@@ -4943,16 +4955,16 @@ const ClientApp = ({
   }, "Create Bridge Room")), /*#__PURE__*/React.createElement(Modal, {
     open: newTeamDMModal,
     onClose: () => { setNewTeamDMModal(false); setNewDMTarget(null); },
-    title: "New Team Member DM",
+    title: "New Direct Message",
     w: 480
   }, /*#__PURE__*/React.createElement("p", {
     style: { fontSize: 12, color: 'var(--tx-1)', marginBottom: 14, lineHeight: 1.6 }
-  }, "Start an encrypted direct conversation with a team member."),
-  clientTeamMemberContacts.length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, "Start an encrypted direct conversation. Select a contact below."),
+  allClientContacts.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', padding: '20px 0', color: 'var(--tx-3)', fontSize: 12 }
-  }, "No team members found. Join a team first.") : /*#__PURE__*/React.createElement("div", {
+  }, "No contacts found.") : /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflow: 'auto', marginBottom: 16 }
-  }, clientTeamMemberContacts.map(c => /*#__PURE__*/React.createElement("div", {
+  }, allClientContacts.map(c => /*#__PURE__*/React.createElement("div", {
     key: c.userId,
     onClick: () => setNewDMTarget(c),
     style: {
