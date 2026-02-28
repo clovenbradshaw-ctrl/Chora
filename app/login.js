@@ -419,28 +419,72 @@ const LoginScreen = ({
     }, "Login")
   )),
 
-  /* ── Hero section: dodecahedron + login card ── */
+  /* ── Hero section: explainer + login card side by side ── */
   /*#__PURE__*/React.createElement("div", {
     style: {
-      minHeight: '100%',
+      minHeight: '100vh',
       display: 'flex',
-      flexDirection: 'column',
+      flexWrap: 'wrap',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '96px 20px 20px'
+      gap: 40,
+      padding: '96px 24px 40px'
     }
   },
 
-  /* Spinning dodecahedron hero */
+  /* ── Explainer column (left) ── */
   /*#__PURE__*/React.createElement("div", {
-    style: { marginBottom: 20 }
-  }, /*#__PURE__*/React.createElement(SpinningDodeca, { size: 120 })),
+    style: { flex: '1 1 320px', maxWidth: 460 }
+  },
+  /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 24 }
+  }, /*#__PURE__*/React.createElement(SpinningDodeca, { size: 72 })),
+  /*#__PURE__*/React.createElement("div", {
+    style: sectionLabelStyle
+  }, "WHAT IS KHORA?"),
+  /*#__PURE__*/React.createElement("h2", {
+    style: { ...sectionTitleStyle, fontSize: 26 }
+  }, "Your information, under your control"),
+  /*#__PURE__*/React.createElement("p", {
+    style: { ...bodyTextStyle, marginBottom: 28 }
+  }, "Khora is a case management system where the person being served owns their data. You decide exactly which pieces of your information to share with each provider, and you can take it back at any time."),
+  /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: 16 }
+  },
+  /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: 12 }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: featureIconBox('var(--gold-dim)', 'var(--gold)')
+  }, /*#__PURE__*/React.createElement(I, { n: "shield", s: 18 })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 700, fontSize: 13, color: 'var(--tx-0)' }
+  }, "You own it"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12, color: 'var(--tx-2)', marginTop: 2 }
+  }, "Your data lives in a personal vault that belongs to you"))),
+  /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: 12 }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: featureIconBox('var(--teal-dim)', 'var(--teal)')
+  }, /*#__PURE__*/React.createElement(I, { n: "eye", s: 18 })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 700, fontSize: 13, color: 'var(--tx-0)' }
+  }, "Field-by-field sharing"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12, color: 'var(--tx-2)', marginTop: 2 }
+  }, "Each provider sees only the specific fields you choose"))),
+  /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: 12 }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: featureIconBox('var(--red-dim)', 'var(--red)')
+  }, /*#__PURE__*/React.createElement(I, { n: "x", s: 18 })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: { fontWeight: 700, fontSize: 13, color: 'var(--tx-0)' }
+  }, "Revoke anytime"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12, color: 'var(--tx-2)', marginTop: 2 }
+  }, "Pull back access \u2014 the encryption keys are destroyed")))
+  )),
 
   /* Login card */
   /*#__PURE__*/React.createElement("div", {
     className: "anim-up",
     style: {
-      width: '100%',
+      flex: '1 1 340px',
       maxWidth: 440
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -878,16 +922,7 @@ const LoginScreen = ({
       fontSize: 10.5,
       color: 'var(--tx-3)'
     }
-  }, typeof matrixcs !== 'undefined' ? 'Secure connection ready' : 'Connecting\u2026'))),
-
-  /* Scroll hint arrow */
-  /*#__PURE__*/React.createElement("div", {
-    style: { textAlign: 'center', marginTop: 16 }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => { const el = document.getElementById('khora-info'); if (el) el.scrollIntoView({ behavior: 'smooth' }); },
-    className: "b-gho b-xs",
-    style: { display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--tx-3)', fontSize: 11, fontFamily: 'var(--mono)', letterSpacing: '.04em' }
-  }, "Learn more ", /*#__PURE__*/React.createElement(I, { n: "chevronDown", s: 14 })))
+  }, typeof matrixcs !== 'undefined' ? 'Secure connection ready' : 'Connecting\u2026')))
 
   ), /* end anim-up */
   ), /* end hero section */
@@ -901,66 +936,9 @@ const LoginScreen = ({
     style: { paddingBottom: 80 }
   },
 
-  /* ── Section 1: What is Khora? ── */
-  /*#__PURE__*/React.createElement("div", {
-    style: { ...infoSectionStyle, paddingTop: 64, paddingBottom: 48 }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { textAlign: 'center', marginBottom: 40 }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: sectionLabelStyle
-  }, "WHAT IS KHORA?"), /*#__PURE__*/React.createElement("h2", {
-    style: { ...sectionTitleStyle, fontSize: 26 }
-  }, "Your information, under your control"), /*#__PURE__*/React.createElement("p", {
-    style: { ...bodyTextStyle, maxWidth: 560, margin: '0 auto' }
-  }, "Khora is a case management system where the person being served owns their data. You decide exactly which pieces of your information to share with each provider, and you can take it back at any time. No vendor lock-in, no corporate database you can't see inside.")),
-
-  /* Three feature cards */
-  /*#__PURE__*/React.createElement("div", {
-    style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }
-  },
-
-  /* Card: You own it */
-  /*#__PURE__*/React.createElement("div", {
-    style: infoCardStyle
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: featureIconBox('var(--gold-dim)', 'var(--gold)')
-  }, /*#__PURE__*/React.createElement(I, { n: "shield", s: 20 })), /*#__PURE__*/React.createElement("div", {
-    style: { fontWeight: 700, fontSize: 14, color: 'var(--tx-0)' }
-  }, "You own it")), /*#__PURE__*/React.createElement("p", {
-    style: bodyTextStyle
-  }, "Your information lives in a personal vault that belongs to you. Not to an organization, not to a database administrator \u2014 to you. You carry it between providers.")),
-
-  /* Card: Field-by-field sharing */
-  /*#__PURE__*/React.createElement("div", {
-    style: infoCardStyle
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: featureIconBox('var(--teal-dim)', 'var(--teal)')
-  }, /*#__PURE__*/React.createElement(I, { n: "eye", s: 20 })), /*#__PURE__*/React.createElement("div", {
-    style: { fontWeight: 700, fontSize: 14, color: 'var(--tx-0)' }
-  }, "Field-by-field sharing")), /*#__PURE__*/React.createElement("p", {
-    style: bodyTextStyle
-  }, "Share your name with one provider, your case notes with another, your contact info with a third. Each provider sees only the specific fields you choose \u2014 nothing more.")),
-
-  /* Card: Revoke anytime */
-  /*#__PURE__*/React.createElement("div", {
-    style: infoCardStyle
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: featureIconBox('var(--red-dim)', 'var(--red)')
-  }, /*#__PURE__*/React.createElement(I, { n: "x", s: 20 })), /*#__PURE__*/React.createElement("div", {
-    style: { fontWeight: 700, fontSize: 14, color: 'var(--tx-0)' }
-  }, "Revoke anytime")), /*#__PURE__*/React.createElement("p", {
-    style: bodyTextStyle
-  }, "Changed your mind? Pull back access to specific fields, or cut a provider off entirely. When you revoke, the encryption keys are destroyed \u2014 it's not a policy, it's math.")))),
-
   /* ── Section 2: Who is Khora for? ── */
   /*#__PURE__*/React.createElement("div", {
-    style: { ...infoSectionStyle, paddingTop: 48, paddingBottom: 48 }
+    style: { ...infoSectionStyle, paddingTop: 64, paddingBottom: 48 }
   }, /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', marginBottom: 40 }
   }, /*#__PURE__*/React.createElement("div", {
