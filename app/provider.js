@@ -10209,7 +10209,7 @@ const ProviderApp = ({
       ...profileDraft,
       credentials: e.target.value
     }),
-    placeholder: "e.g. LCSW, CHW, HMIS Certified"
+    placeholder: "e.g. LCSW, CHW, CPM Certified"
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14

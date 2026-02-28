@@ -222,7 +222,7 @@ const DefinitionPopup = ({ fieldDef, fieldDefs, fieldCrosswalks, onClose, onSave
             React.createElement('input', { placeholder: 'Organization (e.g. HUD)', value: authDraft.org,
               onChange: e => setAuthDraft({...authDraft, org: e.target.value}),
               style: { fontSize: 12, padding: '4px 8px', border: '1px solid var(--border-0)', borderRadius: 'var(--r)', background: 'var(--bg-2)', color: 'var(--tx-0)' } }),
-            React.createElement('input', { placeholder: 'Standard name (e.g. HMIS Data Standards)', value: authDraft.name,
+            React.createElement('input', { placeholder: 'Standard name (e.g. HUD Data Standards)', value: authDraft.name,
               onChange: e => setAuthDraft({...authDraft, name: e.target.value}),
               style: { fontSize: 12, padding: '4px 8px', border: '1px solid var(--border-0)', borderRadius: 'var(--r)', background: 'var(--bg-2)', color: 'var(--tx-0)' } }),
             React.createElement('input', { placeholder: 'Provision (e.g. Element 3.01)', value: authDraft.provision,

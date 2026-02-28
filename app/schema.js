@@ -1440,7 +1440,7 @@ const FormBuilder = ({
     autoFocus: true,
     value: draft,
     onChange: setDraft,
-    placeholder: "Short name (e.g. HUD HMIS, CoC Priority)",
+    placeholder: "Short name (e.g. HUD CoC, CoC Priority)",
     onKeyDown: e => {
       if (e.key === 'Enter' && draft.trim()) doAddFramework();
       if (e.key === 'Escape') {

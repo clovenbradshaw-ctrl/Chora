@@ -231,7 +231,7 @@ const FieldPicker = ({ open, onClose, onSelect, fieldDefs, catLabels, catColors 
           React.createElement(I, { n: 'globe', s: 12, c: 'var(--teal)' }),
           'Browse URI Libraries'
         ),
-        React.createElement('span', { style: { fontSize: 10, color: 'var(--tx-3)' } }, 'Schema.org \u00B7 Dublin Core \u00B7 FOAF \u00B7 HMIS \u00B7 vCard \u00B7 FHIR')
+        React.createElement('span', { style: { fontSize: 10, color: 'var(--tx-3)' } }, 'Schema.org \u00B7 Dublin Core \u00B7 FOAF \u00B7 vCard \u00B7 FHIR')
       ),
       React.createElement('div', { className: 'fp-search' },
         React.createElement('input', { value: search, onChange: e => setSearch(e.target.value), placeholder: 'Search fields...',  autoFocus: true }),
@@ -1415,7 +1415,7 @@ const TeamDetailView = ({
       React.createElement(I, { n: 'globe', s: 12, c: 'var(--teal)' }),
       'Import from URI Library'
     ),
-    React.createElement('span', { style: { fontSize: 10, color: 'var(--tx-3)' } }, 'Pre-fill from Schema.org, HMIS, FHIR, etc.')
+    React.createElement('span', { style: { fontSize: 10, color: 'var(--tx-3)' } }, 'Pre-fill from Schema.org, FHIR, etc.')
   ),
   // URI Library Browser
   uriBrowserOpen && React.createElement(UriLibraryBrowser, {

@@ -1361,7 +1361,7 @@ const DEFAULT_INDIVIDUAL_TABLE_SCHEMA = {
     { key: 'referral_source',    label: 'Referral Source',        data_type: 'text',          required: false, sensitive: false, description: 'How or by whom this individual was referred.' },
     { key: 'priority',           label: 'Priority',               data_type: 'single_select', required: false, sensitive: false, description: 'Urgency level for this individual\'s case.', options: ['urgent', 'high', 'medium', 'low'] },
     { key: 'program',            label: 'Program / Service',      data_type: 'text',          required: false, sensitive: false, description: 'Program or service this individual is enrolled in.' },
-    // ── Demographics (HMIS-aligned) ─────────────────────────────────────────
+    // ── Demographics ─────────────────────────────────────────────────────────
     { key: 'gender_identity',    label: 'Gender Identity',        data_type: 'text',          required: false, sensitive: true,  description: 'How this individual describes their gender.' },
     { key: 'race_ethnicity',     label: 'Race / Ethnicity',       data_type: 'multi_select',  required: false, sensitive: true,  description: 'Race and/or ethnicity (select all that apply).', options: ['American Indian or Alaska Native', 'Asian', 'Black or African American', 'Hispanic or Latino', 'Native Hawaiian or Pacific Islander', 'White', 'Multiracial', 'Other', 'Unknown', 'Prefer not to say'] },
     { key: 'veteran_status',     label: 'Veteran Status',         data_type: 'single_select', required: false, sensitive: false, description: 'U.S. military veteran status.', options: ['Yes', 'No', 'Unknown'] },
@@ -1408,7 +1408,7 @@ const FRAMEWORK_BINDINGS = {
           implication: 'Eligible for CoC-funded services',
           eo_chain: [{
             op: 'CON',
-            desc: 'sleep_location → hud:hmis_3.12'
+            desc: 'sleep_location → hud:3.12'
           }, {
             op: 'SYN',
             desc: 'vehicle → code_7'
@@ -1416,7 +1416,7 @@ const FRAMEWORK_BINDINGS = {
             op: 'CON',
             desc: 'code_7 → 24cfr578.3(b)(1)'
           }],
-          eo_compact: 'CON(sleep_location → hud:hmis_3.12) → SYN(vehicle → code_7)'
+          eo_compact: 'CON(sleep_location → hud:3.12) → SYN(vehicle → code_7)'
         }, {
           id: 'fb_vehicle_coc',
           authority_id: 'auth_local_coc',
@@ -1437,7 +1437,7 @@ const FRAMEWORK_BINDINGS = {
           eo_compact: 'CON(sleep_location → coc:outreach_priority) → SYN(vehicle → priority_1)'
         }, {
           id: 'fb_vehicle_pit',
-          authority_id: 'auth_hud_hmis_ds',
+          authority_id: 'auth_hud_ds',
           authority_name: 'PIT Count Methodology',
           authority_org: 'HUD Exchange',
           authority_uri: 'https://hudexchange.info/programs/hdx/pit-hic/',
@@ -1469,7 +1469,7 @@ const FRAMEWORK_BINDINGS = {
           implication: 'Eligible for CoC-funded services',
           eo_chain: [{
             op: 'CON',
-            desc: 'sleep_location → hud:hmis_3.12'
+            desc: 'sleep_location → hud:3.12'
           }, {
             op: 'SYN',
             desc: 'encampment → code_16'
@@ -1495,7 +1495,7 @@ const FRAMEWORK_BINDINGS = {
           eo_compact: 'CON → SYN(encampment → priority_1)'
         }, {
           id: 'fb_encampment_pit',
-          authority_id: 'auth_hud_hmis_ds',
+          authority_id: 'auth_hud_ds',
           authority_name: 'PIT Count Methodology',
           authority_org: 'HUD Exchange',
           authority_uri: 'https://hudexchange.info/programs/hdx/pit-hic/',
@@ -1527,7 +1527,7 @@ const FRAMEWORK_BINDINGS = {
           implication: 'Eligible for CoC-funded services',
           eo_chain: [{
             op: 'CON',
-            desc: 'sleep_location → hud:hmis_3.12'
+            desc: 'sleep_location → hud:3.12'
           }, {
             op: 'SYN',
             desc: 'unsheltered → code_16'
@@ -1570,7 +1570,7 @@ const FRAMEWORK_BINDINGS = {
           implication: 'Eligible for CoC-funded services',
           eo_chain: [{
             op: 'CON',
-            desc: 'sleep_location → hud:hmis_3.12'
+            desc: 'sleep_location → hud:3.12'
           }, {
             op: 'SYN',
             desc: 'shelter → code_3'
@@ -1596,7 +1596,7 @@ const FRAMEWORK_BINDINGS = {
           eo_compact: 'CON → SYN(shelter → priority_3)'
         }, {
           id: 'fb_shelter_pit',
-          authority_id: 'auth_hud_hmis_ds',
+          authority_id: 'auth_hud_ds',
           authority_name: 'PIT Count Methodology',
           authority_org: 'HUD Exchange',
           authority_uri: 'https://hudexchange.info/programs/hdx/pit-hic/',
@@ -1628,7 +1628,7 @@ const FRAMEWORK_BINDINGS = {
           implication: 'Not eligible for CoC homeless services',
           eo_chain: [{
             op: 'CON',
-            desc: 'sleep_location → hud:hmis_3.12'
+            desc: 'sleep_location → hud:3.12'
           }, {
             op: 'SYN',
             desc: 'own_housing → code_1'
@@ -1668,7 +1668,7 @@ const FRAMEWORK_BINDINGS = {
           implication: 'Eligible for CoC-funded services (in TH program)',
           eo_chain: [{
             op: 'CON',
-            desc: 'sleep_location → hud:hmis_3.12'
+            desc: 'sleep_location → hud:3.12'
           }, {
             op: 'SYN',
             desc: 'transitional → code_4'
@@ -1676,7 +1676,7 @@ const FRAMEWORK_BINDINGS = {
           eo_compact: 'CON → SYN(transitional → code_4)'
         }, {
           id: 'fb_trans_pit',
-          authority_id: 'auth_hud_hmis_ds',
+          authority_id: 'auth_hud_ds',
           authority_name: 'PIT Count Methodology',
           authority_org: 'HUD Exchange',
           authority_uri: 'https://hudexchange.info/programs/hdx/pit-hic/',
@@ -1704,9 +1704,9 @@ const FRAMEWORK_COLORS = {
     accent: 'blue',
     label: 'HUD'
   },
-  'auth_hud_hmis_ds': {
+  'auth_hud_ds': {
     accent: 'teal',
-    label: 'HMIS'
+    label: 'HUD'
   },
   'auth_local_coc': {
     accent: 'orange',

@@ -449,7 +449,7 @@ NETWORK ROOM (CoC / Coalition)
 No service worker, no IndexedDB cache, no offline queue. Matrix SDK handles some reconnection, but vault data isn't accessible offline.
 
 ### Audit logging
-EO operations provide an implicit audit trail, but there's no dedicated audit log view showing who accessed what data when. For HMIS compliance, this matters.
+EO operations provide an implicit audit trail, but there's no dedicated audit log view showing who accessed what data when. For compliance, this matters.
 
 ### Error recovery
 No retry logic for failed Matrix API calls. No optimistic UI updates. No conflict resolution for concurrent state writes.
