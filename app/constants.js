@@ -117,7 +117,9 @@ const EVT = {
   // Team record index — maps team rooms to their owned CLIENT_RECORD rooms, tracks vault access state
   TEAM_RECORD_INDEX: `${NS}.team.record.index`,
   // Account claim verification (6-digit code for identity confirmation before room claim)
-  CLAIM_VERIFICATION: `${NS}.claim.verification`
+  CLAIM_VERIFICATION: `${NS}.claim.verification`,
+  // Filen backup credentials (encrypted email + password, stored in user's owned room)
+  BACKUP_CREDS: `${NS}.backup.credentials`
 };
 
 /* ═══════════════════ MATURITY LEVELS (MVP §Screen 4) ═══════════════════ */

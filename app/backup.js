@@ -10,9 +10,12 @@
  *   KhoraBackup.canBridge          — boolean, true if paid account (can create public links)
  *   KhoraBackup.bridgeSettings     — {enabled, capacity_gb, enabled_at} or null
  *
- *   KhoraBackup.connect(matrixId, email)   → true | 'needs_confirmation' | throws
+ *   KhoraBackup.connectWithPassword(email, pw) → true | false (login with user password)
+ *   KhoraBackup.registerWithPassword(email, pw) → 'needs_confirmation' | throws
  *   KhoraBackup.disconnect()               → void
- *   KhoraBackup.autoConnect()              → true | false (silent, from saved creds)
+ *   KhoraBackup.autoConnect()              → true | false (room data first, then legacy)
+ *   KhoraBackup.saveCredsToRoom(email, pw) → true | false (encrypt + store in room state)
+ *   KhoraBackup.loadCredsFromRoom()        → {email, password} | null
  *
  *   KhoraBackup.uploadFile(file, folder?)  → {uuid, fileKey, bucket, region, chunks}
  *   KhoraBackup.uploadJSON(data, filename, folder?)  → upload result
@@ -164,6 +167,36 @@ const KhoraBackup = (() => {
   function hasSeenRecovery() { try { return localStorage.getItem('khora_backup_seen') === '1'; } catch { return false; } }
   function markRecoverySeen() { try { localStorage.setItem('khora_backup_seen', '1'); } catch {} }
 
+  // ── Room-based credential persistence (encrypted) ──
+  // Encrypt the Filen password using a key derived from the Matrix ID before storing in room state
+  async function encryptForRoom(plaintext, matrixId) {
+    const keyData = await pbkdf2Bits(matrixId, 'khora-backup-room-creds-v1', 100000, 'SHA-256', 256);
+    const key = await crypto.subtle.importKey('raw', keyData, 'AES-GCM', false, ['encrypt']);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, tagLength: 128 }, key, te.encode(plaintext));
+    return { ct: b64e(ct), iv: b64e(iv) };
+  }
+  async function decryptFromRoom(envelope, matrixId) {
+    try {
+      const keyData = await pbkdf2Bits(matrixId, 'khora-backup-room-creds-v1', 100000, 'SHA-256', 256);
+      const key = await crypto.subtle.importKey('raw', keyData, 'AES-GCM', false, ['decrypt']);
+      const ct = b64d(envelope.ct), iv = b64d(envelope.iv);
+      return td.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv, tagLength: 128 }, key, ct));
+    } catch { return null; }
+  }
+
+  // Find the user's owned room (vault for client, roster for provider)
+  async function findOwnedRoom() {
+    try {
+      const scanned = await svc.scanRooms([]);
+      for (const [rid, state] of Object.entries(scanned || {})) {
+        const id = state?.[EVT.IDENTITY];
+        if (id?.owner === svc.userId && (id.account_type === 'client' || id.account_type === 'provider')) return rid;
+      }
+    } catch {}
+    return null;
+  }
+
   // ── Pool Bridge persistence ──
   function savePoolBridgeSettings(enabled, capacityGB) { try { localStorage.setItem('khora_backup_bridge', JSON.stringify({ enabled, capacity_gb: capacityGB, enabled_at: enabled ? new Date().toISOString() : null, ts: Date.now() })); } catch {} }
   function loadPoolBridgeSettings() { try { return JSON.parse(localStorage.getItem('khora_backup_bridge')); } catch { return null; } }
@@ -237,20 +270,46 @@ const KhoraBackup = (() => {
     fmtSize,
 
     // ── Connection ──
-    async connect(matrixId, email) {
-      const fp = await deriveFilenPassword(matrixId);
-      const ok = await tryLogin(email, fp);
-      if (ok) { S.matrixId = matrixId; S.filenPassword = fp; saveCreds(matrixId, email); emit({ event: 'connected', matrixId, email }); return true; }
-      const reg = await tryRegister(email, fp);
-      if (reg === 'registered' || reg === 'exists_unconfirmed') { saveCreds(matrixId, email); return 'needs_confirmation'; }
+    // Login with user-provided password
+    async connectWithPassword(email, password) {
+      const matrixId = svc.userId;
+      const ok = await tryLogin(email, password);
+      if (ok) {
+        S.matrixId = matrixId; S.filenPassword = password;
+        saveCreds(matrixId, email);
+        // Save encrypted password to room data for cross-device auto-login
+        try { await api.saveCredsToRoom(email, password); } catch (e) { console.warn('Could not save backup creds to room:', e.message); }
+        emit({ event: 'connected', matrixId, email });
+        return true;
+      }
+      return false;
+    },
+
+    // Register a new Filen account with user-provided password
+    async registerWithPassword(email, password) {
+      const matrixId = svc.userId;
+      const reg = await tryRegister(email, password);
+      if (reg === 'registered' || reg === 'exists_unconfirmed') {
+        // Save creds locally so retryAfterConfirmation can use them
+        saveCreds(matrixId, email);
+        // Temporarily store password for use after confirmation
+        S._pendingPassword = password;
+        return 'needs_confirmation';
+      }
       throw new Error(reg);
     },
 
     async retryAfterConfirmation() {
       const creds = loadCreds(); if (!creds) throw new Error('No saved credentials');
-      const fp = await deriveFilenPassword(creds.matrixId);
-      const ok = await tryLogin(creds.email, fp);
-      if (ok) { S.matrixId = creds.matrixId; S.filenPassword = fp; emit({ event: 'connected', matrixId: creds.matrixId, email: creds.email }); return true; }
+      const password = S._pendingPassword;
+      if (!password) throw new Error('No pending password');
+      const ok = await tryLogin(creds.email, password);
+      if (ok) {
+        S.matrixId = creds.matrixId; S.filenPassword = password; S._pendingPassword = null;
+        try { await api.saveCredsToRoom(creds.email, password); } catch (e) { console.warn('Could not save backup creds to room:', e.message); }
+        emit({ event: 'connected', matrixId: creds.matrixId, email: creds.email });
+        return true;
+      }
       return false;
     },
 
@@ -260,7 +319,47 @@ const KhoraBackup = (() => {
       return !!r.status;
     },
 
+    // Save encrypted Filen creds to the user's owned room for cross-device auto-login
+    async saveCredsToRoom(email, password) {
+      const roomId = await findOwnedRoom();
+      if (!roomId) return false;
+      const matrixId = svc.userId;
+      const encrypted = await encryptForRoom(password, matrixId);
+      await svc.setState(roomId, EVT.BACKUP_CREDS, { email, encrypted, v: 1 });
+      return true;
+    },
+
+    // Load Filen creds from room data
+    async loadCredsFromRoom() {
+      try {
+        const scanned = await svc.scanRooms([EVT.BACKUP_CREDS]);
+        for (const [, state] of Object.entries(scanned || {})) {
+          const creds = state?.[EVT.BACKUP_CREDS];
+          if (creds?.email && creds?.encrypted?.ct && creds?.v === 1) {
+            const password = await decryptFromRoom(creds.encrypted, svc.userId);
+            if (password) return { email: creds.email, password };
+          }
+        }
+      } catch {}
+      return null;
+    },
+
+    // Auto-connect: try room data first, then fall back to localStorage legacy creds
     async autoConnect() {
+      // Try room-based credentials first (cross-device)
+      try {
+        const roomCreds = await api.loadCredsFromRoom();
+        if (roomCreds) {
+          const ok = await tryLogin(roomCreds.email, roomCreds.password);
+          if (ok) {
+            S.matrixId = svc.userId; S.filenPassword = roomCreds.password;
+            saveCreds(svc.userId, roomCreds.email);
+            emit({ event: 'connected', matrixId: svc.userId, email: roomCreds.email });
+            return true;
+          }
+        }
+      } catch {}
+      // Fallback: localStorage creds with derived password (legacy)
       const creds = loadCreds(); if (!creds || !creds.matrixId || !creds.email) return false;
       try {
         const fp = await deriveFilenPassword(creds.matrixId);
