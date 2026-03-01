@@ -1648,6 +1648,82 @@ const CreateTableModal = ({ open, onClose, team, svc, teams, showToast }) => {
   );
 };
 
+/* ─── CustomRecordPanel — slide-out detail view for a custom table record ─── */
+const CustomRecordPanel = ({ record, table, onClose, onCellEdit, svc }) => {
+  if (!record || !table) return null;
+  const cols = table.columns || [];
+  return React.createElement(React.Fragment, null,
+    React.createElement('div', { className: 'dt-panel-overlay', onClick: onClose }),
+    React.createElement('div', { className: 'dt-panel' },
+      React.createElement('div', { className: 'dt-panel-head' },
+        React.createElement('div', null,
+          React.createElement('h2', null, (() => {
+            const firstCol = cols[0];
+            return firstCol ? (record.data?.[firstCol.key] || 'Record') : 'Record';
+          })()),
+          React.createElement('div', {
+            style: { display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }
+          },
+            React.createElement('span', { className: 'tag tag-purple', style: { fontSize: 9 } }, table.name),
+            React.createElement('span', { style: { fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--tx-3)' } }, record.id)
+          )
+        ),
+        React.createElement('button', {
+          onClick: onClose,
+          style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--tx-2)' }
+        }, '\u2715')
+      ),
+      React.createElement('div', { className: 'dt-panel-body' },
+        // Record metadata
+        React.createElement('div', {
+          style: { display: 'flex', gap: 12, flexWrap: 'wrap', padding: '8px 12px', background: 'var(--bg-2)', borderRadius: 'var(--r)', marginBottom: 14, fontSize: 11, color: 'var(--tx-2)', fontFamily: 'var(--mono)' }
+        },
+          record.created_by && React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+            React.createElement(I, { n: 'user', s: 10, c: 'var(--tx-3)' }),
+            (record.created_by || '').split(':')[0]?.replace('@', '') || '?'),
+          record.created_at && React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+            React.createElement(I, { n: 'clock', s: 10, c: 'var(--tx-3)' }),
+            new Date(record.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })),
+          record.modified_at && record.modified_at !== record.created_at && React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+            React.createElement(I, { n: 'git-commit', s: 10, c: 'var(--teal)' }),
+            'Modified ', new Date(record.modified_at).toLocaleDateString())
+        ),
+        // Field rows
+        React.createElement('span', { className: 'section-label' }, 'FIELDS'),
+        cols.map(col => {
+          const val = record.data?.[col.key] ?? '';
+          return React.createElement('div', {
+            key: col.key,
+            style: { padding: '10px 12px', borderRadius: 'var(--r)', border: '1px solid var(--border-0)', marginBottom: 6, background: 'var(--bg-2)' }
+          },
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+              React.createElement('span', { style: { fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--tx-2)' } },
+                col.label),
+              React.createElement('div', { style: { display: 'flex', gap: 4 } },
+                React.createElement('span', { className: 'tag tag-blue', style: { fontSize: 7 } }, (col.data_type || 'text').toUpperCase()),
+                col.sensitive && React.createElement('span', { className: 'tag tag-red', style: { fontSize: 7 } }, 'PII'),
+                col.required && React.createElement('span', { className: 'tag tag-gold', style: { fontSize: 7 } }, 'REQ'))
+            ),
+            React.createElement('div', { style: { marginTop: 6 } },
+              React.createElement(EditableCell, {
+                value: val,
+                type: col.data_type,
+                options: (col.data_type === 'single_select' || col.data_type === 'boolean') ? col.options : undefined,
+                placeholder: col.description?.slice(0, 40) || 'Click to edit...',
+                singleClick: true,
+                onSave: v => onCellEdit && onCellEdit(record, col.key, v)
+              })
+            ),
+            col.description && React.createElement('div', {
+              style: { fontSize: 10, color: 'var(--tx-3)', marginTop: 4, fontStyle: 'italic' }
+            }, col.description)
+          );
+        })
+      )
+    )
+  );
+};
+
 /* ─── CustomTableView — view + add records for a team custom table ─── */
 const CustomTableView = ({ table: tableProp, team, svc, showToast, onBack }) => {
   const [records, setRecords] = useState([]);
@@ -1659,8 +1735,68 @@ const CustomTableView = ({ table: tableProp, team, svc, showToast, onBack }) => 
   const [newColData, setNewColData] = useState({ label: '', key: '', data_type: 'text', description: '', required: false, sensitive: false, options: '' });
   const [savingCol, setSavingCol] = useState(false);
   const [localTable, setLocalTable] = useState(tableProp);
+  const [detailRecord, setDetailRecord] = useState(null);
   React.useEffect(() => { setLocalTable(tableProp); }, [tableProp]);
   const table = localTable || tableProp;
+
+  // ── Inline cell edit handler (ALT operation) ──
+  const cellEditTimerRef = React.useRef({});
+  const handleCellEdit = (record, colKey, newValue) => {
+    const oldValue = record.data?.[colKey];
+    if (oldValue === newValue) return;
+    // Optimistic update
+    setRecords(prev => prev.map(r => r.id === record.id
+      ? { ...r, data: { ...r.data, [colKey]: newValue }, modified_by: svc.userId, modified_at: Date.now() }
+      : r
+    ));
+    // Also update detail panel if open
+    if (detailRecord?.id === record.id) {
+      setDetailRecord(prev => prev ? { ...prev, data: { ...prev.data, [colKey]: newValue }, modified_by: svc.userId, modified_at: Date.now() } : prev);
+    }
+    // Debounced persist
+    const timerKey = record.id + ':' + colKey;
+    if (cellEditTimerRef.current[timerKey]) clearTimeout(cellEditTimerRef.current[timerKey]);
+    cellEditTimerRef.current[timerKey] = setTimeout(async () => {
+      try {
+        const updated = {
+          ...record,
+          data: { ...record.data, [colKey]: newValue },
+          modified_by: svc.userId,
+          modified_at: Date.now()
+        };
+        await svc.setState(team.roomId, EVT.TEAM_TABLE_RECORD, updated, table.id + ':' + record.id);
+        // Emit ALT event for provenance tracking
+        if (svc.emitOp) {
+          svc.emitOp(team.roomId, 'ALT', 'org.table.' + table.id + '.' + colKey, {
+            record_id: record.id,
+            from: oldValue ?? null,
+            to: newValue
+          });
+        }
+      } catch (e) {
+        showToast('Failed to save: ' + e.message, 'error');
+      }
+      delete cellEditTimerRef.current[timerKey];
+    }, 300);
+  };
+
+  // ── Bulk action handler (delete = soft-archive) ──
+  const handleBulkAction = async (actionId, selectedIds) => {
+    if (actionId === 'delete') {
+      for (const id of selectedIds) {
+        const rec = records.find(r => r.id === id);
+        if (!rec) continue;
+        try {
+          const archived = { ...rec, status: 'archived', modified_by: svc.userId, modified_at: Date.now() };
+          await svc.setState(team.roomId, EVT.TEAM_TABLE_RECORD, archived, table.id + ':' + rec.id);
+        } catch (e) {
+          showToast('Failed to delete record: ' + e.message, 'error');
+        }
+      }
+      setRecords(prev => prev.filter(r => !selectedIds.includes(r.id)));
+      showToast(selectedIds.length + ' record(s) deleted', 'success');
+    }
+  };
 
   const handleAddColumn = async () => {
     if (!newColData.label.trim()) { showToast('Column label is required', 'warning'); return; }
@@ -1879,43 +2015,68 @@ const CustomTableView = ({ table: tableProp, team, svc, showToast, onBack }) => 
       )
     ),
 
-    // Records table
+    // Records DataTable (replaces raw table — adds search, sort, group, inline edit, bulk select)
     loading
       ? React.createElement('div', { style: { textAlign: 'center', padding: 32, color: 'var(--tx-3)' } }, 'Loading records...')
       : records.length === 0 && !addingRow
         ? React.createElement('div', { style: { textAlign: 'center', padding: 32, color: 'var(--tx-3)', fontSize: 12 } },
             React.createElement(I, { n: 'layers', s: 24, c: 'var(--border-1)' }),
             React.createElement('p', { style: { marginTop: 8 } }, 'No records yet. Add the first row.'))
-        : React.createElement('div', { style: { overflowX: 'auto' } },
-            React.createElement('table', { className: 'dt', style: { width: '100%' } },
-              React.createElement('thead', null,
-                React.createElement('tr', null,
-                  React.createElement('th', { style: { width: 32, fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--tx-3)' } }, '#'),
-                  (table.columns || []).map(col =>
-                    React.createElement('th', { key: col.key },
-                      col.label,
-                      col.required && React.createElement('span', { style: { color: 'var(--red)', marginLeft: 2 } }, '*'),
-                      col.sensitive && React.createElement('span', { title: 'Sensitive / PII', style: { marginLeft: 4, color: 'var(--orange)' } }, '\uD83D\uDD12')
-                    )
-                  ),
-                  React.createElement('th', { style: { width: 90, fontSize: 9 } }, 'ADDED')
-                )
-              ),
-              React.createElement('tbody', null,
-                records.map((rec, idx) =>
-                  React.createElement('tr', { key: rec.id },
-                    React.createElement('td', { style: { fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--tx-3)', textAlign: 'center' } }, idx + 1),
-                    (table.columns || []).map(col =>
-                      React.createElement('td', { key: col.key, style: { maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
-                        rec.data?.[col.key] ?? React.createElement('span', { style: { color: 'var(--tx-3)', fontStyle: 'italic' } }, '—'))
-                    ),
-                    React.createElement('td', { style: { fontSize: 10, color: 'var(--tx-3)' } },
-                      rec.created_at ? new Date(rec.created_at).toLocaleDateString() : '—')
-                  )
-                )
-              )
-            )
-          )
+        : React.createElement(DataTable, {
+            data: records,
+            columns: [
+              ...(table.columns || []).map(col => ({
+                key: col.key,
+                label: col.label + (col.required ? ' *' : ''),
+                editable: true,
+                data_type: col.data_type,
+                options: col.data_type === 'single_select' ? col.options
+                  : col.data_type === 'boolean' ? ['yes', 'no']
+                  : undefined
+              })),
+              { key: '_added', label: 'Added', fixed: true }
+            ],
+            defaultVisibleCols: (table.columns || []).map(c => c.key).concat('_added'),
+            label: 'records',
+            selectable: true,
+            editable: true,
+            bulkActions: [{ id: 'delete', label: 'Delete', icon: 'trash' }],
+            onBulkAction: handleBulkAction,
+            getVal: (row, key) => {
+              if (key === '_added') return row.created_at ? new Date(row.created_at).toLocaleDateString() : '—';
+              return row.data?.[key] ?? '';
+            },
+            renderCell: (row, col) => {
+              if (col.key === '_added') {
+                return React.createElement('span', { style: { fontSize: 10, color: 'var(--tx-3)' } },
+                  row.created_at ? new Date(row.created_at).toLocaleDateString() : '—');
+              }
+              const val = row.data?.[col.key];
+              if (val === undefined || val === null || val === '') {
+                return React.createElement('span', { style: { color: 'var(--tx-3)', fontStyle: 'italic' } }, '—');
+              }
+              return String(val);
+            },
+            onCellEdit: handleCellEdit,
+            onRowClick: row => setDetailRecord(row),
+            selectedId: detailRecord?.id,
+            groupOptions: (table.columns || []).filter(c =>
+              c.data_type === 'single_select' || c.data_type === 'boolean'
+            ).map(c => ({ k: c.key, l: c.label })),
+            onAddRow: () => { setAddingRow(true); setAddingColumn(false); },
+            addRowLabel: 'Add row'
+          }),
+
+    // Record detail panel
+    detailRecord && React.createElement(CustomRecordPanel, {
+      record: detailRecord,
+      table: table,
+      onClose: () => setDetailRecord(null),
+      onCellEdit: (rec, colKey, val) => {
+        handleCellEdit(rec, colKey, val);
+      },
+      svc: svc
+    })
   );
 };
 
