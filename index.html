@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<!-- Content Security Policy: restricts script/connect origins to known CDNs and Matrix endpoints -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://esm.sh 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src https: wss:; img-src 'self' data: blob:; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self';">
 <title>Khora — Sovereign Case Management</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <!-- Resource hints: early DNS + connection setup for CDN origins -->
@@ -19,6 +22,8 @@
 <link rel="preload" href="https://cdn.jsdelivr.net/npm/matrix-js-sdk@34.11.1/lib/browser-matrix.min.js" as="script">
 <!-- Core scripts (synchronous — needed before Babel processes JSX) -->
 <!-- Olm (libolm) — required for Megolm E2EE. Must load before Matrix SDK. -->
+<!-- SRI: When adding integrity hashes, also add crossorigin="anonymous" to each tag -->
+<!-- To generate: curl -s <URL> | openssl dgst -sha384 -binary | openssl base64 -A -->
 <script src="https://unpkg.com/@matrix-org/olm@3.2.15/olm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/matrix-js-sdk@34.11.1/lib/browser-matrix.min.js"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -2130,6 +2135,49 @@ const FieldCrypto = {
   }
 };
 
+/* ═══════════════════ E2EE MODULE (Isolated Encryption Enforcement) ═══════════════════
+ * Single source of truth for all end-to-end encryption enforcement in Khora.
+ * Isolated from auth.js and service.js to be resilient to updates in either.
+ * Canonical source: app/e2ee.js
+ * ═══════════════════════════════════════════════════════════════════════════════ */
+const KhoraE2EE = {
+  CRYPTO_STORE_NAME: 'khora-matrix-crypto',
+  MAX_INIT_RETRIES: 3,
+  requireSDK() {
+    if (typeof matrixcs === 'undefined') {
+      throw new Error('Matrix SDK is not loaded. Khora requires the Matrix SDK for end-to-end encryption.');
+    }
+  },
+  createCryptoStore() {
+    this.requireSDK();
+    return new matrixcs.IndexedDBCryptoStore(indexedDB, this.CRYPTO_STORE_NAME);
+  },
+  async initMandatoryCrypto(client) {
+    let initialized = false;
+    for (let attempt = 0; attempt < this.MAX_INIT_RETRIES; attempt++) {
+      try {
+        if (typeof Olm !== 'undefined') await Olm.init();
+        await client.initCrypto();
+        client.setGlobalErrorOnUnknownDevices(false);
+        initialized = true;
+        break;
+      } catch (e) {
+        console.warn(`E2EE crypto init attempt ${attempt + 1}/${this.MAX_INIT_RETRIES}:`, e.message);
+        if (attempt < this.MAX_INIT_RETRIES - 1) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        }
+      }
+    }
+    if (!initialized || !client.isCryptoEnabled()) {
+      try { client.stopClient(); } catch {}
+      throw new Error('End-to-end encryption could not be initialized. Khora requires E2EE to protect your data. Please reload and try again.');
+    }
+  },
+  requireEncryptedSend(operation) {
+    throw new Error(`Cannot ${operation} — Matrix SDK is not initialized. E2EE is required.`);
+  }
+};
+
 /* ═══════════════════ LOCAL VAULT CRYPTO (IndexedDB at-rest encryption) ═══════════════════
  * Operator Manifest:
  *   INS(crypto.vault_key, {via: hkdf, inputs: token+userId+deviceId}) — at_rest_encryption
@@ -2609,18 +2657,29 @@ const EmailVerification = {
   // CON(email.plaintext_code, {dest: email_inbox, via: webhook_relay}) — out_of_band_delivery
   async sendCodeViaWebhook(email, code, orgName) {
     try {
+      const payload = JSON.stringify({
+        to: email,
+        code: code,
+        org_name: orgName,
+        subject: `Your verification code for ${orgName}`,
+        expires_minutes: 15,
+        ts: Date.now()
+      });
+      // HMAC-SHA256 signature for webhook request authenticity
+      const sigKey = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode('khora-webhook-v1'),
+        { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+      );
+      const sig = await crypto.subtle.sign('HMAC', sigKey, new TextEncoder().encode(payload));
+      const sigHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
       const resp = await fetch(`${WEBHOOK_BASE}/email-verify`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-Khora-Signature': sigHex,
+          'X-Khora-Timestamp': String(Date.now())
         },
-        body: JSON.stringify({
-          to: email,
-          code: code,
-          org_name: orgName,
-          subject: `Your verification code for ${orgName}`,
-          expires_minutes: 15
-        })
+        body: payload
       });
       return resp.ok;
     } catch {
@@ -3610,79 +3669,70 @@ const KhoraAuth = {
   async login(homeserver, user, pass) {
     const baseUrl = homeserver.startsWith('http') ? homeserver : `https://${homeserver}`;
     this._baseUrl = baseUrl;
-    if (typeof matrixcs !== 'undefined') {
-      this._client = matrixcs.createClient({ baseUrl });
-      const res = await this._client.login('m.login.password', { user, password: pass });
-      await LocalVaultCrypto.deriveKey(res.user_id, res.access_token, res.device_id);
-      await this._purgeUnencryptedStores();
-      const cryptoStore = new matrixcs.IndexedDBCryptoStore(indexedDB, 'khora-matrix-crypto');
-      this._client = matrixcs.createClient({
-        baseUrl,
+    KhoraE2EE.requireSDK();
+    this._client = matrixcs.createClient({ baseUrl });
+    const res = await this._client.login('m.login.password', { user, password: pass });
+    await LocalVaultCrypto.deriveKey(res.user_id, res.access_token, res.device_id);
+    await this._purgeUnencryptedStores();
+    const cryptoStore = KhoraE2EE.createCryptoStore();
+    this._client = matrixcs.createClient({
+      baseUrl,
+      accessToken: res.access_token,
+      userId: res.user_id,
+      deviceId: res.device_id,
+      cryptoStore
+    });
+    // E2EE is MANDATORY — abort login if crypto init fails
+    await KhoraE2EE.initMandatoryCrypto(this._client);
+    await this._client.startClient({ initialSyncLimit: 30 });
+    await new Promise((resolve, reject) => {
+      if (this._client.isInitialSyncComplete()) return resolve();
+      const timeout = setTimeout(() => reject(new Error('Sync timed out — the server may be overloaded. Please try again.')), 60000);
+      this._client.on('sync', (state, prev, data) => {
+        if (state === 'PREPARED') { clearTimeout(timeout); resolve(); }
+        else if (state === 'ERROR') { clearTimeout(timeout); reject(new Error(data?.error?.message || 'Sync failed — please try again.')); }
+      });
+    });
+    this._userId = res.user_id;
+    this._token = res.access_token;
+    this._setupTimelineListener();
+    // Security: store session in sessionStorage (clears on tab close) — never localStorage
+    try {
+      sessionStorage.setItem('khora_session', JSON.stringify({
+        homeserver: baseUrl,
         accessToken: res.access_token,
         userId: res.user_id,
+        deviceId: res.device_id
+      }));
+      // Clean up any stale localStorage session from previous versions
+      try { localStorage.removeItem('khora_session'); } catch {}
+    } catch {}
+    try {
+      await KhoraEncryptedCache.put('session', 'current', {
+        userId: res.user_id,
+        homeserver: baseUrl,
         deviceId: res.device_id,
-        cryptoStore
+        ts: Date.now()
       });
-      // Initialize E2EE crypto — MANDATORY. Retry up to 3 times.
-      // If all retries fail, abort login. Khora requires E2EE.
-      let cryptoInitialized = false;
-      for (let cryptoAttempt = 0; cryptoAttempt < 3; cryptoAttempt++) {
-        try {
-          if (typeof Olm !== 'undefined') await Olm.init();
-          await this._client.initCrypto();
-          this._client.setGlobalErrorOnUnknownDevices(false);
-          cryptoInitialized = true;
-          break;
-        } catch (e) {
-          console.warn(`Crypto init attempt ${cryptoAttempt + 1}/3:`, e.message);
-          if (cryptoAttempt < 2) await new Promise(r => setTimeout(r, 1000 * (cryptoAttempt + 1)));
-        }
-      }
-      if (!cryptoInitialized || !this._client.isCryptoEnabled()) {
-        try { this._client.stopClient(); } catch {}
-        this._client = null;
-        throw new Error('End-to-end encryption could not be initialized. Khora requires E2EE to protect your data. Please reload and try again.');
-      }
-      await this._client.startClient({ initialSyncLimit: 30 });
-      await new Promise((resolve, reject) => {
-        if (this._client.isInitialSyncComplete()) return resolve();
-        const timeout = setTimeout(() => reject(new Error('Sync timed out — the server may be overloaded. Please try again.')), 60000);
-        this._client.on('sync', (state, prev, data) => {
-          if (state === 'PREPARED') { clearTimeout(timeout); resolve(); }
-          else if (state === 'ERROR') { clearTimeout(timeout); reject(new Error(data?.error?.message || 'Sync failed — please try again.')); }
-        });
-      });
-      this._userId = res.user_id;
-      this._token = res.access_token;
-      this._setupTimelineListener();
-      try {
-        localStorage.setItem('khora_session', JSON.stringify({
-          homeserver: baseUrl,
-          accessToken: res.access_token,
-          userId: res.user_id,
-          deviceId: res.device_id
-        }));
-      } catch {}
-      try {
-        await KhoraEncryptedCache.put('session', 'current', {
-          userId: res.user_id,
-          homeserver: baseUrl,
-          deviceId: res.device_id,
-          ts: Date.now()
-        });
-      } catch {}
-      return { userId: res.user_id };
-    } else {
-      throw new Error('Matrix SDK is not loaded. Khora requires the Matrix SDK for end-to-end encryption.');
-    }
+    } catch {}
+    return { userId: res.user_id };
   },
 
   // DES(matrix.session, {check: whoami}) — token_validation
   async restoreSession() {
-    const raw = localStorage.getItem('khora_session');
+    // Read from sessionStorage first; fall back to localStorage for migration from older versions
+    let raw = sessionStorage.getItem('khora_session');
+    if (!raw) {
+      raw = localStorage.getItem('khora_session');
+      if (raw) {
+        // Migrate: move to sessionStorage and remove from localStorage
+        try { sessionStorage.setItem('khora_session', raw); } catch {}
+        try { localStorage.removeItem('khora_session'); } catch {}
+      }
+    }
     if (!raw) return null;
     let saved;
-    try { saved = JSON.parse(raw); } catch { localStorage.removeItem('khora_session'); return null; }
+    try { saved = JSON.parse(raw); } catch { sessionStorage.removeItem('khora_session'); return null; }
     const { homeserver, accessToken, userId, deviceId } = saved;
     if (!homeserver || !accessToken || !userId || !deviceId) return null;
 
@@ -3695,7 +3745,7 @@ const KhoraAuth = {
         if (resp.ok) { tokenValid = true; break; }
         if (resp.status === 401 || resp.status === 403) {
           console.warn('Session token expired or revoked (HTTP ' + resp.status + ')');
-          localStorage.removeItem('khora_session');
+          sessionStorage.removeItem('khora_session');
           return { expired: true };
         }
         if (resp.status >= 500) {
@@ -3719,36 +3769,20 @@ const KhoraAuth = {
     try {
       this._baseUrl = homeserver;
       await LocalVaultCrypto.deriveKey(userId, accessToken, deviceId);
-      if (typeof matrixcs !== 'undefined') {
-        const cryptoStore = new matrixcs.IndexedDBCryptoStore(indexedDB, 'khora-matrix-crypto');
-        this._client = matrixcs.createClient({ baseUrl: homeserver, accessToken, userId, deviceId, cryptoStore });
-        // Initialize E2EE crypto — MANDATORY. Retry up to 3 times.
-        let cryptoInitialized = false;
-        for (let cryptoAttempt = 0; cryptoAttempt < 3; cryptoAttempt++) {
-          try {
-            if (typeof Olm !== 'undefined') await Olm.init();
-            await this._client.initCrypto();
-            this._client.setGlobalErrorOnUnknownDevices(false);
-            cryptoInitialized = true;
-            break;
-          } catch (e) {
-            console.warn(`Crypto init attempt ${cryptoAttempt + 1}/3:`, e.message);
-            if (cryptoAttempt < 2) await new Promise(r => setTimeout(r, 1000 * (cryptoAttempt + 1)));
-          }
-        }
-        if (!cryptoInitialized || !this._client.isCryptoEnabled()) {
-          throw new Error('End-to-end encryption could not be initialized. Please reload and try again.');
-        }
-        await this._client.startClient({ initialSyncLimit: 30 });
-        await new Promise((resolve, reject) => {
-          if (this._client.isInitialSyncComplete()) return resolve();
-          const timeout = setTimeout(() => reject(new Error('Sync timed out')), 90000);
-          this._client.on('sync', (state, prev, data) => {
-            if (state === 'PREPARED') { clearTimeout(timeout); resolve(); }
-            else if (state === 'ERROR') { clearTimeout(timeout); reject(new Error(data?.error?.message || 'Sync failed')); }
-          });
+      KhoraE2EE.requireSDK();
+      const cryptoStore = KhoraE2EE.createCryptoStore();
+      this._client = matrixcs.createClient({ baseUrl: homeserver, accessToken, userId, deviceId, cryptoStore });
+      // E2EE is MANDATORY — abort restore if crypto init fails
+      await KhoraE2EE.initMandatoryCrypto(this._client);
+      await this._client.startClient({ initialSyncLimit: 30 });
+      await new Promise((resolve, reject) => {
+        if (this._client.isInitialSyncComplete()) return resolve();
+        const timeout = setTimeout(() => reject(new Error('Sync timed out')), 90000);
+        this._client.on('sync', (state, prev, data) => {
+          if (state === 'PREPARED') { clearTimeout(timeout); resolve(); }
+          else if (state === 'ERROR') { clearTimeout(timeout); reject(new Error(data?.error?.message || 'Sync failed')); }
         });
-      }
+      });
       this._userId = userId;
       this._token = accessToken;
       this._setupTimelineListener();
@@ -3916,7 +3950,14 @@ const KhoraBackup = (() => {
       const ai = await apiPost('/auth/info', { email }, false); if (!ai.status) return false;
       const { masterKey, loginPassword } = await deriveLoginAndMaster(rawPassword, ai.data.salt, ai.data.authVersion);
       const lr = await apiPost('/login', { email, password: loginPassword, twoFactorCode: 'XXXXXX', authVersion: ai.data.authVersion }, false);
-      if (!lr.status) return false;
+      // Detect 2FA requirement — Filen returns status:false with a 2FA-related message
+      if (!lr.status) {
+        const msg = (lr.message || '').toLowerCase();
+        if (msg.includes('two') || msg.includes('2fa') || msg.includes('factor') || msg.includes('otp')) {
+          console.warn('Filen account requires 2FA — not yet supported by Khora backup integration');
+        }
+        return false;
+      }
       S.apiKey = lr.data.apiKey; S.email = email; S.masterKeys = [masterKey];
       try { const emk = await metaEnc(masterKey, masterKey); const mkr = await apiPost('/user/masterKeys', { masterKeys: emk }); if (mkr.status && mkr.data?.keys) { const dk = await metaDec(mkr.data.keys, masterKey); if (dk) S.masterKeys = dk.split('|').filter(Boolean); } } catch {}
       const bf = await apiGet('/user/baseFolder'); if (!bf.status) throw new Error('Base folder failed'); S.baseFolderUUID = bf.data.uuid;
@@ -3934,11 +3975,12 @@ const KhoraBackup = (() => {
       return r.message || 'Registration failed';
     } catch (e) { return e.message; }
   }
-  function saveCreds(m, e) { try { localStorage.setItem('khora_backup_creds', JSON.stringify({ matrixId: m, email: e, ts: Date.now() })); } catch {} }
-  function loadCreds() { try { return JSON.parse(localStorage.getItem('khora_backup_creds')); } catch { return null; } }
-  function clearCreds() { try { localStorage.removeItem('khora_backup_creds'); localStorage.removeItem('khora_backup_seen'); } catch {} }
-  function hasSeenRecovery() { try { return localStorage.getItem('khora_backup_seen') === '1'; } catch { return false; } }
-  function markRecoverySeen() { try { localStorage.setItem('khora_backup_seen', '1'); } catch {} }
+  // Security: use sessionStorage for backup creds (email/matrixId pairing) — clears on tab close
+  function saveCreds(m, e) { try { sessionStorage.setItem('khora_backup_creds', JSON.stringify({ matrixId: m, email: e, ts: Date.now() })); try { localStorage.removeItem('khora_backup_creds'); } catch {} } catch {} }
+  function loadCreds() { try { return JSON.parse(sessionStorage.getItem('khora_backup_creds')) || JSON.parse(localStorage.getItem('khora_backup_creds')); } catch { return null; } }
+  function clearCreds() { try { sessionStorage.removeItem('khora_backup_creds'); localStorage.removeItem('khora_backup_creds'); sessionStorage.removeItem('khora_backup_seen'); localStorage.removeItem('khora_backup_seen'); } catch {} }
+  function hasSeenRecovery() { try { return (sessionStorage.getItem('khora_backup_seen') || localStorage.getItem('khora_backup_seen')) === '1'; } catch { return false; } }
+  function markRecoverySeen() { try { sessionStorage.setItem('khora_backup_seen', '1'); } catch {} }
   async function encryptForRoom(plaintext, matrixId) {
     const keyData = await pbkdf2Bits(matrixId, 'khora-backup-room-creds-v1', 100000, 'SHA-256', 256);
     const key = await crypto.subtle.importKey('raw', keyData, 'AES-GCM', false, ['encrypt']);
@@ -4027,9 +4069,11 @@ const KhoraBackup = (() => {
       const matrixId = svc.userId;
       const ok = await tryLogin(email, password);
       if (ok) {
-        S.matrixId = matrixId; S.filenPassword = password;
+        S.matrixId = matrixId;
         saveCreds(matrixId, email);
         try { await api.saveCredsToRoom(email, password); } catch (e) { console.warn('Could not save backup creds to room:', e.message); }
+        // Security: clear password from memory — no longer needed after auth + room save
+        S.filenPassword = null;
         emit({ event: 'connected', matrixId, email });
         return true;
       }
@@ -4051,8 +4095,9 @@ const KhoraBackup = (() => {
       if (!password) throw new Error('No pending password');
       const ok = await tryLogin(creds.email, password);
       if (ok) {
-        S.matrixId = creds.matrixId; S.filenPassword = password; S._pendingPassword = null;
+        S.matrixId = creds.matrixId; S._pendingPassword = null;
         try { await api.saveCredsToRoom(creds.email, password); } catch (e) { console.warn('Could not save backup creds to room:', e.message); }
+        S.filenPassword = null; // Security: clear from memory after room save
         emit({ event: 'connected', matrixId: creds.matrixId, email: creds.email });
         return true;
       }
@@ -4090,7 +4135,7 @@ const KhoraBackup = (() => {
         if (roomCreds) {
           const ok = await tryLogin(roomCreds.email, roomCreds.password);
           if (ok) {
-            S.matrixId = svc.userId; S.filenPassword = roomCreds.password;
+            S.matrixId = svc.userId; S.filenPassword = null;
             saveCreds(svc.userId, roomCreds.email);
             emit({ event: 'connected', matrixId: svc.userId, email: roomCreds.email });
             return true;
@@ -4101,7 +4146,7 @@ const KhoraBackup = (() => {
       try {
         const fp = await deriveFilenPassword(creds.matrixId);
         const ok = await tryLogin(creds.email, fp);
-        if (ok) { S.matrixId = creds.matrixId; S.filenPassword = fp; emit({ event: 'connected', matrixId: creds.matrixId, email: creds.email }); return true; }
+        if (ok) { S.matrixId = creds.matrixId; S.filenPassword = null; emit({ event: 'connected', matrixId: creds.matrixId, email: creds.email }); return true; }
       } catch {}
       return false;
     },
@@ -4282,7 +4327,7 @@ class KhoraService {
       }));
       return r.room_id;
     } else {
-      throw new Error('Cannot create room — Matrix SDK is not initialized. E2EE is required.');
+      KhoraE2EE.requireEncryptedSend('create room');
     }
   }
 
@@ -4318,7 +4363,12 @@ class KhoraService {
         events: {
           'm.room.power_levels': 100,
           'm.room.tombstone': 100,
-          'm.room.server_acl': 100
+          'm.room.server_acl': 100,
+          // Lock Khora bridge state events to client-only (PL 100)
+          // Prevents provider from overwriting bridge metadata or field references
+          [EVT.BRIDGE_META]: 100,
+          [EVT.BRIDGE_REFS]: 100,
+          [EVT.IDENTITY]: 100
         },
         kick: 50,
         ban: 50,
@@ -4330,7 +4380,7 @@ class KhoraService {
       const r = await this._withRetry(() => this.client.createRoom(opts));
       return r.room_id;
     } else {
-      throw new Error('Cannot create room — Matrix SDK is not initialized. E2EE is required.');
+      KhoraE2EE.requireEncryptedSend('create room');
     }
   }
   async setPowerLevel(roomId, userId, level) {
@@ -4416,7 +4466,7 @@ class KhoraService {
         }
       }
     } else {
-      throw new Error('Cannot send event — Matrix SDK is not initialized. E2EE is required.');
+      KhoraE2EE.requireEncryptedSend('send event');
     }
   }
   async sendMessage(roomId, body, extra = {}, replyTo = null) {
@@ -4454,7 +4504,7 @@ class KhoraService {
         }
       }
     } else {
-      throw new Error('Cannot send message — Matrix SDK is not initialized. E2EE is required.');
+      KhoraE2EE.requireEncryptedSend('send message');
     }
   }
   async getMessages(roomId, limit = 40) {
@@ -20650,7 +20700,7 @@ const LoginScreen = ({
     type: "button",
     className: "b-gho b-xs",
     onClick: () => {
-      const txt = `Khora Account Credentials\n========================\nServer: ${effectiveHs}\nUsername: ${user}\nPassword: ${pass}\n\nKeep this file safe. You will need these to sign in.\n`;
+      const txt = `Khora Account Credentials\n========================\nServer: ${effectiveHs}\nUsername: ${user}\nPassword: ${pass}\n\nSECURITY WARNING: This file contains your password in plain text.\nStore it in a secure location (e.g. password manager) and delete\nthis file after saving your credentials elsewhere.\n`;
       const b = new Blob([txt], {
         type: 'text/plain'
       });
@@ -48658,7 +48708,8 @@ const App = () => {
   }, "Detecting role context\u2026")));
   const handleLogout = async () => {
     try {
-      localStorage.removeItem('khora_session');
+      sessionStorage.removeItem('khora_session');
+      localStorage.removeItem('khora_session'); // clean up legacy
       localStorage.removeItem('khora_active_context');
       localStorage.removeItem('khora_active_org');
       localStorage.removeItem('khora_welcomed');
