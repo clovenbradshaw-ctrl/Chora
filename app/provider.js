@@ -4752,7 +4752,8 @@ const ProviderApp = ({
     canAllocateResource: canAllocateResource,
     onAllocate: handleProfileAllocate,
     fieldDefs: fieldDefs,
-    onFieldEdit: handleDbCellEdit
+    onFieldEdit: handleDbCellEdit,
+    activeTeamObj: activeTeamObj
   }), /*#__PURE__*/React.createElement(NoteCreateModal, {
     open: newNoteModal,
     onClose: () => setNewNoteModal(false),
