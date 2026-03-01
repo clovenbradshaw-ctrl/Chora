@@ -304,12 +304,13 @@ const LoginScreen = ({
   onLogin
 }) => {
   const [mode, setMode] = useState('login'); // login | register
-  const [hs, setHs] = useState('hyphae.social');
+  const [hs, setHs] = useState('matrix.org');
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [extReg, setExtReg] = useState(null); // null or { server, username }
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // Extract host server from username if present (e.g. @user:matrix.org -> matrix.org)
@@ -877,17 +878,35 @@ const LoginScreen = ({
   }, /*#__PURE__*/React.createElement(I, {
     n: "download",
     s: 12
-  }), " Save credentials")), !hideHs && /*#__PURE__*/React.createElement("div", {
+  }), " Save credentials")), mode === 'login' && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14,
+      textAlign: 'right'
+    }
+  }, /*#__PURE__*/React.createElement("a", {
+    href: "https://app.element.io/#/forgot_password",
+    target: "_blank",
+    rel: "noopener",
+    style: { fontSize: 12, color: 'var(--teal)', textDecoration: 'none', fontFamily: 'var(--mono)' }
+  }, "Forgot password?")), !hideHs && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setShowAdvanced(!showAdvanced),
+    className: "b-gho b-xs",
+    style: { display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--tx-3)', fontSize: 11, fontFamily: 'var(--mono)', letterSpacing: '.04em', marginBottom: showAdvanced ? 8 : 0 }
+  }, /*#__PURE__*/React.createElement(I, {
+    n: showAdvanced ? "chevronDown" : "chevronRight",
+    s: 12
+  }), " Advanced"), showAdvanced && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     className: "section-label"
   }, "SERVER"), /*#__PURE__*/React.createElement("input", {
     value: hs,
     onChange: e => setHs(e.target.value),
     placeholder: "e.g. matrix.org"
-  })), err && /*#__PURE__*/React.createElement("div", {
+  }))), err && /*#__PURE__*/React.createElement("div", {
     style: {
       background: 'var(--red-dim)',
       border: '1px solid rgba(232,93,93,.2)',
