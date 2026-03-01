@@ -1691,9 +1691,12 @@ const BackupSettingsView = ({ showToast }) => {
     if (KhoraBackup.isConnected) return 'connected';
     const creds = KhoraBackup.savedCreds;
     if (creds && creds.matrixId && creds.email) return 'auto';
-    return 'setup';
+    return 'choose';
   });
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [storage, setStorage] = useState(KhoraBackup.storage);
   const [bridgeSettings, setBridgeSettings] = useState(KhoraBackup.bridgeSettings);
@@ -1708,7 +1711,7 @@ const BackupSettingsView = ({ showToast }) => {
   useEffect(() => {
     const handler = ev => {
       if (ev.event === 'connected') { setPhase('connected'); setStorage(KhoraBackup.storage); setBridgeSettings(KhoraBackup.bridgeSettings); }
-      if (ev.event === 'disconnected') { setPhase('setup'); setFiles(null); }
+      if (ev.event === 'disconnected') { setPhase('choose'); setFiles(null); }
       if (ev.event === 'backup_complete') { const ts = new Date().toISOString(); setLastBackup(ts); try { localStorage.setItem('khora_backup_last', ts); } catch {} }
       if (ev.event === 'bridge_enabled') setBridgeSettings(KhoraBackup.bridgeSettings);
       if (ev.event === 'bridge_disabled') setBridgeSettings(KhoraBackup.bridgeSettings);
@@ -1724,26 +1727,42 @@ const BackupSettingsView = ({ showToast }) => {
       KhoraBackup.autoConnect().then(ok => {
         setBusy(false);
         if (ok) { setPhase('connected'); setStorage(KhoraBackup.storage); }
-        else setPhase('setup');
-      }).catch(() => { setBusy(false); setPhase('setup'); });
+        else setPhase('choose');
+      }).catch(() => { setBusy(false); setPhase('choose'); });
     }
   }, []);
 
-  const handleSetup = async () => {
-    const matrixId = svc.userId;
+  const handleLogin = async () => {
     const em = email.trim();
     if (!em || !em.includes('@')) { showToast('Enter a valid email address', 'error'); return; }
+    if (!password) { showToast('Enter your password', 'error'); return; }
     setBusy(true);
     try {
-      const result = await KhoraBackup.connect(matrixId, em);
-      if (result === true) {
-        if (!KhoraBackup.hasSeenRecovery) setPhase('recovery');
-        else { setPhase('connected'); setStorage(KhoraBackup.storage); showToast('Backup connected', 'success'); }
-      } else if (result === 'needs_confirmation') {
+      const ok = await KhoraBackup.connectWithPassword(em, password);
+      if (ok) {
+        setPassword(''); setConfirmPassword('');
+        setPhase('connected'); setStorage(KhoraBackup.storage);
+        showToast('Backup connected', 'success');
+      } else {
+        showToast('Login failed — check your email and password', 'error');
+      }
+    } catch (e) { showToast('Login failed: ' + e.message, 'error'); }
+    setBusy(false);
+  };
+
+  const handleCreateAccount = async () => {
+    const em = email.trim();
+    if (!em || !em.includes('@')) { showToast('Enter a valid email address', 'error'); return; }
+    if (!password || password.length < 8) { showToast('Password must be at least 8 characters', 'error'); return; }
+    if (password !== confirmPassword) { showToast('Passwords do not match', 'error'); return; }
+    setBusy(true);
+    try {
+      const result = await KhoraBackup.registerWithPassword(em, password);
+      if (result === 'needs_confirmation') {
         setPhase('confirm');
         showToast('Check your email for a verification link', 'info');
       }
-    } catch (e) { showToast('Backup setup failed: ' + e.message, 'error'); }
+    } catch (e) { showToast('Account creation failed: ' + e.message, 'error'); }
     setBusy(false);
   };
 
@@ -1752,8 +1771,9 @@ const BackupSettingsView = ({ showToast }) => {
     try {
       const ok = await KhoraBackup.retryAfterConfirmation();
       if (ok) {
-        if (!KhoraBackup.hasSeenRecovery) setPhase('recovery');
-        else { setPhase('connected'); setStorage(KhoraBackup.storage); showToast('Backup connected', 'success'); }
+        setPassword(''); setConfirmPassword('');
+        setPhase('connected'); setStorage(KhoraBackup.storage);
+        showToast('Backup connected', 'success');
       } else { showToast('Not ready yet — check your email for the confirmation link', 'warn'); }
     } catch (e) { showToast('Connection failed: ' + e.message, 'error'); }
     setBusy(false);
@@ -1764,17 +1784,11 @@ const BackupSettingsView = ({ showToast }) => {
     catch { showToast('Failed to resend', 'error'); }
   };
 
-  const handleRecoveryDone = () => {
-    KhoraBackup.markRecoverySeen();
-    setPhase('connected');
-    setStorage(KhoraBackup.storage);
-    showToast('Backup connected', 'success');
-  };
-
   const handleDisconnect = () => {
     KhoraBackup.disconnect();
-    setPhase('setup');
+    setPhase('choose');
     setFiles(null);
+    setEmail(''); setPassword(''); setConfirmPassword('');
     showToast('Backup disconnected', 'info');
   };
 
@@ -1796,25 +1810,79 @@ const BackupSettingsView = ({ showToast }) => {
   const cardStyle = { background: 'var(--bg-2)', border: '1px solid var(--border-0)', borderRadius: 'var(--r-lg)', padding: '24px 22px' };
   const labelStyle = { fontSize: 10.5, fontWeight: 600, color: 'var(--tx-2)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 6, display: 'block' };
   const inputStyle = { width: '100%', background: 'var(--bg-1)', border: '1px solid var(--border-0)', borderRadius: 'var(--r)', padding: '10px 14px', color: 'var(--tx-0)', fontFamily: 'var(--mono)', fontSize: 13, outline: 'none' };
+  const eyeBtnStyle = { position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--tx-3)', padding: 4 };
 
-  // ── Setup phase ──
-  if (phase === 'setup') return /*#__PURE__*/React.createElement("div", { style: { padding: 20, maxWidth: 560 } },
+  // ── Choose: login or create account ──
+  if (phase === 'choose') return /*#__PURE__*/React.createElement("div", { style: { padding: 20, maxWidth: 560 } },
     /*#__PURE__*/React.createElement("h2", { style: { fontSize: 18, fontWeight: 700, marginBottom: 4 } }, "Encrypted Backup"),
     /*#__PURE__*/React.createElement("p", { style: { fontSize: 13, color: 'var(--tx-2)', marginBottom: 20, lineHeight: 1.5 } },
-      "Back up your data to an encrypted cloud vault. Your Matrix ID is your recovery key \u2014 if your server ever goes down, you can recover everything with just your Matrix ID and email."),
+      "Back up your data to an encrypted cloud vault powered by Filen. Your password is saved securely in your room data for automatic login across devices."),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 14, flexDirection: 'column' } },
+      /*#__PURE__*/React.createElement("div", { style: { ...cardStyle, cursor: 'pointer', transition: 'border-color .2s' }, onClick: () => setPhase('login'),
+        onMouseOver: e => e.currentTarget.style.borderColor = 'var(--teal)',
+        onMouseOut: e => e.currentTarget.style.borderColor = 'var(--border-0)' },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14 } },
+          /*#__PURE__*/React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: 'var(--teal-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--teal)', flexShrink: 0 } },
+            /*#__PURE__*/React.createElement(I, { n: "lock", s: 20 })),
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 700, marginBottom: 2 } }, "Log In"),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--tx-2)' } }, "I already have a Filen account")))),
+      /*#__PURE__*/React.createElement("div", { style: { ...cardStyle, cursor: 'pointer', transition: 'border-color .2s' }, onClick: () => setPhase('create'),
+        onMouseOver: e => e.currentTarget.style.borderColor = 'var(--blue)',
+        onMouseOut: e => e.currentTarget.style.borderColor = 'var(--border-0)' },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14 } },
+          /*#__PURE__*/React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: 'var(--blue-dim, rgba(80,140,255,0.12))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--blue)', flexShrink: 0 } },
+            /*#__PURE__*/React.createElement(I, { n: "plus", s: 20 })),
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 700, marginBottom: 2 } }, "Create Account"),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--tx-2)' } }, "Sign up for a free Filen account"))))));
+
+  // ── Login phase ──
+  if (phase === 'login') return /*#__PURE__*/React.createElement("div", { style: { padding: 20, maxWidth: 560 } },
+    /*#__PURE__*/React.createElement("h2", { style: { fontSize: 18, fontWeight: 700, marginBottom: 4 } }, "Encrypted Backup"),
+    /*#__PURE__*/React.createElement("p", { style: { fontSize: 13, color: 'var(--tx-2)', marginBottom: 20, lineHeight: 1.5 } },
+      "Sign in with your Filen credentials. Your password will be encrypted and saved in your room data for automatic login."),
     /*#__PURE__*/React.createElement("div", { style: cardStyle },
       /*#__PURE__*/React.createElement("div", { style: { textAlign: 'center', marginBottom: 16 } },
         /*#__PURE__*/React.createElement("div", { style: { width: 48, height: 48, borderRadius: '50%', background: 'var(--teal-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', color: 'var(--teal)' } },
-          /*#__PURE__*/React.createElement(I, { n: "shield", s: 22 })),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 700, marginBottom: 4 } }, "Set Up Encrypted Backup"),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: 'var(--tx-2)' } }, "Your data \xB7 your keys \xB7 always recoverable")),
-      /*#__PURE__*/React.createElement("label", { style: labelStyle }, "MATRIX ID"),
-      /*#__PURE__*/React.createElement("input", { type: "text", value: svc.userId || '', disabled: true, style: { ...inputStyle, opacity: 0.6, marginBottom: 14 } }),
-      /*#__PURE__*/React.createElement("label", { style: labelStyle }, "RECOVERY EMAIL"),
-      /*#__PURE__*/React.createElement("input", { type: "email", placeholder: "you@example.com", value: email, onChange: e => setEmail(e.target.value), style: { ...inputStyle, marginBottom: 18 }, onKeyDown: e => { if (e.key === 'Enter') handleSetup(); } }),
-      /*#__PURE__*/React.createElement("button", { className: "b-pri", onClick: handleSetup, disabled: busy, style: { width: '100%', justifyContent: 'center' } },
-        busy ? /*#__PURE__*/React.createElement(Spin, { s: 14 }) : /*#__PURE__*/React.createElement(I, { n: "shield", s: 14 }),
-        busy ? ' Setting up\u2026' : ' Enable Backup')));
+          /*#__PURE__*/React.createElement(I, { n: "lock", s: 22 })),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 700, marginBottom: 4 } }, "Log In to Filen")),
+      /*#__PURE__*/React.createElement("label", { style: labelStyle }, "EMAIL"),
+      /*#__PURE__*/React.createElement("input", { type: "email", placeholder: "you@example.com", value: email, onChange: e => setEmail(e.target.value), style: { ...inputStyle, marginBottom: 14 } }),
+      /*#__PURE__*/React.createElement("label", { style: labelStyle }, "PASSWORD"),
+      /*#__PURE__*/React.createElement("div", { style: { position: 'relative', marginBottom: 18 } },
+        /*#__PURE__*/React.createElement("input", { type: showPassword ? 'text' : 'password', placeholder: "Your Filen password", value: password, onChange: e => setPassword(e.target.value), style: { ...inputStyle, paddingRight: 40 }, onKeyDown: e => { if (e.key === 'Enter') handleLogin(); } }),
+        /*#__PURE__*/React.createElement("button", { style: eyeBtnStyle, onClick: () => setShowPassword(v => !v), tabIndex: -1 },
+          /*#__PURE__*/React.createElement(I, { n: showPassword ? "eyeOff" : "eye", s: 14 }))),
+      /*#__PURE__*/React.createElement("button", { className: "b-pri", onClick: handleLogin, disabled: busy, style: { width: '100%', justifyContent: 'center', marginBottom: 10 } },
+        busy ? /*#__PURE__*/React.createElement(Spin, { s: 14 }) : /*#__PURE__*/React.createElement(I, { n: "lock", s: 14 }),
+        busy ? ' Signing in\u2026' : ' Sign In'),
+      /*#__PURE__*/React.createElement("button", { className: "b-gho b-sm", onClick: () => { setPhase('choose'); setPassword(''); setEmail(''); }, style: { width: '100%', justifyContent: 'center' } }, "\u2190 Back")));
+
+  // ── Create account phase ──
+  if (phase === 'create') return /*#__PURE__*/React.createElement("div", { style: { padding: 20, maxWidth: 560 } },
+    /*#__PURE__*/React.createElement("h2", { style: { fontSize: 18, fontWeight: 700, marginBottom: 4 } }, "Encrypted Backup"),
+    /*#__PURE__*/React.createElement("p", { style: { fontSize: 13, color: 'var(--tx-2)', marginBottom: 20, lineHeight: 1.5 } },
+      "Create a free Filen account for encrypted cloud backup. Your password will be encrypted and saved in your room data for automatic login."),
+    /*#__PURE__*/React.createElement("div", { style: cardStyle },
+      /*#__PURE__*/React.createElement("div", { style: { textAlign: 'center', marginBottom: 16 } },
+        /*#__PURE__*/React.createElement("div", { style: { width: 48, height: 48, borderRadius: '50%', background: 'var(--blue-dim, rgba(80,140,255,0.12))', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', color: 'var(--blue)' } },
+          /*#__PURE__*/React.createElement(I, { n: "plus", s: 22 })),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 700, marginBottom: 4 } }, "Create Filen Account")),
+      /*#__PURE__*/React.createElement("label", { style: labelStyle }, "EMAIL"),
+      /*#__PURE__*/React.createElement("input", { type: "email", placeholder: "you@example.com", value: email, onChange: e => setEmail(e.target.value), style: { ...inputStyle, marginBottom: 14 } }),
+      /*#__PURE__*/React.createElement("label", { style: labelStyle }, "PASSWORD"),
+      /*#__PURE__*/React.createElement("div", { style: { position: 'relative', marginBottom: 14 } },
+        /*#__PURE__*/React.createElement("input", { type: showPassword ? 'text' : 'password', placeholder: "Choose a strong password", value: password, onChange: e => setPassword(e.target.value), style: { ...inputStyle, paddingRight: 40 } }),
+        /*#__PURE__*/React.createElement("button", { style: eyeBtnStyle, onClick: () => setShowPassword(v => !v), tabIndex: -1 },
+          /*#__PURE__*/React.createElement(I, { n: showPassword ? "eyeOff" : "eye", s: 14 }))),
+      /*#__PURE__*/React.createElement("label", { style: labelStyle }, "CONFIRM PASSWORD"),
+      /*#__PURE__*/React.createElement("input", { type: showPassword ? 'text' : 'password', placeholder: "Re-enter your password", value: confirmPassword, onChange: e => setConfirmPassword(e.target.value), style: { ...inputStyle, marginBottom: 18 }, onKeyDown: e => { if (e.key === 'Enter') handleCreateAccount(); } }),
+      password && password.length < 8 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: 'var(--gold)', marginBottom: 8, marginTop: -10 } }, "Password must be at least 8 characters"),
+      /*#__PURE__*/React.createElement("button", { className: "b-pri", onClick: handleCreateAccount, disabled: busy, style: { width: '100%', justifyContent: 'center', marginBottom: 10 } },
+        busy ? /*#__PURE__*/React.createElement(Spin, { s: 14 }) : /*#__PURE__*/React.createElement(I, { n: "plus", s: 14 }),
+        busy ? ' Creating account\u2026' : ' Create Account'),
+      /*#__PURE__*/React.createElement("button", { className: "b-gho b-sm", onClick: () => { setPhase('choose'); setPassword(''); setConfirmPassword(''); setEmail(''); }, style: { width: '100%', justifyContent: 'center' } }, "\u2190 Back")));
 
   // ── Email confirmation phase ──
   if (phase === 'confirm') return /*#__PURE__*/React.createElement("div", { style: { padding: 20, maxWidth: 560 } },
@@ -1834,28 +1902,7 @@ const BackupSettingsView = ({ showToast }) => {
           busy ? ' Connecting\u2026' : "I've confirmed \u2014 activate backup"),
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: 8, justifyContent: 'center' } },
           /*#__PURE__*/React.createElement("button", { className: "b-gho b-sm", onClick: handleResend }, "Resend email"),
-          /*#__PURE__*/React.createElement("button", { className: "b-gho b-sm", onClick: () => setPhase('setup') }, "\u2190 Back")))));
-
-  // ── Recovery info phase ──
-  if (phase === 'recovery') return /*#__PURE__*/React.createElement("div", { style: { padding: 20, maxWidth: 560 } },
-    /*#__PURE__*/React.createElement("h2", { style: { fontSize: 18, fontWeight: 700, marginBottom: 4 } }, "Encrypted Backup"),
-    /*#__PURE__*/React.createElement("div", { style: cardStyle },
-      /*#__PURE__*/React.createElement("div", { style: { textAlign: 'center' } },
-        /*#__PURE__*/React.createElement("div", { style: { width: 48, height: 48, borderRadius: '50%', background: 'var(--teal-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', color: 'var(--teal)' } },
-          /*#__PURE__*/React.createElement(I, { n: "shieldCheck", s: 22 })),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 15, fontWeight: 700, marginBottom: 8 } }, "Your Recovery Info"),
-        /*#__PURE__*/React.createElement("p", { style: { fontSize: 13, color: 'var(--tx-2)', lineHeight: 1.5, marginBottom: 16 } },
-          "Save this somewhere safe. If your server ever goes down, this is all you need to recover every file.")),
-      /*#__PURE__*/React.createElement("div", { style: { background: 'var(--bg-1)', border: '2px dashed var(--border-0)', borderRadius: 'var(--r)', padding: 16, textAlign: 'center', marginBottom: 10 } },
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: 'var(--tx-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 } }, "RECOVERY IDENTITY"),
-        /*#__PURE__*/React.createElement("div", { style: { fontFamily: 'var(--mono)', fontSize: 14, color: 'var(--teal)', fontWeight: 600, wordBreak: 'break-all', userSelect: 'all' } }, KhoraBackup.identity)),
-      /*#__PURE__*/React.createElement("div", { style: { background: 'var(--bg-1)', border: '2px dashed var(--border-0)', borderRadius: 'var(--r)', padding: 16, textAlign: 'center', marginBottom: 16 } },
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: 'var(--tx-3)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 } }, "RECOVERY EMAIL"),
-        /*#__PURE__*/React.createElement("div", { style: { fontFamily: 'var(--mono)', fontSize: 14, color: 'var(--tx-0)', fontWeight: 600, userSelect: 'all' } }, KhoraBackup.email)),
-      /*#__PURE__*/React.createElement("p", { style: { fontSize: 11, color: 'var(--tx-3)', textAlign: 'center', lineHeight: 1.6, marginBottom: 14 } },
-        "That\u2019s it \u2014 those two things. No passwords to remember. Your encryption key is derived automatically from your Matrix ID."),
-      /*#__PURE__*/React.createElement("button", { className: "b-pri", onClick: handleRecoveryDone, style: { width: '100%', justifyContent: 'center' } },
-        /*#__PURE__*/React.createElement(I, { n: "shieldCheck", s: 14 }), " Got it \u2014 open my backup")));
+          /*#__PURE__*/React.createElement("button", { className: "b-gho b-sm", onClick: () => setPhase('choose') }, "\u2190 Back")))));
 
   // ── Auto-reconnecting ──
   if (phase === 'auto') return /*#__PURE__*/React.createElement("div", { style: { padding: 20, maxWidth: 560 } },
