@@ -387,17 +387,42 @@ const DataTable = ({
   // Drag reorder
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
+  // Column filters: { colKey: { value, op } } where op is 'eq'|'contains'|'gte'|'lte'|'range'
+  const [columnFilters, setColumnFilters] = useState({});
+  const [filterDd, setFilterDd] = useState(null); // which column's filter dropdown is open
   const visCols = columns.filter(c => c.fixed || visibleCols.includes(c.key));
   const extraColCount = (selectable ? 1 : 0) + (draggable ? 1 : 0);
+  const activeFilterCount = Object.keys(columnFilters).length;
 
-  // Filter
+  // Filter (global search + column filters)
   const filtered = data.filter(row => {
-    if (!search) return true;
-    const s = search.toLowerCase();
-    return visCols.some(c => {
-      const v = getVal(row, c.key);
-      return v && String(v).toLowerCase().includes(s);
-    });
+    // Global search
+    if (search) {
+      const s = search.toLowerCase();
+      const matchesSearch = visCols.some(c => {
+        const v = getVal(row, c.key);
+        return v && String(v).toLowerCase().includes(s);
+      });
+      if (!matchesSearch) return false;
+    }
+    // Column-level filters
+    for (const [colKey, filter] of Object.entries(columnFilters)) {
+      const val = String(getVal(row, colKey) || '').toLowerCase();
+      if (filter.op === 'eq') {
+        if (val !== String(filter.value).toLowerCase()) return false;
+      } else if (filter.op === 'contains') {
+        if (!val.includes(String(filter.value).toLowerCase())) return false;
+      } else if (filter.op === 'any') {
+        // For multi-select: filter.value is array of acceptable values
+        if (!Array.isArray(filter.value) || filter.value.length === 0) continue;
+        if (!filter.value.some(fv => val.includes(String(fv).toLowerCase()))) return false;
+      } else if (filter.op === 'gte') {
+        if (val < String(filter.value).toLowerCase()) return false;
+      } else if (filter.op === 'lte') {
+        if (val > String(filter.value).toLowerCase()) return false;
+      }
+    }
+    return true;
   });
 
   // Sort
@@ -508,6 +533,7 @@ const DataTable = ({
     onClick: () => {
       setGrpDd(!grpDd);
       setColDd(false);
+      setFilterDd(null);
     }
   }, '≡ ' + (groupBy === 'none' ? 'Group' : (groupOptions.find(g => g.k === groupBy) || {}).l || groupBy)), grpDd && /*#__PURE__*/React.createElement("div", {
     className: "dt-dd"
@@ -527,6 +553,7 @@ const DataTable = ({
     onClick: () => {
       setColDd(!colDd);
       setGrpDd(false);
+      setFilterDd(null);
     }
   }, '⊞ Columns (' + visCols.length + ')'), colDd && /*#__PURE__*/React.createElement("div", {
     className: "dt-dd"
@@ -544,9 +571,16 @@ const DataTable = ({
     }, /*#__PURE__*/React.createElement("span", {
       className: 'dt-check' + (on ? ' on' : '')
     }, on ? '✓' : ''), c.label, c.fixed ? ' (always)' : '');
-  }))), /*#__PURE__*/React.createElement("span", {
+  }))),
+  // Filter button + clear
+  activeFilterCount > 0 && React.createElement("button", {
+    className: "b-gho b-sm",
+    style: { background: 'var(--teal-dim)', color: 'var(--teal)', borderColor: 'rgba(0,180,160,.2)' },
+    onClick: () => setColumnFilters({})
+  }, '\u2715 Clear ', activeFilterCount, ' filter', activeFilterCount > 1 ? 's' : ''),
+  /*#__PURE__*/React.createElement("span", {
     className: "dt-toolbar-right"
-  }, filtered.length, " ", label || 'rows')), /*#__PURE__*/React.createElement("div", {
+  }, filtered.length, activeFilterCount > 0 ? ' of ' + data.length : '', " ", label || 'rows')), /*#__PURE__*/React.createElement("div", {
     className: "dt-wrap"
   }, /*#__PURE__*/React.createElement("div", {
     className: "dt-scroll"
@@ -564,8 +598,78 @@ const DataTable = ({
     onClick: toggleSelectAll
   }, isAllSelected ? '✓' : isSomeSelected ? '—' : '')), visCols.map(c => /*#__PURE__*/React.createElement("th", {
     key: c.key,
-    onClick: () => handleSort(c.key)
-  }, c.label, sortField === c.key ? sortDir === 'asc' ? ' ↑' : ' ↓' : '')))), /*#__PURE__*/React.createElement("tbody", null, Object.entries(grouped).map(([gName, rows]) => /*#__PURE__*/React.createElement(React.Fragment, {
+    style: { position: 'relative' }
+  },
+    React.createElement("span", {
+      style: { cursor: 'pointer', flex: 1 },
+      onClick: () => handleSort(c.key)
+    }, c.label, sortField === c.key ? sortDir === 'asc' ? ' \u2191' : ' \u2193' : ''),
+    // Column filter icon
+    (c.data_type || c.options) && React.createElement("span", {
+      onClick: e => { e.stopPropagation(); setFilterDd(filterDd === c.key ? null : c.key); },
+      style: { cursor: 'pointer', marginLeft: 4, fontSize: 10, opacity: columnFilters[c.key] ? 1 : 0.3, color: columnFilters[c.key] ? 'var(--teal)' : 'inherit' },
+      title: 'Filter this column'
+    }, '\u25BC'),
+    // Column filter dropdown
+    filterDd === c.key && React.createElement("div", {
+      className: "dt-dd",
+      style: { position: 'absolute', top: '100%', left: 0, zIndex: 20, minWidth: 180, maxHeight: 220, overflowY: 'auto' },
+      onClick: e => e.stopPropagation()
+    },
+      React.createElement("div", { className: "dt-dd-label" }, "Filter: ", c.label),
+      // Clear filter for this column
+      columnFilters[c.key] && React.createElement("div", {
+        className: "dt-dd-item",
+        style: { color: 'var(--red)', fontWeight: 600 },
+        onClick: () => { setColumnFilters(prev => { const n = { ...prev }; delete n[c.key]; return n; }); setFilterDd(null); }
+      }, '\u2715 Clear filter'),
+      // Type-aware filter UI
+      (c.options && c.options.length > 0)
+        ? c.options.map(opt => React.createElement("div", {
+            key: opt,
+            className: 'dt-dd-item' + (columnFilters[c.key]?.value === opt ? ' sel' : ''),
+            onClick: () => { setColumnFilters(prev => ({ ...prev, [c.key]: { op: 'eq', value: opt } })); setFilterDd(null); }
+          }, opt))
+        : (c.data_type === 'date')
+          ? React.createElement("div", { style: { padding: '6px 10px' } },
+              React.createElement("div", { style: { fontSize: 10, marginBottom: 4, color: 'var(--tx-2)' } }, "From:"),
+              React.createElement("input", {
+                type: "date",
+                style: { fontSize: 11, width: '100%', marginBottom: 6 },
+                value: columnFilters[c.key]?.value?.from || '',
+                onChange: e => setColumnFilters(prev => ({
+                  ...prev,
+                  [c.key]: { op: 'gte', value: e.target.value }
+                }))
+              }),
+              React.createElement("div", { style: { fontSize: 10, marginBottom: 4, color: 'var(--tx-2)' } }, "To:"),
+              React.createElement("input", {
+                type: "date",
+                style: { fontSize: 11, width: '100%' },
+                value: columnFilters[c.key]?.lte || '',
+                onChange: e => setColumnFilters(prev => ({
+                  ...prev,
+                  [c.key]: { op: 'lte', value: e.target.value }
+                }))
+              })
+            )
+          : React.createElement("div", { style: { padding: '6px 10px' } },
+              React.createElement("input", {
+                type: c.data_type === 'number' ? 'number' : 'text',
+                placeholder: 'Filter value...',
+                style: { fontSize: 11, width: '100%' },
+                value: columnFilters[c.key]?.value || '',
+                onChange: e => {
+                  const v = e.target.value;
+                  if (!v) { setColumnFilters(prev => { const n = { ...prev }; delete n[c.key]; return n; }); }
+                  else { setColumnFilters(prev => ({ ...prev, [c.key]: { op: 'contains', value: v } })); }
+                },
+                autoFocus: true,
+                onKeyDown: e => { if (e.key === 'Enter' || e.key === 'Escape') setFilterDd(null); }
+              })
+            )
+    )
+  )))), /*#__PURE__*/React.createElement("tbody", null, Object.entries(grouped).map(([gName, rows]) => /*#__PURE__*/React.createElement(React.Fragment, {
     key: gName
   }, gName !== '__all' && /*#__PURE__*/React.createElement("tr", {
     className: "dt-grp"
@@ -593,7 +697,7 @@ const DataTable = ({
     placeholder: col.placeholder,
     onSave: v => onCellEdit && onCellEdit(row, col.key, v),
     options: col.options,
-    type: col.data_type,
+    type: col.data_type || col.type,
     renderDisplay: col.options || col.renderDisplay ? () => renderCell(row, col) : undefined
   }) : renderCell(row, col))))))))), onAddRow && /*#__PURE__*/React.createElement("div", {
     className: "dt-add-row",
@@ -2726,27 +2830,34 @@ const DatabaseView = ({
     label: 'Individual',
     fixed: true,
     editable: true,
+    data_type: 'text',
     placeholder: 'Enter name...'
   }, {
     key: 'status',
     label: 'Status',
     editable: true,
+    data_type: 'single_select',
     options: ['imported', 'invited', 'joined', 'claimed', 'active', 'revoked']
   }, {
     key: 'priority',
     label: 'Priority',
     editable: true,
+    data_type: 'single_select',
     options: ['none', 'low', 'medium', 'high', 'critical']
   }, {
     key: 'assignedTo',
     label: 'Assigned',
-    editable: true
+    editable: true,
+    data_type: 'text'
   }, {
     key: 'fields_count',
-    label: 'Fields'
+    label: 'Fields',
+    data_type: 'number'
   }, {
     key: 'transferable',
-    label: 'Transfer'
+    label: 'Transfer',
+    data_type: 'single_select',
+    options: ['Yes', 'Locked']
   }, {
     key: 'linked_records',
     label: 'Linked Records'
@@ -2772,7 +2883,9 @@ const DatabaseView = ({
         key,
         label: def?.label || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
         isField: true,
-        editable: true
+        editable: true,
+        data_type: def?.data_type || 'text',
+        options: def?.options
       });
     }
   });
@@ -2960,56 +3073,33 @@ const DatabaseView = ({
   });
   const hasCrossTeamLinks = crossTeamLinks.length > 0;
 
-  // If teams exist but none is selected, show team selection prompt
-  if (hasTeams && !isTeamScoped) {
-    return React.createElement("div", {
-      className: `anim-up db-view${sidebarCollapsed ? ' db-full-width' : ''}`,
-      style: { textAlign: 'center', padding: '60px 20px' }
-    },
-      React.createElement(I, { n: "database", s: 48, c: "var(--border-1)" }),
-      React.createElement("h2", {
-        style: { fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 700, marginTop: 16, marginBottom: 8 }
-      }, "Enter a Team Workspace"),
-      React.createElement("p", {
-        style: { color: 'var(--tx-2)', fontSize: 13, maxWidth: 440, margin: '0 auto 24px', lineHeight: 1.5 }
-      }, "Choose a team workspace to access its individuals, notes, resources, and tables. Data from linked teams will be clearly marked."),
-      React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360, margin: '0 auto' }
-      },
-        (teams || []).map(t => {
-          const tColor = `hsl(${t.color_hue || 260}, 60%, 55%)`;
-          return React.createElement("button", {
-            key: t.roomId,
-            className: "card",
-            style: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', cursor: 'pointer', border: `1px solid ${tColor}33`, transition: 'all .15s', textAlign: 'left' },
-            onClick: () => {
-              // Trigger team context switch via the parent switchTeamContext
-              if (typeof window.__khoraSwitchTeam === 'function') window.__khoraSwitchTeam(t.roomId);
-            },
-            onMouseEnter: e => { e.currentTarget.style.borderColor = tColor; e.currentTarget.style.background = `${tColor}11`; },
-            onMouseLeave: e => { e.currentTarget.style.borderColor = `${tColor}33`; e.currentTarget.style.background = ''; }
-          },
-            React.createElement("span", { style: { width: 12, height: 12, borderRadius: '50%', background: tColor, flexShrink: 0 } }),
-            React.createElement("div", { style: { flex: 1 } },
-              React.createElement("div", { style: { fontWeight: 700, fontSize: 13.5 } }, t.name || 'Unnamed Team'),
-              React.createElement("div", { style: { fontSize: 11, color: 'var(--tx-2)', marginTop: 2 } },
-                (t.members || []).length, ' members',
-                t.hierarchy?.parent_team_name ? ` · nested under ${t.hierarchy.parent_team_name}` : '',
-                (t.customTables || []).filter(tb => tb.status === 'active').length > 0
-                  ? ` · ${(t.customTables || []).filter(tb => tb.status === 'active').length} tables`
-                  : ''
-              )
-            ),
-            React.createElement(I, { n: "chevronRight", s: 14, c: "var(--tx-3)" })
-          );
-        })
-      )
-    );
-  }
+  // If teams exist but none is selected, show team filter bar instead of blocking
+  // (Tables tab still requires team selection — tables are team-scoped)
 
   return /*#__PURE__*/React.createElement("div", {
     className: `anim-up db-view${sidebarCollapsed ? ' db-full-width' : ''}`
   },
+  // ── All-teams filter bar (shown when no team is selected) ──
+  hasTeams && !isTeamScoped && React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', marginBottom: 14, background: 'var(--bg-2)', border: '1px solid var(--border-0)', borderRadius: 'var(--r-lg)', flexWrap: 'wrap' }
+  },
+    React.createElement(I, { n: "users", s: 13, c: "var(--tx-2)" }),
+    React.createElement("span", { style: { fontSize: 11, color: 'var(--tx-2)', fontWeight: 600, marginRight: 4 } }, "All Teams"),
+    (teams || []).map(t => {
+      const tColor = `hsl(${t.color_hue || 260}, 60%, 55%)`;
+      return React.createElement("button", {
+        key: t.roomId,
+        className: "b-gho b-xs",
+        style: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, borderColor: `${tColor}44` },
+        onClick: () => { if (typeof window.__khoraSwitchTeam === 'function') window.__khoraSwitchTeam(t.roomId); }
+      },
+        React.createElement("span", { style: { width: 7, height: 7, borderRadius: '50%', background: tColor, flexShrink: 0 } }),
+        t.name || 'Team'
+      );
+    }),
+    React.createElement("span", { style: { marginLeft: 'auto', fontSize: 10, color: 'var(--tx-3)', fontFamily: 'var(--mono)' } },
+      allIndividuals.length, ' across ', (teams || []).length, ' teams')
+  ),
   // ── Team scope header ──
   isTeamScoped && React.createElement("div", {
     style: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', marginBottom: 14, background: `hsla(${activeTeamObj.color_hue || 260}, 60%, 55%, 0.08)`, border: `1px solid hsla(${activeTeamObj.color_hue || 260}, 60%, 55%, 0.2)`, borderRadius: 'var(--r-lg)' }
@@ -3336,7 +3426,23 @@ const DatabaseView = ({
       ? React.createElement('div', { style: { textAlign: 'center', padding: '40px 20px', color: 'var(--tx-3)' } },
           React.createElement(I, { n: 'database', s: 32, c: 'var(--border-1)' }),
           React.createElement('p', { style: { marginTop: 10, fontSize: 13 } }, 'Custom tables are team-specific.'),
-          React.createElement('p', { style: { fontSize: 12, marginTop: 4 } }, 'Select a team context from the sidebar to view and create tables.'))
+          React.createElement('p', { style: { fontSize: 12, marginTop: 4, marginBottom: 16 } }, 'Select a team to view and create tables.'),
+          React.createElement('div', { style: { display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' } },
+            (teams || []).map(t => {
+              const tColor = `hsl(${t.color_hue || 260}, 60%, 55%)`;
+              const tblCount = (t.customTables || []).filter(tb => tb.status === 'active').length;
+              return React.createElement('button', {
+                key: t.roomId,
+                className: 'b-gho b-sm',
+                style: { display: 'inline-flex', alignItems: 'center', gap: 6, borderColor: `${tColor}44` },
+                onClick: () => { if (typeof window.__khoraSwitchTeam === 'function') window.__khoraSwitchTeam(t.roomId); }
+              },
+                React.createElement('span', { style: { width: 8, height: 8, borderRadius: '50%', background: tColor } }),
+                t.name || 'Team',
+                tblCount > 0 && React.createElement('span', { className: 'tag', style: { fontSize: 8, marginLeft: 2 } }, tblCount, ' table', tblCount !== 1 ? 's' : '')
+              );
+            })
+          ))
       : React.createElement(React.Fragment, null,
           // Team context header + create button
           React.createElement('div', { style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 } },
