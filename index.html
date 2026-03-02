@@ -2236,10 +2236,6 @@ const KhoraE2EE = {
         break;
       } catch (e) {
         console.warn(`E2EE crypto init attempt ${attempt + 1}/${this.MAX_INIT_RETRIES}:`, e.message);
-        // On second failure, try clearing a potentially corrupted crypto store
-        if (attempt === 1) {
-          try { indexedDB.deleteDatabase(this.CRYPTO_STORE_NAME); } catch {}
-        }
         if (attempt < this.MAX_INIT_RETRIES - 1) {
           await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
         }
@@ -3729,7 +3725,7 @@ const KhoraAuth = {
       try {
         const dbs = await indexedDB.databases();
         for (const db of dbs) {
-          if (db.name && db.name !== KhoraEncryptedCache.DB_NAME && !db.name.includes('crypto')) {
+          if (db.name && db.name !== KhoraEncryptedCache.DB_NAME && !db.name.includes('crypto') && !db.name.startsWith('matrix-js-sdk')) {
             try { indexedDB.deleteDatabase(db.name); } catch {}
           }
         }
@@ -3737,7 +3733,7 @@ const KhoraAuth = {
         console.warn('IndexedDB purge:', e.message);
       }
     }
-    for (const name of ['amino', 'matrix-js-sdk:default', 'matrix-js-sdk:riot-web-sync', 'matrix-js-sdk:web-sync']) {
+    for (const name of ['amino']) {
       try { indexedDB.deleteDatabase(name); } catch {}
     }
   },
@@ -22474,6 +22470,7 @@ const ClientApp = ({
           }
         }]);
         showToast('Vault created — encrypted room ready', 'success');
+        await new Promise(r => setTimeout(r, 1000));
       }
       if (!schema) {
         schema = await svc.createRoom('[Khora Schema]', 'Schema definitions', [{
@@ -22493,9 +22490,11 @@ const ClientApp = ({
           id: 'transform_default',
           transforms: DEFAULT_TRANSFORMS
         }, 'default')]].flat();
-        for (let i = 0; i < allSeeds.length; i++) {
-          await allSeeds[i]();
-          if (i % 3 === 2) await new Promise(r => setTimeout(r, 200));
+        // Seed in parallel batches of 2 to stay under rate limits
+        for (let i = 0; i < allSeeds.length; i += 2) {
+          const batch = allSeeds.slice(i, i + 2);
+          await Promise.all(batch.map(fn => fn()));
+          if (i + 2 < allSeeds.length) await new Promise(r => setTimeout(r, 500));
         }
       }
       setVaultRoom(vault);
@@ -22642,31 +22641,45 @@ const ClientApp = ({
       ...vaultData,
       ...editData
     };
+    let opFailed = false;
     for (const [key, val] of Object.entries(editData)) {
+      let result;
       if (val && !vaultData[key]) {
         // INS — field first populated
-        await emitOp(vaultRoom, 'INS', dot('vault', 'fields', key), {
+        result = await emitOp(vaultRoom, 'INS', dot('vault', 'fields', key), {
           value: val,
           source: 'client_input'
         }, vaultFrame());
       } else if (val && vaultData[key] && val !== vaultData[key]) {
         // ALT — value change within stable frame
-        await emitOp(vaultRoom, 'ALT', dot('vault', 'client_profile', key), {
+        result = await emitOp(vaultRoom, 'ALT', dot('vault', 'client_profile', key), {
           from: vaultData[key],
           to: val,
           source: 'client_input'
         }, vaultFrame());
       } else if (!val && vaultData[key]) {
         // NUL — existence removal
-        await emitOp(vaultRoom, 'NUL', dot('vault', 'client_profile', key), {
+        result = await emitOp(vaultRoom, 'NUL', dot('vault', 'client_profile', key), {
           reason: 'client_cleared',
           previous_value: vaultData[key]
         }, vaultFrame());
+      } else {
+        continue;
       }
+      if (!result) opFailed = true;
     }
-    await saveSnapshot(updated);
+    try {
+      await saveSnapshot(updated);
+    } catch (snapErr) {
+      showToast('Failed to save — please try again', 'error');
+      return;
+    }
     setEditModal(false);
-    showToast('Vault updated', 'success');
+    if (opFailed) {
+      showToast('Saved locally, but some changes failed to sync — they will retry on next edit', 'warning');
+    } else {
+      showToast('Vault updated', 'success');
+    }
     // Schedule encrypted cloud backup (debounced 30s after last change)
     KhoraBackup.scheduleVaultBackup(updated, 30000);
     // Propagate to bridges (§8.3)
@@ -36679,6 +36692,7 @@ const ProviderApp = ({
             cases: []
           }
         }]);
+        await new Promise(r => setTimeout(r, 1000));
       }
       if (!metricsR) {
         metricsR = await svc.createRoom('[Khora Metrics]', 'Anonymized metrics', [{
@@ -36690,6 +36704,7 @@ const ProviderApp = ({
             created: Date.now()
           }
         }]);
+        await new Promise(r => setTimeout(r, 1000));
       }
       if (!schema) {
         schema = await svc.createRoom('[Khora Schema]', 'Schema definitions', [{
@@ -36711,9 +36726,11 @@ const ProviderApp = ({
           id: 'transform_default',
           transforms: DEFAULT_TRANSFORMS
         }, 'default')]].flat();
-        for (let i = 0; i < allSeeds.length; i++) {
-          await allSeeds[i]();
-          if (i % 3 === 2) await new Promise(r => setTimeout(r, 200));
+        // Seed in parallel batches of 2 to stay under rate limits
+        for (let i = 0; i < allSeeds.length; i += 2) {
+          const batch = allSeeds.slice(i, i + 2);
+          await Promise.all(batch.map(fn => fn()));
+          if (i + 2 < allSeeds.length) await new Promise(r => setTimeout(r, 500));
         }
       }
       // Fallback: if metrics/schema not found by owner, check org metadata for linked room IDs

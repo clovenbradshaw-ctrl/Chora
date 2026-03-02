@@ -279,7 +279,7 @@ const KhoraAuth = {
       try {
         const dbs = await indexedDB.databases();
         for (const db of dbs) {
-          if (db.name && db.name !== KhoraEncryptedCache.DB_NAME && !db.name.includes('crypto')) {
+          if (db.name && db.name !== KhoraEncryptedCache.DB_NAME && !db.name.includes('crypto') && !db.name.startsWith('matrix-js-sdk')) {
             try { indexedDB.deleteDatabase(db.name); } catch {}
           }
         }
@@ -287,7 +287,7 @@ const KhoraAuth = {
         console.warn('IndexedDB purge:', e.message);
       }
     }
-    for (const name of ['amino', 'matrix-js-sdk:default', 'matrix-js-sdk:riot-web-sync', 'matrix-js-sdk:web-sync']) {
+    for (const name of ['amino']) {
       try { indexedDB.deleteDatabase(name); } catch {}
     }
   },

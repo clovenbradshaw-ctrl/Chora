@@ -69,10 +69,6 @@ const KhoraE2EE = {
         break;
       } catch (e) {
         console.warn(`E2EE crypto init attempt ${attempt + 1}/${this.MAX_INIT_RETRIES}:`, e.message);
-        // On second failure, try clearing a potentially corrupted crypto store
-        if (attempt === 1) {
-          try { indexedDB.deleteDatabase(this.CRYPTO_STORE_NAME); } catch {}
-        }
         if (attempt < this.MAX_INIT_RETRIES - 1) {
           await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
         }

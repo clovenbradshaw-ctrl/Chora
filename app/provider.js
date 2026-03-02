@@ -744,11 +744,11 @@ const ProviderApp = ({
           id: 'transform_default',
           transforms: DEFAULT_TRANSFORMS
         }, 'default')]].flat();
-        // Seed in parallel batches of 3 to stay under rate limits
-        for (let i = 0; i < allSeeds.length; i += 3) {
-          const batch = allSeeds.slice(i, i + 3);
+        // Seed in parallel batches of 2 to stay under rate limits
+        for (let i = 0; i < allSeeds.length; i += 2) {
+          const batch = allSeeds.slice(i, i + 2);
           await Promise.all(batch.map(fn => fn()));
-          if (i + 3 < allSeeds.length) await new Promise(r => setTimeout(r, 200));
+          if (i + 2 < allSeeds.length) await new Promise(r => setTimeout(r, 500));
         }
       }
       // Fallback: if metrics/schema not found by owner, check org metadata for linked room IDs
