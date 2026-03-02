@@ -250,16 +250,19 @@ const EditableCell = ({
   const safeValue = (value !== null && typeof value === 'object') ? (value.value != null ? String(value.value) : JSON.stringify(value)) : (value || '');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(safeValue);
+  const draftRef = useRef(safeValue);
   const inputRef = useRef(null);
   useEffect(() => {
+    draftRef.current = safeValue;
     setDraft(safeValue);
   }, [safeValue]);
   useEffect(() => {
     if (editing && inputRef.current) inputRef.current.focus();
   }, [editing]);
+  const updateDraft = val => { draftRef.current = val; setDraft(val); };
   const commit = () => {
     setEditing(false);
-    if (draft !== (value || '')) onSave && onSave(draft);
+    if (draftRef.current !== (value || '')) onSave && onSave(draftRef.current);
   };
   const startEdit = e => {
     e.stopPropagation();
@@ -272,17 +275,10 @@ const EditableCell = ({
         ref: inputRef,
         className: "dt-ecell-input",
         value: draft,
-        onChange: e => {
-          const newVal = e.target.value;
-          setDraft(newVal);
-          // Commit immediately — don't rely on onBlur closure which may
-          // hold a stale draft due to React batching.
-          setEditing(false);
-          if (newVal !== (value || '')) onSave && onSave(newVal);
-        },
+        onChange: e => { updateDraft(e.target.value); },
         onBlur: commit,
         onKeyDown: e => {
-          if (e.key === 'Escape') { setDraft(value || ''); setEditing(false); }
+          if (e.key === 'Escape') { updateDraft(value || ''); setEditing(false); }
         },
         onClick: e => e.stopPropagation(),
         style: { cursor: 'pointer' }
@@ -295,10 +291,10 @@ const EditableCell = ({
         ref: inputRef,
         className: "dt-ecell-input",
         value: draft,
-        onChange: e => setDraft(e.target.value),
+        onChange: e => updateDraft(e.target.value),
         onBlur: commit,
         onKeyDown: e => {
-          if (e.key === 'Escape') { setDraft(value || ''); setEditing(false); }
+          if (e.key === 'Escape') { updateDraft(value || ''); setEditing(false); }
         },
         onClick: e => e.stopPropagation(),
         rows: 3,
@@ -312,11 +308,11 @@ const EditableCell = ({
         className: "dt-ecell-input",
         type: "date",
         value: draft,
-        onChange: e => setDraft(e.target.value),
+        onChange: e => updateDraft(e.target.value),
         onBlur: commit,
         onKeyDown: e => {
           if (e.key === 'Enter') { e.preventDefault(); commit(); }
-          if (e.key === 'Escape') { setDraft(value || ''); setEditing(false); }
+          if (e.key === 'Escape') { updateDraft(value || ''); setEditing(false); }
         },
         onClick: e => e.stopPropagation()
       });
@@ -328,11 +324,11 @@ const EditableCell = ({
         className: "dt-ecell-input",
         type: "number",
         value: draft,
-        onChange: e => setDraft(e.target.value),
+        onChange: e => updateDraft(e.target.value),
         onBlur: commit,
         onKeyDown: e => {
           if (e.key === 'Enter') { e.preventDefault(); commit(); }
-          if (e.key === 'Escape') { setDraft(value || ''); setEditing(false); }
+          if (e.key === 'Escape') { updateDraft(value || ''); setEditing(false); }
         },
         onClick: e => e.stopPropagation()
       });
@@ -343,11 +339,11 @@ const EditableCell = ({
       className: "dt-ecell-input",
       type: type === 'email' ? 'email' : type === 'phone' ? 'tel' : 'text',
       value: draft,
-      onChange: e => setDraft(e.target.value),
+      onChange: e => updateDraft(e.target.value),
       onBlur: commit,
       onKeyDown: e => {
         if (e.key === 'Enter') { e.preventDefault(); commit(); }
-        if (e.key === 'Escape') { setDraft(value || ''); setEditing(false); }
+        if (e.key === 'Escape') { updateDraft(value || ''); setEditing(false); }
       },
       onClick: e => e.stopPropagation()
     });
