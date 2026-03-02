@@ -1385,21 +1385,18 @@ const ProviderApp = ({
               setCaseAssignments(updatedAssignments);
             }
             editApplied = true;
-            // Also update identity state for status field specifically
-            if (fieldKey === 'status') {
-              const updates = { ...row._clientRecord, status: newValue };
-              await svc.setState(row.id, EVT.IDENTITY, updates);
-              setClientRecords(prev => prev.map(r =>
-                r.roomId === row.id ? { ...r, status: newValue } : r
-              ));
-              editApplied = true;
-            }
+            // Also persist CRM fields to the client record's own identity state
+            const identityUpdates = { ...row._clientRecord, [fieldKey]: newValue };
+            await svc.setState(row.id, EVT.IDENTITY, identityUpdates);
+            setClientRecords(prev => prev.map(r =>
+              r.roomId === row.id ? { ...r, [fieldKey]: newValue } : r
+            ));
             // Update local UI state
             syncActiveIndividual(prev => ({
               ...prev,
               [fieldKey]: newValue,
               fields: { ...prev.fields, [fieldKey]: { ...(prev.fields?.[fieldKey] || {}), value: newValue, eo_op: oldValue ? 'ALT' : 'INS' } },
-              _clientRecord: fieldKey === 'status' ? { ...prev._clientRecord, status: newValue } : prev._clientRecord
+              _clientRecord: { ...prev._clientRecord, [fieldKey]: newValue }
             }));
           }
         }
