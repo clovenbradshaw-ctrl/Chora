@@ -272,7 +272,14 @@ const EditableCell = ({
         ref: inputRef,
         className: "dt-ecell-input",
         value: draft,
-        onChange: e => { setDraft(e.target.value); },
+        onChange: e => {
+          const newVal = e.target.value;
+          setDraft(newVal);
+          // Commit immediately — don't rely on onBlur closure which may
+          // hold a stale draft due to React batching.
+          setEditing(false);
+          if (newVal !== (value || '')) onSave && onSave(newVal);
+        },
         onBlur: commit,
         onKeyDown: e => {
           if (e.key === 'Escape') { setDraft(value || ''); setEditing(false); }
