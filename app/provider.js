@@ -709,6 +709,7 @@ const ProviderApp = ({
             cases: []
           }
         }]);
+        await new Promise(r => setTimeout(r, 1000));
       }
       if (!metricsR) {
         metricsR = await svc.createRoom('[Khora Metrics]', 'Anonymized metrics', [{
@@ -720,6 +721,7 @@ const ProviderApp = ({
             created: Date.now()
           }
         }]);
+        await new Promise(r => setTimeout(r, 1000));
       }
       if (!schema) {
         schema = await svc.createRoom('[Khora Schema]', 'Schema definitions', [{
@@ -743,7 +745,7 @@ const ProviderApp = ({
         }, 'default')]].flat();
         for (let i = 0; i < allSeeds.length; i++) {
           await allSeeds[i]();
-          if (i % 3 === 2) await new Promise(r => setTimeout(r, 200));
+          if (i % 2 === 1) await new Promise(r => setTimeout(r, 500));
         }
       }
       // Fallback: if metrics/schema not found by owner, check org metadata for linked room IDs
