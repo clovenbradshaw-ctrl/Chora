@@ -16,6 +16,20 @@
  * KhoraService delegates identity and client access to KhoraAuth via getters.
  * ═══════════════════════════════════════════════════════════ */
 class KhoraService {
+  // ── Global room-creation queue ──
+  // Matrix homeservers (especially matrix.org) aggressively rate-limit createRoom.
+  // Serializing all room creations through a single queue prevents concurrent
+  // requests from triggering 429 floods that cascade into retry storms.
+  _roomQueue = Promise.resolve();
+  _enqueueRoomCreation(fn) {
+    const task = this._roomQueue
+      .catch(() => {})                                      // don't let prior failures block the queue
+      .then(() => new Promise(r => setTimeout(r, 600)))     // breathing room between creations
+      .then(() => fn());
+    this._roomQueue = task.catch(() => {});                  // keep queue moving on failure
+    return task;
+  }
+
   // ── Delegation to KhoraAuth (backward-compatible interface) ──
   // All 254+ svc.userId references across the codebase continue working.
   get client() { return KhoraAuth.client; }
@@ -36,8 +50,10 @@ class KhoraService {
         const retryMs = e?.data?.retry_after_ms || e?.retry_after_ms;
         const httpStatus = e?.httpStatus || e?.statusCode || e?.status;
         if (httpStatus === 429 || e?.errcode === 'M_LIMIT_EXCEEDED' || msg.includes('too many') || msg.includes('rate') || msg.includes('limit') || retryMs) {
-          const wait = Math.min(retryMs || 2000 * Math.pow(2, attempt), 30000);
-          console.warn(`[KhoraService] Rate limited (attempt ${attempt + 1}/${maxAttempts}), waiting ${wait}ms`);
+          const base = retryMs || 2000 * Math.pow(2, attempt);
+          const jitter = Math.random() * 1000;               // jitter avoids thundering-herd retries
+          const wait = Math.min(base + jitter, 30000);
+          console.warn(`[KhoraService] Rate limited (attempt ${attempt + 1}/${maxAttempts}), waiting ${Math.round(wait)}ms`);
           await new Promise(r => setTimeout(r, wait));
           continue;
         }
@@ -62,7 +78,7 @@ class KhoraService {
       const r = await fetch(url, opts);
       if (r.status === 429) {
         const err = await r.json().catch(() => ({}));
-        const wait = Math.min(err.retry_after_ms || 2000 * Math.pow(2, attempt), 30000);
+        const wait = Math.min((err.retry_after_ms || 2000 * Math.pow(2, attempt)) + Math.random() * 1000, 30000);
         console.warn(`[KhoraService] API rate limited (attempt ${attempt + 1}/5), waiting ${wait}ms`);
         await new Promise(res => setTimeout(res, wait));
         continue;
@@ -78,78 +94,82 @@ class KhoraService {
 
   // INS(matrix.room, {e2ee, state}) — room_creation — Megolm encryption enabled by default
   async createRoom(name, topic, extraState = []) {
-    const initial_state = [{
-      type: 'm.room.encryption',
-      state_key: '',
-      content: {
-        algorithm: 'm.megolm.v1.aes-sha2'
+    return this._enqueueRoomCreation(async () => {
+      const initial_state = [{
+        type: 'm.room.encryption',
+        state_key: '',
+        content: {
+          algorithm: 'm.megolm.v1.aes-sha2'
+        }
+      }, ...extraState];
+      if (this.client) {
+        const r = await this._withRetry(() => this.client.createRoom({
+          name,
+          topic,
+          visibility: 'private',
+          preset: 'private_chat',
+          initial_state
+        }));
+        return r.room_id;
+      } else {
+        KhoraE2EE.requireEncryptedSend('create room');
       }
-    }, ...extraState];
-    if (this.client) {
-      const r = await this._withRetry(() => this.client.createRoom({
+    });
+  }
+
+  // INS(matrix.bridge_room, {power_levels}) — client_sovereign_creation — client PL 100, provider PL 50
+  async createClientRoom(name, topic, extraState = [], clientMatrixId = null) {
+    return this._enqueueRoomCreation(async () => {
+      const initial_state = [{
+        type: 'm.room.encryption',
+        state_key: '',
+        content: {
+          algorithm: 'm.megolm.v1.aes-sha2'
+        }
+      }, ...extraState];
+      const opts = {
         name,
         topic,
         visibility: 'private',
         preset: 'private_chat',
         initial_state
-      }));
-      return r.room_id;
-    } else {
-      KhoraE2EE.requireEncryptedSend('create room');
-    }
-  }
-
-  // INS(matrix.bridge_room, {power_levels}) — client_sovereign_creation — client PL 100, provider PL 50
-  async createClientRoom(name, topic, extraState = [], clientMatrixId = null) {
-    const initial_state = [{
-      type: 'm.room.encryption',
-      state_key: '',
-      content: {
-        algorithm: 'm.megolm.v1.aes-sha2'
-      }
-    }, ...extraState];
-    const opts = {
-      name,
-      topic,
-      visibility: 'private',
-      preset: 'private_chat',
-      initial_state
-    };
-    // If we know the client's Matrix ID, pre-set them as room admin (PL 100)
-    // Provider gets PL 50 — client can kick provider but not vice versa.
-    // We must explicitly set `events` to override the preset defaults (which require
-    // PL 100 for m.room.encryption etc.) — otherwise initial_state events fail
-    // because the provider only has PL 50.
-    if (clientMatrixId) {
-      opts.power_level_content_override = {
-        users: {
-          [this.userId]: 50,
-          [clientMatrixId]: 100
-        },
-        events_default: 0,
-        state_default: 50,
-        events: {
-          'm.room.power_levels': 100,
-          'm.room.tombstone': 100,
-          'm.room.server_acl': 100,
-          // Lock Khora bridge state events to client-only (PL 100)
-          // Prevents provider from overwriting bridge metadata or field references
-          [EVT.BRIDGE_META]: 100,
-          [EVT.BRIDGE_REFS]: 100,
-          [EVT.IDENTITY]: 100
-        },
-        kick: 50,
-        ban: 50,
-        invite: 50,
-        redact: 50
       };
-    }
-    if (this.client) {
-      const r = await this._withRetry(() => this.client.createRoom(opts));
-      return r.room_id;
-    } else {
-      KhoraE2EE.requireEncryptedSend('create room');
-    }
+      // If we know the client's Matrix ID, pre-set them as room admin (PL 100)
+      // Provider gets PL 50 — client can kick provider but not vice versa.
+      // We must explicitly set `events` to override the preset defaults (which require
+      // PL 100 for m.room.encryption etc.) — otherwise initial_state events fail
+      // because the provider only has PL 50.
+      if (clientMatrixId) {
+        opts.power_level_content_override = {
+          users: {
+            [this.userId]: 50,
+            [clientMatrixId]: 100
+          },
+          events_default: 0,
+          state_default: 50,
+          events: {
+            'm.room.power_levels': 100,
+            'm.room.tombstone': 100,
+            'm.room.server_acl': 100,
+            // Lock Khora bridge state events to client-only (PL 100)
+            // Prevents provider from overwriting bridge metadata or field references
+            [EVT.BRIDGE_META]: 100,
+            [EVT.BRIDGE_REFS]: 100,
+            [EVT.IDENTITY]: 100
+          },
+          kick: 50,
+          ban: 50,
+          invite: 50,
+          redact: 50
+        };
+      }
+      if (this.client) {
+        const r = await this._withRetry(() => this.client.createRoom(opts));
+        return r.room_id;
+      } else {
+        KhoraE2EE.requireEncryptedSend('create room');
+      }
+    });
   }
   async setPowerLevel(roomId, userId, level) {
     if (this.client) {

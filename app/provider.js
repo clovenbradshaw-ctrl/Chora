@@ -690,7 +690,7 @@ const ProviderApp = ({
       const selectedOrg = detectedOrgs.find(o => o.roomId === preferredOrgId) || detectedOrgs[0] || null;
       const detectedOrg = selectedOrg?.roomId || null;
       const detectedOrgRole = selectedOrg?.role || null;
-      // Create missing rooms in parallel to avoid sequential round-trips
+      // Create missing rooms (serialized by KhoraService queue to avoid 429 rate-limit floods)
       const roomCreations = [];
       if (!roster) {
         roomCreations.push(svc.createRoom('[Khora Roster]', 'Provider case index', [{
