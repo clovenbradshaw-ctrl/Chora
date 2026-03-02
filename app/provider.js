@@ -1885,21 +1885,44 @@ const ProviderApp = ({
   // ─── Client record management ───
   const handleCreateClientRecord = async () => {
     if (!newClientName.trim()) return;
+    const draftName = newClientName.trim();
+    const draftClientId = newClientMatrixId.trim() || null;
+    const draftNotes = newClientNotes || undefined;
+    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const optimisticRecord = {
+      roomId: optimisticId,
+      client_name: draftName,
+      client_matrix_id: draftClientId,
+      notes: draftNotes,
+      owner: svc.userId,
+      created: Date.now(),
+      status: draftClientId ? 'invited' : 'created',
+      team_id: activeTeamContext || null,
+      team_name: activeTeamObj?.name || null,
+      sync_status: 'syncing',
+      retry_draft: {
+        name: draftName,
+        client_matrix_id: draftClientId,
+        notes: draftNotes
+      }
+    };
+    setClientRecords(prev => [...prev, optimisticRecord]);
+    showToast('Creating record… saved locally, syncing now', 'info');
     try {
-      const clientId = newClientMatrixId.trim() || null;
+      const clientId = draftClientId;
       const identityBase = {
         account_type: 'client_record',
         owner: svc.userId,
         created: Date.now(),
-        client_name: newClientName,
+        client_name: draftName,
         client_matrix_id: clientId,
-        notes: newClientNotes || undefined,
+        notes: draftNotes,
         status: 'created',
         // Explicit team association — enables direct filtering without room-membership indirection
         team_id: activeTeamContext || null,
         team_name: activeTeamObj?.name || null
       };
-      const roomId = await svc.createClientRoom(`[Client] ${newClientName}`, `${T.client_term} record for ${newClientName}`, [{
+      const roomId = await svc.createClientRoom(`[Client] ${draftName}`, `${T.client_term} record for ${draftName}`, [{
         type: EVT.IDENTITY,
         state_key: '',
         content: identityBase
@@ -1916,7 +1939,7 @@ const ProviderApp = ({
           console.warn('Invite failed:', e.message);
         }
       }
-      await emitOp(roomId, 'DES', dot('org', 'client_record', newClientName), {
+      await emitOp(roomId, 'DES', dot('org', 'client_record', draftName), {
         created_by: svc.userId,
         client_id: clientId || undefined,
         status: clientId ? 'invited' : 'created',
@@ -1944,22 +1967,23 @@ const ProviderApp = ({
       }
       const newRecord = {
         roomId,
-        client_name: newClientName,
+        client_name: draftName,
         client_matrix_id: clientId,
-        notes: newClientNotes || undefined,
+        notes: draftNotes,
         owner: svc.userId,
         created: Date.now(),
         status: clientId ? 'invited' : 'created',
         team_id: activeTeamContext || null,
-        team_name: activeTeamObj?.name || null
+        team_name: activeTeamObj?.name || null,
+        sync_status: 'synced'
       };
-      setClientRecords(prev => [...prev, newRecord]);
+      setClientRecords(prev => prev.map(r => (r.roomId === optimisticId ? newRecord : r)));
       setCreateClientModal(false);
       // Emit EO event to track individual creation
       try {
-        await emitOp(roomId, 'INS', dot('org', 'individuals', newClientName), {
-          designation: newClientName,
-          client_name: newClientName,
+        await emitOp(roomId, 'INS', dot('org', 'individuals', draftName), {
+          designation: draftName,
+          client_name: draftName,
           client_matrix_id: clientId || undefined,
           edit_source: 'client_creation'
         }, {
@@ -1973,31 +1997,53 @@ const ProviderApp = ({
       setNewClientName('');
       setNewClientMatrixId('');
       setNewClientNotes('');
-      showToast(`${T.client_term} "${newClientName}" created${clientId ? ' — invite sent' : ''}`, 'success');
+      showToast('Record synced successfully', 'success');
     } catch (e) {
-      showToast('Failed: ' + e.message, 'error');
+      setClientRecords(prev => prev.map(r => (r.roomId === optimisticId ? { ...r, sync_status: 'error' } : r)));
+      showToast('Could not sync record. Retrying view…', 'error');
+      await loadCases();
     }
   };
   // Quick-add individual: creates a client record with just a name (no modal)
   const handleQuickAddIndividual = async (name) => {
     if (!name || !name.trim()) return;
+    const draftName = name.trim();
+    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const optimisticRecord = {
+      roomId: optimisticId,
+      client_name: draftName,
+      client_matrix_id: null,
+      owner: svc.userId,
+      created: Date.now(),
+      status: 'created',
+      team_id: activeTeamContext || null,
+      team_name: activeTeamObj?.name || null,
+      sync_status: 'syncing',
+      retry_draft: {
+        name: draftName,
+        client_matrix_id: null,
+        notes: undefined
+      }
+    };
+    setClientRecords(prev => [...prev, optimisticRecord]);
+    showToast('Creating record… saved locally, syncing now', 'info');
     try {
       const identityBase = {
         account_type: 'client_record',
         owner: svc.userId,
         created: Date.now(),
-        client_name: name,
+        client_name: draftName,
         client_matrix_id: null,
         status: 'created',
         team_id: activeTeamContext || null,
         team_name: activeTeamObj?.name || null
       };
-      const roomId = await svc.createClientRoom(`[Client] ${name}`, `${T.client_term} record for ${name}`, [{
+      const roomId = await svc.createClientRoom(`[Client] ${draftName}`, `${T.client_term} record for ${draftName}`, [{
         type: EVT.IDENTITY,
         state_key: '',
         content: identityBase
       }], null);
-      await emitOp(roomId, 'DES', dot('org', 'client_record', name), {
+      await emitOp(roomId, 'DES', dot('org', 'client_record', draftName), {
         created_by: svc.userId,
         status: 'created',
         team_id: activeTeamContext || undefined
@@ -2014,25 +2060,28 @@ const ProviderApp = ({
       }
       const newRecord = {
         roomId,
-        client_name: name,
+        client_name: draftName,
         client_matrix_id: null,
         owner: svc.userId,
         created: Date.now(),
         status: 'created',
         team_id: activeTeamContext || null,
-        team_name: activeTeamObj?.name || null
+        team_name: activeTeamObj?.name || null,
+        sync_status: 'synced'
       };
-      setClientRecords(prev => [...prev, newRecord]);
+      setClientRecords(prev => prev.map(r => (r.roomId === optimisticId ? newRecord : r)));
       try {
-        await emitOp(roomId, 'INS', dot('org', 'individuals', name), {
-          designation: name,
-          client_name: name,
+        await emitOp(roomId, 'INS', dot('org', 'individuals', draftName), {
+          designation: draftName,
+          client_name: draftName,
           edit_source: 'quick_add'
         }, { type: 'org', epistemic: 'MEANT', role: orgRole || 'provider' });
       } catch (e) { console.warn('Quick-add event tracking failed:', e.message); }
-      showToast(`${T.client_term} "${name}" added`, 'success');
+      showToast('Record synced successfully', 'success');
     } catch (e) {
-      showToast('Failed: ' + e.message, 'error');
+      setClientRecords(prev => prev.map(r => (r.roomId === optimisticId ? { ...r, sync_status: 'error' } : r)));
+      showToast('Could not sync record. Retrying view…', 'error');
+      await loadCases();
     }
   };
 
