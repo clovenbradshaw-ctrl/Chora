@@ -1195,6 +1195,9 @@ table.dt td.dt-drag-handle:active{cursor:grabbing}
 /* ═══ Inline add row ═══ */
 .dt-add-row{padding:8px 12px;color:var(--tx-3);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;border-top:1px dashed var(--border-0);transition:all .15s}
 .dt-add-row:hover{background:var(--gold-dim);color:var(--gold)}
+.dt-quick-add{background:var(--bg-2);border-top:1px solid var(--teal);cursor:default}
+.dt-quick-add:hover{background:var(--bg-2);color:var(--tx-0)}
+.dt-quick-add-input::placeholder{color:var(--tx-3);opacity:.7}
 /* ═══ Notes ═══ */
 .note-card{padding:14px 16px;border-radius:var(--r-lg);border:1px solid var(--border-0);background:var(--bg-1);margin-bottom:8px;transition:border-color .15s;cursor:pointer}
 .note-card:hover{border-color:var(--gold)}
@@ -22487,9 +22490,11 @@ const ClientApp = ({
           id: 'transform_default',
           transforms: DEFAULT_TRANSFORMS
         }, 'default')]].flat();
-        for (let i = 0; i < allSeeds.length; i++) {
-          await allSeeds[i]();
-          if (i % 2 === 1) await new Promise(r => setTimeout(r, 500));
+        // Seed in parallel batches of 2 to stay under rate limits
+        for (let i = 0; i < allSeeds.length; i += 2) {
+          const batch = allSeeds.slice(i, i + 2);
+          await Promise.all(batch.map(fn => fn()));
+          if (i + 2 < allSeeds.length) await new Promise(r => setTimeout(r, 500));
         }
       }
       setVaultRoom(vault);
@@ -36721,9 +36726,11 @@ const ProviderApp = ({
           id: 'transform_default',
           transforms: DEFAULT_TRANSFORMS
         }, 'default')]].flat();
-        for (let i = 0; i < allSeeds.length; i++) {
-          await allSeeds[i]();
-          if (i % 2 === 1) await new Promise(r => setTimeout(r, 500));
+        // Seed in parallel batches of 2 to stay under rate limits
+        for (let i = 0; i < allSeeds.length; i += 2) {
+          const batch = allSeeds.slice(i, i + 2);
+          await Promise.all(batch.map(fn => fn()));
+          if (i + 2 < allSeeds.length) await new Promise(r => setTimeout(r, 500));
         }
       }
       // Fallback: if metrics/schema not found by owner, check org metadata for linked room IDs
