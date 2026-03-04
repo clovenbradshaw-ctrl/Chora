@@ -292,6 +292,16 @@ class KhoraService {
       } else {
         await this._api('PUT', `/rooms/${encodeURIComponent(roomId)}/state/${type}/${sk}`, content);
       }
+      // Keep encrypted cache in sync so page refreshes show latest data
+      // without waiting for the next full scanRooms() call.
+      try {
+        const cached = await KhoraEncryptedCache.get('rooms', 'scan_result');
+        if (cached?.data) {
+          if (!cached.data[roomId]) cached.data[roomId] = {};
+          cached.data[roomId][type] = content;
+          await KhoraEncryptedCache.put('rooms', 'scan_result', { data: cached.data, ts: Date.now() });
+        }
+      } catch {}
     });
   }
 
