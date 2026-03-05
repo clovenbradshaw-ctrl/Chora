@@ -1354,34 +1354,19 @@ const DEFAULT_INDIVIDUAL_TABLE_SCHEMA = {
   rollup_to_parent: false,
   status: 'active',
   columns: [
-    // ── Case Management ─────────────────────────────────────────────────────
-    { key: 'intake_date',        label: 'Intake Date',            data_type: 'date',          required: true,  sensitive: false, description: 'Date first enrolled or encountered.' },
-    { key: 'status',             label: 'Case Status',            data_type: 'single_select', required: true,  sensitive: false, description: 'Current status of this individual\'s case.', options: ['active', 'pending', 'inactive', 'closed', 'waitlist'] },
-    { key: 'assigned_to',        label: 'Assigned Case Manager',  data_type: 'text',          required: false, sensitive: false, description: 'Name or user ID of the primary case manager.' },
-    { key: 'referral_source',    label: 'Referral Source',        data_type: 'text',          required: false, sensitive: false, description: 'How or by whom this individual was referred.' },
-    { key: 'priority',           label: 'Priority',               data_type: 'single_select', required: false, sensitive: false, description: 'Urgency level for this individual\'s case.', options: ['urgent', 'high', 'medium', 'low'] },
-    { key: 'program',            label: 'Program / Service',      data_type: 'text',          required: false, sensitive: false, description: 'Program or service this individual is enrolled in.' },
-    // ── Demographics ─────────────────────────────────────────────────────────
-    { key: 'gender_identity',    label: 'Gender Identity',        data_type: 'text',          required: false, sensitive: true,  description: 'How this individual describes their gender.' },
-    { key: 'race_ethnicity',     label: 'Race / Ethnicity',       data_type: 'multi_select',  required: false, sensitive: true,  description: 'Race and/or ethnicity (select all that apply).', options: ['American Indian or Alaska Native', 'Asian', 'Black or African American', 'Hispanic or Latino', 'Native Hawaiian or Pacific Islander', 'White', 'Multiracial', 'Other', 'Unknown', 'Prefer not to say'] },
-    { key: 'veteran_status',     label: 'Veteran Status',         data_type: 'single_select', required: false, sensitive: false, description: 'U.S. military veteran status.', options: ['Yes', 'No', 'Unknown'] },
-    { key: 'household_size',     label: 'Household Size',         data_type: 'number',        required: false, sensitive: false, description: 'Total number of people in the household including children.' },
-    { key: 'disability',         label: 'Disability Status',      data_type: 'multi_select',  required: false, sensitive: true,  description: 'Disability type(s), if any (select all that apply).', options: ['Physical', 'Cognitive', 'Mental Health', 'Substance Use Disorder', 'Chronic Health Condition', 'None', 'Unknown', 'Prefer not to say'] },
-    { key: 'income_source',      label: 'Primary Income Source',  data_type: 'multi_select',  required: false, sensitive: false, description: 'Source(s) of income (select all that apply).', options: ['Employment', 'SSI', 'SSDI', 'TANF', 'General Assistance', 'VA Benefits', 'Child Support', 'No Income', 'Other', 'Unknown'] },
-    // ── Housing Status (HUD/CoC required) ──────────────────────────────────
-    { key: 'housing_status',     label: 'Housing Status',         data_type: 'single_select', required: false, sensitive: false, description: 'Current living / housing situation.', options: ['Unsheltered', 'Emergency Shelter', 'Safe Haven', 'Transitional Housing', 'Doubled Up', 'Hotel or Motel', 'Permanent Housing', 'Unknown'] },
-    { key: 'chronic_homeless',   label: 'Chronic Homelessness',   data_type: 'single_select', required: false, sensitive: false, description: 'Meets HUD definition of chronic homelessness (12+ months or 4+ episodes in 3 years).', options: ['Yes', 'No', 'Unknown'] },
-    { key: 'living_situation',   label: 'Living Situation Detail',data_type: 'text',          required: false, sensitive: false, description: 'Free-text description of where the individual is currently staying.' },
-    // ── Case Tracking ───────────────────────────────────────────────────────
-    { key: 'presenting_situation', label: 'Presenting Situation', data_type: 'text_long',     required: false, sensitive: false, description: 'Why this individual is seeking services; what brought them in.' },
-    { key: 'goals',              label: 'Goals',                  data_type: 'text_long',     required: false, sensitive: false, description: 'What this individual wants to achieve.' },
-    { key: 'barriers',          label: 'Barriers',               data_type: 'text_long',     required: false, sensitive: false, description: 'What is getting in the way of progress.' },
-    { key: 'last_contact_date', label: 'Last Contact Date',      data_type: 'date',          required: false, sensitive: false, description: 'Date of the most recent interaction.' },
-    { key: 'next_appointment',  label: 'Next Appointment',       data_type: 'date',          required: false, sensitive: false, description: 'Date of next scheduled interaction.' },
-    // ── Exit & Outcome ──────────────────────────────────────────────────────
-    { key: 'exit_date',         label: 'Exit Date',              data_type: 'date',          required: false, sensitive: false, description: 'Date this individual exited the program or was closed.' },
-    { key: 'exit_destination',  label: 'Exit Destination',       data_type: 'single_select', required: false, sensitive: false, description: 'Where this individual went upon exit.', options: ['Permanent Housing', 'Transitional Housing', 'Family or Friends', 'Emergency Shelter', 'Another Provider', 'Institutional Setting', 'No Contact / Left', 'Deceased', 'Unknown', 'Other'] },
-    { key: 'outcome',           label: 'Outcome Notes',          data_type: 'text_long',     required: false, sensitive: false, description: 'Summary of outcomes achieved at case closure.' }
+    // ── Identity (vault) ────────────────────────────────────────────────────
+    { key: 'full_name',          label: 'Full Name',              data_type: 'text',          required: true,  sensitive: false, description: 'Full name of the individual.' },
+    { key: 'dob',                label: 'Date of Birth',          data_type: 'date',          required: false, sensitive: true,  description: 'Date of birth.' },
+    { key: 'id_number',          label: 'ID Number',              data_type: 'text',          required: false, sensitive: true,  description: 'Government or program ID number.' },
+    // ── Contact (vault) ─────────────────────────────────────────────────────
+    { key: 'email',              label: 'Email',                  data_type: 'email',         required: false, sensitive: false, description: 'Email address.' },
+    { key: 'phone',              label: 'Phone',                  data_type: 'phone',         required: false, sensitive: false, description: 'Phone number.' },
+    { key: 'address',            label: 'Address',                data_type: 'text',          required: false, sensitive: true,  description: 'Physical address.' },
+    { key: 'fhir_emergency_contact', label: 'Emergency Contact',  data_type: 'text',          required: false, sensitive: true,  description: 'Emergency contact information.' },
+    // ── Details (vault) ─────────────────────────────────────────────────────
+    { key: 'affiliation',        label: 'Organization / Affiliation', data_type: 'text',      required: false, sensitive: false, description: 'Organization or affiliation.' },
+    { key: 'case_notes',         label: 'Case Notes',             data_type: 'text_long',     required: false, sensitive: false, description: 'General case notes.' },
+    { key: 'documents',          label: 'Documents',              data_type: 'text',          required: false, sensitive: true,  description: 'Document references.' }
   ]
 };
 

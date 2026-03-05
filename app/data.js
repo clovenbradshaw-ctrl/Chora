@@ -179,14 +179,6 @@ const dtFmtDate = iso => {
  * their data types, options, and sensitivity markers.
  * ════════════════════════════════════════════════════════════════ */
 const CRM_PROFILE_SECTIONS = [
-  { id: 'case_management', label: 'Case Management', icon: 'briefcase', color: 'gold', fields: [
-    { key: 'intake_date', label: 'Intake Date', data_type: 'date', source: 'crm', required: true },
-    { key: 'status', label: 'Case Status', data_type: 'single_select', source: 'crm', required: true, options: ['active', 'pending', 'inactive', 'closed', 'waitlist'] },
-    { key: 'assigned_to', label: 'Assigned Case Manager', data_type: 'text', source: 'crm' },
-    { key: 'referral_source', label: 'Referral Source', data_type: 'text', source: 'crm' },
-    { key: 'priority', label: 'Priority', data_type: 'single_select', source: 'crm', options: ['urgent', 'high', 'medium', 'low'] },
-    { key: 'program', label: 'Program / Service', data_type: 'text', source: 'crm' },
-  ]},
   { id: 'identity', label: 'Identity', icon: 'user', color: 'blue', fields: [
     { key: 'full_name', label: 'Full Name', data_type: 'text', source: 'vault' },
     { key: 'dob', label: 'Date of Birth', data_type: 'date', source: 'vault', sensitive: true },
@@ -197,31 +189,6 @@ const CRM_PROFILE_SECTIONS = [
     { key: 'phone', label: 'Phone', data_type: 'phone', source: 'vault' },
     { key: 'address', label: 'Address', data_type: 'text', source: 'vault', sensitive: true },
     { key: 'fhir_emergency_contact', label: 'Emergency Contact', data_type: 'text', source: 'vault', sensitive: true },
-  ]},
-  { id: 'demographics', label: 'Demographics', icon: 'users', color: 'purple', fields: [
-    { key: 'gender_identity', label: 'Gender Identity', data_type: 'text', source: 'crm', sensitive: true },
-    { key: 'race_ethnicity', label: 'Race / Ethnicity', data_type: 'multi_select', source: 'crm', sensitive: true, options: ['American Indian or Alaska Native', 'Asian', 'Black or African American', 'Hispanic or Latino', 'Native Hawaiian or Pacific Islander', 'White', 'Multiracial', 'Other', 'Unknown', 'Prefer not to say'] },
-    { key: 'veteran_status', label: 'Veteran Status', data_type: 'single_select', source: 'crm', options: ['Yes', 'No', 'Unknown'] },
-    { key: 'household_size', label: 'Household Size', data_type: 'number', source: 'crm' },
-    { key: 'disability', label: 'Disability Status', data_type: 'multi_select', source: 'crm', sensitive: true, options: ['Physical', 'Cognitive', 'Mental Health', 'Substance Use Disorder', 'Chronic Health Condition', 'None', 'Unknown', 'Prefer not to say'] },
-    { key: 'income_source', label: 'Primary Income Source', data_type: 'multi_select', source: 'crm', options: ['Employment', 'SSI', 'SSDI', 'TANF', 'General Assistance', 'VA Benefits', 'Child Support', 'No Income', 'Other', 'Unknown'] },
-  ]},
-  { id: 'housing', label: 'Housing', icon: 'globe', color: 'orange', fields: [
-    { key: 'housing_status', label: 'Housing Status', data_type: 'single_select', source: 'crm', options: ['Unsheltered', 'Emergency Shelter', 'Safe Haven', 'Transitional Housing', 'Doubled Up', 'Hotel or Motel', 'Permanent Housing', 'Unknown'] },
-    { key: 'chronic_homeless', label: 'Chronic Homelessness', data_type: 'single_select', source: 'crm', options: ['Yes', 'No', 'Unknown'] },
-    { key: 'living_situation', label: 'Living Situation Detail', data_type: 'text', source: 'crm' },
-  ]},
-  { id: 'case_tracking', label: 'Case Tracking', icon: 'layers', color: 'teal', fields: [
-    { key: 'presenting_situation', label: 'Presenting Situation', data_type: 'text_long', source: 'crm' },
-    { key: 'goals', label: 'Goals', data_type: 'text_long', source: 'crm' },
-    { key: 'barriers', label: 'Barriers', data_type: 'text_long', source: 'crm' },
-    { key: 'last_contact_date', label: 'Last Contact Date', data_type: 'date', source: 'crm' },
-    { key: 'next_appointment', label: 'Next Appointment', data_type: 'date', source: 'crm' },
-  ]},
-  { id: 'exit_outcome', label: 'Exit & Outcome', icon: 'flag', color: 'green', fields: [
-    { key: 'exit_date', label: 'Exit Date', data_type: 'date', source: 'crm' },
-    { key: 'exit_destination', label: 'Exit Destination', data_type: 'single_select', source: 'crm', options: ['Permanent Housing', 'Transitional Housing', 'Family or Friends', 'Emergency Shelter', 'Another Provider', 'Institutional Setting', 'No Contact / Left', 'Deceased', 'Unknown', 'Other'] },
-    { key: 'outcome', label: 'Outcome Notes', data_type: 'text_long', source: 'crm' },
   ]},
   { id: 'details', label: 'Details', icon: 'folder', color: 'gold', fields: [
     { key: 'affiliation', label: 'Organization / Affiliation', data_type: 'text', source: 'vault' },
