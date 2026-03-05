@@ -37424,12 +37424,73 @@ const ProviderApp = ({
     if (newValue === oldValue) return;
     // Normalize: profile page sends 'full_name', table sends 'name'
     const isNameField = fieldKey === 'name' || fieldKey === 'full_name';
-    // Debounce: clear existing timer for this row+field, set a new one
+    const roomId = row.bridgeRoom || row.id;
+
+    // ── Optimistic local state update (immediate, before debounce/network) ──
+    const syncActiveIndividual = (updater) => {
+      setActiveIndividual(prev => {
+        if (!prev || (prev.bridgeRoom || prev.id) !== roomId) return prev;
+        return updater(prev);
+      });
+    };
+    if (row._case) {
+      if (isNameField) {
+        setCases(prev => prev.map(c =>
+          c.bridgeRoomId === roomId
+            ? { ...c, sharedData: { ...c.sharedData, full_name: newValue } }
+            : c
+        ));
+        syncActiveIndividual(prev => ({
+          ...prev,
+          name: newValue,
+          _case: { ...prev._case, sharedData: { ...prev._case.sharedData, full_name: newValue } }
+        }));
+      } else if (fieldKey === 'status') {
+        setCases(prev => prev.map(c =>
+          c.bridgeRoomId === roomId
+            ? { ...c, meta: { ...c.meta, status: newValue } }
+            : c
+        ));
+        syncActiveIndividual(prev => ({
+          ...prev,
+          status: newValue,
+          _case: prev._case ? { ...prev._case, meta: { ...prev._case.meta, status: newValue } } : prev._case
+        }));
+      } else if (fieldKey === 'priority') {
+        syncActiveIndividual(prev => ({
+          ...prev,
+          priority: newValue
+        }));
+      } else {
+        setCases(prev => prev.map(c =>
+          c.bridgeRoomId === roomId
+            ? { ...c, sharedData: { ...c.sharedData, [fieldKey]: newValue } }
+            : c
+        ));
+        syncActiveIndividual(prev => ({
+          ...prev,
+          fields: { ...prev.fields, [fieldKey]: { ...(prev.fields?.[fieldKey] || {}), value: newValue, eo_op: oldValue ? 'ALT' : 'INS' } },
+          _case: prev._case ? { ...prev._case, sharedData: { ...prev._case.sharedData, [fieldKey]: newValue } } : prev._case
+        }));
+      }
+    } else if (row._clientRecord) {
+      syncActiveIndividual(prev => ({
+        ...prev,
+        name: isNameField ? newValue : prev.name,
+        _clientRecord: { ...prev._clientRecord, ...(isNameField ? { client_name: newValue } : {}) }
+      }));
+      setClientRecords(prev => prev.map(r =>
+        r.roomId === row.id
+          ? { ...r, ...(isNameField ? { client_name: newValue } : {}) }
+          : r
+      ));
+    }
+
+    // ── Debounced network persistence ──
     const timerKey = row.id + ':' + fieldKey;
     if (cellEditTimerRef.current[timerKey]) clearTimeout(cellEditTimerRef.current[timerKey]);
     cellEditTimerRef.current[timerKey] = setTimeout(async () => {
       try {
-        const roomId = row.bridgeRoom || row.id;
         // Emit EO operation to track the edit
         await emitOp(roomId, oldValue ? 'ALT' : 'INS', dot('org', 'individuals', fieldKey), {
           from: oldValue || undefined,
@@ -37440,13 +37501,6 @@ const ProviderApp = ({
           epistemic: 'MEANT',
           role: orgRole || 'provider'
         });
-        // Helper: update activeIndividual if it matches this row
-        const syncActiveIndividual = (updater) => {
-          setActiveIndividual(prev => {
-            if (!prev || (prev.bridgeRoom || prev.id) !== roomId) return prev;
-            return updater(prev);
-          });
-        };
         // Persist the edit to Matrix state
         if (row._case) {
           if (isNameField) {
@@ -37459,17 +37513,6 @@ const ProviderApp = ({
             await svc.setState(roomId, EVT.BRIDGE_REFS, {
               fields: updatedData
             });
-            // Update local cases state so UI reflects the change
-            setCases(prev => prev.map(c =>
-              c.bridgeRoomId === roomId
-                ? { ...c, sharedData: { ...c.sharedData, full_name: newValue } }
-                : c
-            ));
-            syncActiveIndividual(prev => ({
-              ...prev,
-              name: newValue,
-              _case: { ...prev._case, sharedData: { ...prev._case.sharedData, full_name: newValue } }
-            }));
             // Update client_name in ROSTER_ASSIGN for org room
             if (orgRoom && caseAssignmentsRef.current[roomId]) {
               const updatedAssignments = {
@@ -37485,7 +37528,7 @@ const ProviderApp = ({
               setCaseAssignments(updatedAssignments);
             }
           } else if (fieldKey === 'status') {
-            // Update status in ROSTER_ASSIGN and local state
+            // Update status in ROSTER_ASSIGN
             if (orgRoom && caseAssignmentsRef.current[roomId]) {
               const updatedAssignments = {
                 ...caseAssignmentsRef.current
@@ -37499,16 +37542,6 @@ const ProviderApp = ({
               });
               setCaseAssignments(updatedAssignments);
             }
-            setCases(prev => prev.map(c =>
-              c.bridgeRoomId === roomId
-                ? { ...c, meta: { ...c.meta, status: newValue } }
-                : c
-            ));
-            syncActiveIndividual(prev => ({
-              ...prev,
-              status: newValue,
-              _case: prev._case ? { ...prev._case, meta: { ...prev._case.meta, status: newValue } } : prev._case
-            }));
           } else if (fieldKey === 'priority') {
             // Update priority in ROSTER_ASSIGN
             if (orgRoom && caseAssignmentsRef.current[roomId]) {
@@ -37524,10 +37557,6 @@ const ProviderApp = ({
               });
               setCaseAssignments(updatedAssignments);
             }
-            syncActiveIndividual(prev => ({
-              ...prev,
-              priority: newValue
-            }));
           } else {
             // Dynamic field — update shared data in bridge
             const freshRefs = (await svc.getState(roomId, EVT.BRIDGE_REFS))?.fields || row._case.sharedData || {};
@@ -37538,31 +37567,15 @@ const ProviderApp = ({
             await svc.setState(roomId, EVT.BRIDGE_REFS, {
               fields: updatedData
             });
-            // Update local cases state so UI reflects the change
-            setCases(prev => prev.map(c =>
-              c.bridgeRoomId === roomId
-                ? { ...c, sharedData: { ...c.sharedData, [fieldKey]: newValue } }
-                : c
-            ));
-            syncActiveIndividual(prev => ({
-              ...prev,
-              fields: { ...prev.fields, [fieldKey]: { ...(prev.fields?.[fieldKey] || {}), value: newValue, eo_op: oldValue ? 'ALT' : 'INS' } },
-              _case: prev._case ? { ...prev._case, sharedData: { ...prev._case.sharedData, [fieldKey]: newValue } } : prev._case
-            }));
           }
         } else if (row._clientRecord) {
-          // Client record rows — update identity state
+          // Client record rows — persist to identity state
           const fresh = await svc.getState(row.id, EVT.IDENTITY) || row._clientRecord || {};
           const updates = {
             ...fresh
           };
           if (isNameField) updates.client_name = newValue;
           await svc.setState(row.id, EVT.IDENTITY, updates);
-          syncActiveIndividual(prev => ({
-            ...prev,
-            name: isNameField ? newValue : prev.name,
-            _clientRecord: updates
-          }));
         }
       } catch (e) {
         console.warn('Cell edit event failed:', e.message);

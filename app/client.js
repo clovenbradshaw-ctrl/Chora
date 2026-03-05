@@ -1592,14 +1592,23 @@ const ClientApp = ({
       custom_field_defs: c, enabled_frameworks: e, ...meta
     }));
 
-    await Promise.all(writes);
-
-    // 5. Update local React state
+    // 5. Update local React state immediately (optimistic — don't wait for network)
     setVaultData(f);
     setObservations(o);
     setMetricsConsent(m);
     setCustomFieldDefs(c);
     setEnabledFrameworks(e);
+
+    await Promise.all(writes);
+
+    // 6. Update local cache so navigating away/back shows fresh data
+    svc.cacheViewData('client', {
+      vaultRoom, schemaRoom,
+      vaultData: f,
+      observations: o,
+      providers,
+      myTeams
+    }).catch(() => {});
   };
   const saveProviderIndex = async provs => {
     await svc.setState(vaultRoom, EVT.VAULT_PROVIDERS, {
